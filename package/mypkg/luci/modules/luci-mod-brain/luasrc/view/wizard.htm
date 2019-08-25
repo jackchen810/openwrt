@@ -1,0 +1,961 @@
+<%
+    local OEM = require "ktapi.oem"
+
+    include("top")
+%>
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/wizard/reset.css">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/wizard/wizard.css">
+    <script type="text/javascript" src="<%=resource%>/js/jquery.toggle-password.js"></script>
+<div class="wizard-main">
+    <form id="msform">
+        <h3 class="leader-tit">设置向导</h3>
+        <!-- progressbar -->
+        <ul id="progressbar">
+            <li class="active">上网设置</li>
+            <li>51盒子设置</li>
+            <li>打印机设置</li>
+        </ul>
+        <!-- fieldsets -->
+        <fieldset>
+            <h3 class="fs-subtitle">请按您的上网方式完成以下设置</h3>
+
+            <div class="select_tie  clearfix">
+                <div class="item">
+                    <label class="outset-label">连网类型</label>
+
+                    <div class="select-overlay" id="disableSelectConnType" style="display:none;"></div>
+                    <div id="divselect" class="divselect">
+                        <span class="label">自动获取(DHCP)</span>
+                        <ul class="list">
+                            <li><a href="javascript:;" data-proto="pppoe" selectid="1" data-panel="mima">宽带拨号(PPPOE)</a></li>
+                            <li><a href="javascript:;" data-proto="dhcp" selectid="2" data-panel="select-panel">自动获取(DHCP)</a></li>
+                            <li><a href="javascript:;" data-proto="static" selectid="3" data-panel="jingtai_yincang">手动设置(静态IP)</a></li>
+                            <li><a href="javascript:;" data-proto="relay" selectid="4" data-panel="zhongji">无线中继</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="mima net-panel">
+                    <div class="select-panel clearfix">
+                        <label class="outset-label" for="netUser">宽带账号</label>
+                        <span class="lianwang-holder">请输入宽带账号</span>
+                        <input type="text" id="netUser" class="comn-input g">
+                    </div>
+                    <div class="select-panel">
+                        <label class="outset-label" for="netUser">宽带密码</label>
+                        <span class="lianwang-holder">请输入宽带密码</span>
+                        <input type="password" id="netPass" class="comn-input g">
+                    </div>
+                </div>
+                <div class="jingtai_yincang net-panel ">
+                    <div class="select-panel clearfix">
+                        <label class="outset-labelme outset-labelme_d" for="netUser">IP地址</label>
+                        <span class="lianwang-holder">请输入IP地址</span>
+                        <input type="text" id="ipaddr" class="comn-input g">
+                    </div>
+                    <div class="select-panel clearfix">
+                        <label class="outset-label" for="netUser">子网掩码</label>
+                        <span class="lianwang-holder">请输入子网掩码</span>
+                        <input type="text" id="netCKMask" class="comn-input g">
+                    </div>
+                    <div class="select-panel clearfix">
+                        <label class="outset-label" for="netUser">默认网关</label>
+                        <span class="lianwang-holder">请输入默认网关</span>
+                        <input type="text" id="netGateWay" class="comn-input g">
+                    </div>
+                </div>
+                <!-- 无线中继 -->
+                <div class="zhongji net-panel">
+                    <div class="select-panel clearfix" style="/*overflow:hidden;*/">
+                        <label class="outset-label">无线名称</label>
+                        <div style="float:left;">
+                            <div class="scan-now" style="display: block;">
+                                <div class="wire-name">
+                                    <input class="wn" style="" type="text" placeholder="正在搜索无线网络...">
+                                    <button class="choose_wire">选择网络</button>
+                                </div>
+
+                                <img class="imgload" style="vertical-align: middle;" src="<%=resource%>/images/loading.gif" alt="">
+                            </div>
+
+                            <div class="wname" style="display: block;">
+                                <div class="wire-name">
+                                    <input id="wifi_net_name" class="wn" type="text" placeholder="请输入网络名称">
+                                    <p id="relay_data" style="display: none;"></p>
+                                    <button id="chose_wifi" class="choose_wire">选择网络</button>
+                                </div>
+
+                                <div id="wifi_net_list" class="wn_list" style="display: none;z-index: 2000"></div>
+
+                                <a id="rescan" onclick="scanApList();" href="javascript:;" style="color: rgb(37, 115, 191); font-size: 14px; display: inline;">重新扫描</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="select-panel clearfix" id="showlock" style="display:none;">
+                        <label class="outset-label">无线密码</label>
+                        <input type="password" id="apclient_pwd" class="comn-input g" style="margin-right:10px;"/>
+                        <!--<span class="showspan" style="color:#999;">-->
+                            <!--<input type="checkbox" class="inp-checkbox" id="relaypwd"/>-->
+                            <!--<label class="checkbox-txt" for="relaypwd">显示密码</label>-->
+                        <!--</span>-->
+                        <div style="display: inline-block;padding-top:8px;">
+                            <input class="magic-checkbox" type="checkbox" name="layout" id="relaypwd">
+                            <label for="relaypwd" class="checkbox-txt" style="line-height:22px;">显示密码</label>
+                        </div>
+                    </div>
+                </div>
+                <script type="text/javascript">
+                    var apclientRequestData = {};
+
+                    function scanApList() {
+                        $(".wname").css("display","none");
+                        $(".scan-now").css("display","block");
+                        $("#rescan").hide();
+
+                        $.ajax({
+                            url: '<%=luci.dispatcher.build_url("admin", "wireless","scan_ap_list")%>',
+                            cache: false,
+                            dataType: "json",
+                            timeout: 50000,
+                            success: function(rsp) {
+                                if (rsp.code == 0) {
+                                    setApListData(rsp.aplist);
+                                } else {
+                                    T_alert.show("扫描失败, 请确认2.4G wifi功能是否正常开启!",2000);
+                                }
+
+                                $(".scan-now").css("display","none");
+                                $(".wname").css("display","block");
+                                if($(window).width() > 370){
+                                    $("#rescan").show();
+                                }
+
+                            },
+                            error: function(x){
+                                $(".scan-now").css("display","none");
+                                $(".wname").css("display","block");
+                                $("#rescan").show();
+                            },
+                            ontimeout:function(){
+                                $(".scan-now").css("display","none");
+                                $(".wname").css("display","block");
+                                $("#rescan").show();
+                            }
+                        });
+                    }
+
+                    function setDefaultApclientInfo() {
+                        $("#apclient_break").css("display","none");
+                        $("#apclient_reconn").css("display","none");
+
+                        if ($("#wifi_net_list").children("a").length < 2 ) {
+                            scanApList("init");
+                        }
+                    }
+
+                    function setApListData(list) {
+                        $("#wifi_net_list").empty();
+
+                        for(var i = 0; i<list.length; i++) {
+                            var $a = $('<a href="javascript:;"></a>');
+                            var img;
+                            var span;
+                            var p;
+
+                            if(list[i].security.toLowerCase() == "none") {
+                                img = '<i><img src="<%=resource%>/images/signal_png/signal'+ list[i].signal + '.png"/></i>'
+                            } else {
+                                img = '<i><img src="<%=resource%>/images/signal_png/signal'+ list[i].signal + 'lock.png"/></i>'
+                            }
+
+                            span = '<span>'+ list[i].ssid +'</span>';
+                            p = '<p style="display:none">'+ list[i].ssid + '?' + list[i].channel + '?' + list[i].bssid + '?'+ list[i].security +'</p>';
+                            $a.append(span).append(p).append(img);
+                            $("#wifi_net_list").append($a);
+
+                            //同步当前设置的中继网络的信道, 防止上级网络重新设置信道, 可以直接保存
+                            // if(list[i].ssid == apclientRequestData.rsp_ssid) {
+                            //     apclientRequestData.channel = list[i].channel;
+                            // }
+                        }
+                    }
+
+                    function stopPropagation(e) {
+                        if (e.stopPropagation)
+                            e.stopPropagation();
+                        else
+                            e.cancelBubble = true;
+                    }
+
+                    $(function () {
+
+                        var height = $(document).height()-90>660+60?$(document).height()-90:660+60;
+                        var width = window.innerWidth;
+                        if(width>1350){
+                            $('.nav').css('height','100%');
+                        }else{
+                            $('.nav').css('height',height);
+                        }
+
+                        $("#chose_wifi").click(function (e) {
+                            if ($("#wifi_net_list").css("display") == "none") {
+                                $("#wifi_net_list").css({"display": "block"});
+                                stopPropagation(e);
+                                $("#wifi_net_list").find("a").bind("click",function(){
+                                    $("#save-btn").css("display","block");
+                                    var value = $(this).find("span").html();
+                                    var lock = $(this).find("img").attr("src");
+
+                                    //设置中继数据
+                                    $("#relay_data").html($(this).find("p").html());
+                                    var str = $("#relay_data").html();
+                                    var str2 = str.split("?");
+                                    apclientRequestData.ssid = str2[0];
+                                    apclientRequestData.channel = str2[1];
+                                    apclientRequestData.bssid = str2[2];
+                                    apclientRequestData.authmode = str2[3];
+
+                                    if(lock.indexOf("lock") > 0){
+                                        if (apclientRequestData.ssid != apclientRequestData.rsp_ssid) {
+                                            $("#apclient_pwd").val("");
+                                        } else {
+                                            $("#apclient_pwd").val(apclientRequestData.rsp_key);
+                                        }
+                                        $("#showlock").css("display","block");
+                                    }else{
+                                        $("#showlock").css("display","none");
+                                    }
+                                    $("#wifi_net_name").val(value);
+                                    $("#wifi_net_list").css("display","none");
+                                });
+
+                                return false;
+                            } else {
+                                $("#wifi_net_list").css({"display": "none"});
+                            }
+
+                        });
+
+                        $('#apclient_pwd').togglePassword({
+                            el: '#relaypwd'
+                        });
+                        $(document).bind('click',function(){
+                            $('#wifi_net_list').css('display','none');
+                        });
+                    })
+
+                    function saveApclient(obj) {
+                        apclientRequestData.key = $('#apclient_pwd').val();
+
+                        if (typeof(apclientRequestData.ssid) == "undefined") {
+                            T_alert.show("请选择一个无线网络",2000);
+                            return false;
+                        }
+
+                        loadSave("before", "save");
+                        $.ajax({
+                            url: "<%=luci.dispatcher.build_url("admin", "wireless", "set_apclient")%>",
+                            cache: false,
+                            dataType: "json",
+                            data: apclientRequestData,
+                            success: function(rsp){
+                                loadSave("after", "save");
+                                if(rsp.result == true){
+                                    T_alert.show("保存成功",2000);
+                                    setTimeout("next_step(obj)", 3000);;
+                                }else{
+                                    T_alert.show("保存失败",2000);
+                                }
+                            },
+                            error: function(x){
+                                loadSave("after", "save");
+                                T_alert.show("保存超时",2000);
+                            },
+                        });
+                    }
+                </script>
+
+                <div class="kelong" style="display: none;">
+                    <div class="zidingyi">
+                        <label class="outset-labere" for="netUser">自定义DNS</label>
+                        <span class="guanbi" style="float:left;"></span>
+                        <span class="text" id="dnsreference">DNS用于解析网站，通常网络运营商会帮我们解析，建议关闭。</span>
+
+                        <div class="shouxuan">
+                            <div class="select-pane">
+                                <label class="outset-label outset-label_p" for="netUser">首选DNS</label>
+                                <span class="lianwang-holder">请输入首选DNS</span>
+                                <input type="text" value="" class="comn-input" id="firstDNS">
+                            </div>
+                            <div class="select-pane">
+                                <label class="outset-label outset-label_p" for="netUser">备用DNS</label>
+                                <span class="lianwang-holder">请输入备用DNS</span>
+                                <input type="text" value="" class="comn-input" id="spareDNS">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr class="hr-new" style="margin:30px auto;padding:0;">
+                <div style="overflow: hidden;text-align:center;">
+                    <div class="baocun save-btn" id="saveSetConnMode" style="margin-right:10px;">下一步
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+                    <a href="javascript:;" class="tiaoguo baocun save-btn" id="pass1">跳过</a>
+                </div>
+            </div>
+            <!-- <input type="button" name="next" class="next action-button" value="Next">-->
+        </fieldset>
+        <fieldset>
+            <h3 class="fs-subtitle">请打开51盒子并完成以下设置</h3>
+            <div class="select_tie">
+                <div class="">
+                    <div class="select-panel clearfix">
+                        <label class="outset-label" for="shuihao-51">税号设置</label>
+                        <span class="lianwang-holder">请输入纳税人识别号</span>
+                        <input type="text" id="shuihao-51" class="comn-input g">
+                    </div>
+                </div>
+                <hr class="hr-new" style="margin:30px auto;padding:0;">
+                <div style="overflow: hidden;text-align: center;">
+                    <div class="baocun save-btn" id="save51Box" style="margin-right:10px;">下一步
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+                    <a href="javascript:;" class="tiaoguo baocun save-btn" id="pass2">跳过</a>
+                </div>
+            </div>
+            <!-- <input type="button" name="next" class="next action-button" value="Next">-->
+        </fieldset>
+        <fieldset>
+            <h3 class="fs-subtitle">请连接打印机</h3>
+            <div class="select_tie">
+                <div class="no-cont">
+                    <i><img src="<%=resource%>/images/newimg/no-contect.png" alt=""></i>
+                    <h3>未检测到打印机连接！</h3>
+                    <p style="display: none">您可以尝试重启打印机或重新检测打印机状态</p>
+                </div>
+
+                <hr class="hr-new" style="margin:30px auto;padding:0;">
+                <div style="text-align: center;">
+                    <div class="baocun save-btn next">完成设置</div>
+                </div>
+            </div>
+        </fieldset>
+    </form>
+
+    <script>
+        jQuery.easing.jswing = jQuery.easing.swing;
+        jQuery.extend(jQuery.easing, {
+            def: "easeOutQuad",
+            swing: function(e, f, a, h, g) {
+                return jQuery.easing[jQuery.easing.def](e, f, a, h, g)
+            },
+            easeInQuad: function(e, f, a, h, g) {
+                return h * (f /= g) * f + a
+            },
+            easeOutQuad: function(e, f, a, h, g) {
+                return -h * (f /= g) * (f - 2) + a
+            },
+            easeInOutQuad: function(e, f, a, h, g) {
+                if ((f /= g / 2) < 1) {
+                    return h / 2 * f * f + a
+                }
+                return -h / 2 * ((--f) * (f - 2) - 1) + a
+            },
+            easeInCubic: function(e, f, a, h, g) {
+                return h * (f /= g) * f * f + a
+            },
+            easeOutCubic: function(e, f, a, h, g) {
+                return h * ((f = f / g - 1) * f * f + 1) + a
+            },
+            easeInOutCubic: function(e, f, a, h, g) {
+                if ((f /= g / 2) < 1) {
+                    return h / 2 * f * f * f + a
+                }
+                return h / 2 * ((f -= 2) * f * f + 2) + a
+            },
+            easeInQuart: function(e, f, a, h, g) {
+                return h * (f /= g) * f * f * f + a
+            },
+            easeOutQuart: function(e, f, a, h, g) {
+                return -h * ((f = f / g - 1) * f * f * f - 1) + a
+            },
+            easeInOutQuart: function(e, f, a, h, g) {
+                if ((f /= g / 2) < 1) {
+                    return h / 2 * f * f * f * f + a
+                }
+                return -h / 2 * ((f -= 2) * f * f * f - 2) + a
+            },
+            easeInQuint: function(e, f, a, h, g) {
+                return h * (f /= g) * f * f * f * f + a
+            },
+            easeOutQuint: function(e, f, a, h, g) {
+                return h * ((f = f / g - 1) * f * f * f * f + 1) + a
+            },
+            easeInOutQuint: function(e, f, a, h, g) {
+                if ((f /= g / 2) < 1) {
+                    return h / 2 * f * f * f * f * f + a
+                }
+                return h / 2 * ((f -= 2) * f * f * f * f + 2) + a
+            },
+            easeInSine: function(e, f, a, h, g) {
+                return -h * Math.cos(f / g * (Math.PI / 2)) + h + a
+            },
+            easeOutSine: function(e, f, a, h, g) {
+                return h * Math.sin(f / g * (Math.PI / 2)) + a
+            },
+            easeInOutSine: function(e, f, a, h, g) {
+                return -h / 2 * (Math.cos(Math.PI * f / g) - 1) + a
+            },
+            easeInExpo: function(e, f, a, h, g) {
+                return (f == 0) ? a : h * Math.pow(2, 10 * (f / g - 1)) + a
+            },
+            easeOutExpo: function(e, f, a, h, g) {
+                return (f == g) ? a + h : h * (-Math.pow(2, -10 * f / g) + 1) + a
+            },
+            easeInOutExpo: function(e, f, a, h, g) {
+                if (f == 0) {
+                    return a
+                }
+                if (f == g) {
+                    return a + h
+                }
+                if ((f /= g / 2) < 1) {
+                    return h / 2 * Math.pow(2, 10 * (f - 1)) + a
+                }
+                return h / 2 * (-Math.pow(2, -10 * --f) + 2) + a
+            },
+            easeInCirc: function(e, f, a, h, g) {
+                return -h * (Math.sqrt(1 - (f /= g) * f) - 1) + a
+            },
+            easeOutCirc: function(e, f, a, h, g) {
+                return h * Math.sqrt(1 - (f = f / g - 1) * f) + a
+            },
+            easeInOutCirc: function(e, f, a, h, g) {
+                if ((f /= g / 2) < 1) {
+                    return -h / 2 * (Math.sqrt(1 - f * f) - 1) + a
+                }
+                return h / 2 * (Math.sqrt(1 - (f -= 2) * f) + 1) + a
+            },
+            easeInElastic: function(f, h, e, l, k) {
+                var i = 1.70158;
+                var j = 0;
+                var g = l;
+                if (h == 0) {
+                    return e
+                }
+                if ((h /= k) == 1) {
+                    return e + l
+                }
+                if (!j) {
+                    j = k * 0.3
+                }
+                if (g < Math.abs(l)) {
+                    g = l;
+                    var i = j / 4
+                } else {
+                    var i = j / (2 * Math.PI) * Math.asin(l / g)
+                }
+                return -(g * Math.pow(2, 10 * (h -= 1)) * Math.sin((h * k - i) * (2 * Math.PI) / j)) + e
+            },
+            easeOutElastic: function(f, h, e, l, k) {
+                var i = 1.70158;
+                var j = 0;
+                var g = l;
+                if (h == 0) {
+                    return e
+                }
+                if ((h /= k) == 1) {
+                    return e + l
+                }
+                if (!j) {
+                    j = k * 0.3
+                }
+                if (g < Math.abs(l)) {
+                    g = l;
+                    var i = j / 4
+                } else {
+                    var i = j / (2 * Math.PI) * Math.asin(l / g)
+                }
+                return g * Math.pow(2, -10 * h) * Math.sin((h * k - i) * (2 * Math.PI) / j) + l + e
+            },
+            easeInOutElastic: function(f, h, e, l, k) {
+                var i = 1.70158;
+                var j = 0;
+                var g = l;
+                if (h == 0) {
+                    return e
+                }
+                if ((h /= k / 2) == 2) {
+                    return e + l
+                }
+                if (!j) {
+                    j = k * (0.3 * 1.5)
+                }
+                if (g < Math.abs(l)) {
+                    g = l;
+                    var i = j / 4
+                } else {
+                    var i = j / (2 * Math.PI) * Math.asin(l / g)
+                }
+                if (h < 1) {
+                    return -0.5 * (g * Math.pow(2, 10 * (h -= 1)) * Math.sin((h * k - i) * (2 * Math.PI) / j)) + e
+                }
+                return g * Math.pow(2, -10 * (h -= 1)) * Math.sin((h * k - i) * (2 * Math.PI) / j) * 0.5 + l + e
+            },
+            easeInBack: function(e, f, a, i, h, g) {
+                if (g == undefined) {
+                    g = 1.70158
+                }
+                return i * (f /= h) * f * ((g + 1) * f - g) + a
+            },
+            easeOutBack: function(e, f, a, i, h, g) {
+                if (g == undefined) {
+                    g = 1.70158
+                }
+                return i * ((f = f / h - 1) * f * ((g + 1) * f + g) + 1) + a
+            },
+            easeInOutBack: function(e, f, a, i, h, g) {
+                if (g == undefined) {
+                    g = 1.70158
+                }
+                if ((f /= h / 2) < 1) {
+                    return i / 2 * (f * f * (((g *= (1.525)) + 1) * f - g)) + a
+                }
+                return i / 2 * ((f -= 2) * f * (((g *= (1.525)) + 1) * f + g) + 2) + a
+            },
+            easeInBounce: function(e, f, a, h, g) {
+                return h - jQuery.easing.easeOutBounce(e, g - f, 0, h, g) + a
+            },
+            easeOutBounce: function(e, f, a, h, g) {
+                if ((f /= g) < (1 / 2.75)) {
+                    return h * (7.5625 * f * f) + a
+                } else {
+                    if (f < (2 / 2.75)) {
+                        return h * (7.5625 * (f -= (1.5 / 2.75)) * f + 0.75) + a
+                    } else {
+                        if (f < (2.5 / 2.75)) {
+                            return h * (7.5625 * (f -= (2.25 / 2.75)) * f + 0.9375) + a
+                        } else {
+                            return h * (7.5625 * (f -= (2.625 / 2.75)) * f + 0.984375) + a
+                        }
+                    }
+                }
+            },
+            easeInOutBounce: function(e, f, a, h, g) {
+                if (f < g / 2) {
+                    return jQuery.easing.easeInBounce(e, f * 2, 0, h, g) * 0.5 + a
+                }
+                return jQuery.easing.easeOutBounce(e, f * 2 - g, 0, h, g) * 0.5 + h * 0.5 + a
+            }
+        });
+
+        //jQuery time
+        var current_fs, next_fs; //fieldsets
+        var left, opacity, scale; //fieldset properties which we will animate
+        var animating; //flag to prevent quick multi-click glitches
+
+        function next_step(obj){
+            if(animating) return false;
+            animating = true;
+
+            current_fs = $(obj).parents('fieldset');
+            next_fs = $(obj).parents('fieldset').next();
+
+            $("#progressbar li").eq($("fieldset").index(next_fs)).addClass("active");
+
+            next_fs.show();
+
+            current_fs.animate({opacity: 0}, {
+                step: function(now, mx) {
+                    scale = 1 - (1 - now) * 0.2;
+                    left = (now * 50)+"%";
+                    opacity = 1 - now;
+                    current_fs.css({'transform': 'scale('+scale+')'});
+                    next_fs.css({'left': left, 'opacity': opacity});
+                },
+                duration: 800,
+                complete: function(){
+                    current_fs.hide();
+                    animating = false;
+                },
+                easing: 'easeInOutBack'
+            });
+        }
+    </script>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript" src="<%=resource%>/xhr.js"></script>
+<script>
+    var G_proto = 'dhcp';
+    var requestData = {};
+    var T_alert = new Toast();
+    var PrinterStat = 0;
+    T_alert._css.lineHeight = "40px";
+
+    var divselect = $("#divselect");
+    var wanprotovalue = "2";
+    var wanmacvalue = "1";
+    var connectiontype = "line";
+    var strarr = ['使用静态IP连网方式时，必须设置DNS，否则会导致无法上网。','DNS用于解析网站，通常网络运营商会帮我们解析，建议关闭。','须设置DNS，否则会导致无法上网。','不建议开启'];
+    divselect.find(".label").on("click", function (e) {
+        var optList = divselect.find(".list");
+        if (optList.is(":visible")) {
+            $(this).removeClass("open");
+            optList.hide();
+        } else {
+            $(this).addClass("open");
+            optList.show();
+        }
+        e.stopPropagation();
+    });
+
+    function getPrinterStatus() {
+            $.getJSON("/cgi-bin/aisino/spooler/manage", {id: "list"}, function(data) {
+                if (data.PRINTERS.length == 0) {
+                    // 未连接
+                    $(".no-cont i img").attr("src","<%=resource%>/images/newimg/no-contect.png");
+                    $(".no-cont h3").html("未检测到打印机连接！");
+                    $(".no-cont p").css("display", "block");
+                } else {
+                    // 已连接
+                    $(".no-cont i img").attr("src","<%=resource%>/images/newimg/wifimon-success.png");
+                    $(".no-cont h3").html("打印机连接正常!");
+                    $(".no-cont p").css("display", "none");
+                }
+            }
+        );
+
+        setTimeout('getPrinterStatus()', 10000);
+    }
+
+    $(function(){
+        getPrinterStatus();
+        var screenWidth = $(window).width();
+        if(wanprotovalue == '3'){
+            if(screenWidth < 480){
+                $("#dnsreference").html(strarr[2]);
+            }else{
+                $("#dnsreference").html(strarr[0]);
+            }
+        }else{
+            if(screenWidth < 480){
+                $("#dnsreference").html(strarr[3]);
+            }else{
+                $("#dnsreference").html(strarr[1]);
+            }
+        }
+
+    });
+    //选择上网方式
+    divselect.on("click", "[data-panel]", function (e) {
+        divselect.find(".label").text($(this).text());
+        divselect.find(".list").hide();
+        $("div.net-panel").hide();
+        divselect.find(".label").removeClass("open");
+        $("div." + $(this).attr("data-panel")).show();
+        G_proto = $(this).attr('data-proto');
+        wanprotovalue = $(this).attr("selectid");
+        if(wanprotovalue == '4'){
+            setDefaultApclientInfo();
+        }
+        if (wanprotovalue == "3") {
+            $(".sets>a").addClass("dianji");
+            $('.guanbi').addClass("closed");
+            $(".sets").hide();
+            $('.kelong').removeClass("kelong_hidden");
+            if($(window).width() < 480){
+                $('#dnsreference').html("必须设置DNS，否则会导致无法上网。");
+            }else{
+                $('#dnsreference').html("使用静态IP连网方式时，必须设置DNS，否则会导致无法上网。");
+            }
+            $('.zidingyi').show();
+            $('.guanbi').hide();
+            $(".shouxuan").show();
+        } else {
+            $(".sets").show();
+            if($(window).width() < 480){
+                $('#dnsreference').html("不建议开启");
+            }else{
+                $('#dnsreference').html("DNS用于解析网站，通常网络运营商会帮我们解析，建议关闭。");
+            }
+
+//            $('.guanbi').addClass("closed");
+//            $('.guanbi').show();
+//            $('.shouxuan').show();
+            $('.guanbi').removeClass("closed");
+            $('.guanbi').show();
+            $('.shouxuan').hide();
+        }
+        e.stopPropagation();
+    });
+
+    function checkInputData(){
+        if(requestData.proto == 'dhcp'){
+            if (!checkDnsSettings("dhcp")){
+                return false;
+            }
+        }else if(requestData.proto == 'pppoe'){
+            if (!checkPPPoeSettings() || !checkDnsSettings("pppoe")) {return false;}
+        }else if(requestData.proto == 'static'){
+            if (!checkStaticSettings("static")) return false;
+        }
+        return true;
+    }
+
+    function checkPPPoeSettings() {
+        requestData.username = $("#netUser").val();
+        requestData.password = $("#netPass").val();
+
+        if (requestData.username.length < 1) {
+            T_alert.show("用户名不能为空",2000);
+            $("#netUser").focus();
+            return false;
+        }
+
+        if (requestData.password.length < 1) {
+            T_alert.show("密码不能为空",2000);
+            return false;
+        }
+
+        return true;
+    }
+
+    function checkDnsSettings(type) {
+        if(!$('.guanbi').hasClass('closed')){//关闭
+            return true;
+        }
+
+        requestData.primayDns = $("#firstDNS").val();
+        requestData.secondDns = $("#spareDNS").val();
+
+
+        if (requestData.primayDns == "") {
+            T_alert.show("首选DNS格式不能为空",2000);
+            $("#firstDNS").focus();
+            return false;
+        }
+
+        if (!validators.ipaddr(requestData.primayDns)) {
+            T_alert.show("首选DNS格式不正确",2000);
+            $("#firstDNS").focus();
+            return false;
+        }
+
+        if (requestData.secondDns != "") {
+            if (!validators.ipaddr(requestData.secondDns)) {
+                T_alert.show("备用DNS格式不正确",2000);
+                $("#spareDNS").focus();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function checkStaticSettings(type) {
+        requestData.ipaddr = $("#ipaddr").val();
+        requestData.netmask = $("#netCKMask").val();
+        requestData.gateway = $("#netGateWay").val();
+        requestData.primayDns = $("#netGateWay").val();
+
+        if (requestData.ipaddr.length < 1) {
+            T_alert.show("IP地址不能为空",2000);
+            $("#ipaddr").focus();
+            return false;
+        }
+
+        if (!validators.ipaddr(requestData.ipaddr)) {
+            T_alert.show("IP地址格式不正确",2000);
+            $("#ipaddr").focus();
+            return false;
+        }
+
+        if (requestData.netmask.length < 1) {
+            T_alert.show("子网掩码不能为空",2000);
+            $("#netCKMask").focus();
+            return false;
+        }
+
+        if (!validators.netmask(requestData.netmask)) {
+            T_alert.show("子网掩码格式不正确",2000);
+            $("#netCKMask").focus();
+            return false;
+        }
+
+        if (requestData.gateway.length < 1) {
+            T_alert.show("网关地址不能为空",2000);
+            $("#netGateWay").focus();
+            return false;
+        }
+
+        if (!validators.ipaddr(requestData.gateway)) {
+            T_alert.show("网关地址格式不正确",2000);
+            $("#netGateWay").focus();
+            return false;
+        }
+
+        if (requestData.gateway == requestData.ipaddr) {
+            T_alert.show("IP地址格式与网关地址相同",2000);
+            $("#ipaddr").focus();
+            return false;
+        }
+
+        return true;
+    }
+
+    var itemInputs = $(".comn-input");
+    itemInputs.on("focus", function () {
+        $(this).prev(".lianwang-holder").hide();
+    }).on('blur', function () {
+        val = $(this).val();
+        if (!val) {
+            $(this).prev(".lianwang-holder").show();
+        }
+    });
+
+    $(".lianwang-holder").on("click", function () {
+        $(this).hide();
+        $(this).next().focus();
+    });
+
+    $(document.body).on("click", function (e) {
+        divselect.find(".list").hide();
+    });
+
+    $("#GuestModeForm").find(".sets>a").on("click", function () {
+        var _this = $(this);
+        if (wanprotovalue != "3") {
+            if (_this.hasClass("dianji")) {
+                _this.removeClass("dianji");
+                $('.kelong').addClass("kelong_hidden");
+                $('.guanbi').removeClass("closed");
+                $(".shouxuan").hide();
+            } else {
+                _this.addClass("dianji");
+                $('.kelong').removeClass("kelong_hidden");
+            }
+        }
+    });
+
+    $('.guanbi').on("click", function () {
+        var _this = $(this);
+        if (_this.hasClass("closed")) {
+            _this.removeClass("closed");
+            $(".shouxuan").hide();
+        } else {
+            _this.addClass("closed");
+            $(".shouxuan").show();
+        }
+    });
+
+    $("#pass1").on("click", function (e) {
+        requestData = {};
+        next_step(this);
+        skip();
+    });
+
+    $("#pass2").on('click',function(){
+        next_step(this);
+    });
+
+    $(".shangbu").on("click", function (e) {
+        if($(window).width() < 970){
+            $('.guide').fadeIn();
+            $('.step_er').hide();
+        }else{
+            $(".guide-scroll").animate({"margin-left":0},300);
+        }
+        $(".set_loh").removeClass("access_right");
+        $(".set_hulian").removeClass("access").removeClass("website");
+
+    });
+
+    // 下一步 上网设置
+    $('#saveSetConnMode').on('click',function(){
+        requestData = {};
+        requestData.proto = G_proto;
+        obj = this;
+        if (G_proto == "relay") {
+            saveApclient(obj);
+        } else {
+            if (!checkInputData()) {
+                return false;
+            }
+
+            if ($(window).width() < 970) {
+                $('.guide').hide();
+                $('.step_er').fadeIn();
+            } else {
+                $(".guide-scroll").animate({"margin-left": "-970px"}, 300);
+            }
+            $(".set_loh").addClass("access_right");
+            $(".set_hulian").addClass("access");
+
+            loadSave("before", "save");
+            skip();
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "network", "set_wan_info")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', wanset :JSON.stringify(requestData)},
+                timeout: 10000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.result == true) {
+                        T_alert.show("设置成功", 4000);
+                        setTimeout("next_step(obj)", 3000);;
+                    } else {
+
+                        T_alert.show("设置失败",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x) {
+                    loadSave("after", "save");
+                    T_alert.show("保存错误",2000);
+                },
+                ontimeout:function() {
+                    loadSave("after", "save");
+                    T_alert.show("保存超时",2000);
+                }
+            });
+        }
+    })
+
+    // 税号设置
+    $('#save51Box').on('click',function() {
+        obj = this;
+        taxnumer = $("#shuihao-51").val();
+        if (taxnumer.length < 1) {
+            T_alert.show("纳税人识别号不能为空!",2000);
+            $("#shuihao-51").focus();
+            return false;
+        }
+
+        loadSave("before", "save");
+        $.getJSON('<%=luci.dispatcher.build_url("admin", "application", "aisino", "set51BoxNetwork")%>', {boxnum:taxnumer}, function(data) {
+            if (data.code == 0) {
+                T_alert.show("保存成功", 2000);
+                next_step(obj);
+            } else {
+                requestData = {};
+                T_alert.show("保存失败, 请检查设备状态或税号", 3000);
+            }
+
+            loadSave("after", "save");
+        });
+    })
+
+    $('.next').on('click',function() {
+        window.location.href = '<%=luci.dispatcher.build_url("admin","home")%>';
+    })
+
+    function skip() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "system", "skipWizard")%>",{},function(rsp) 
+        {
+            ;
+        });
+    }
+</script>
+<%include("bottom")%>

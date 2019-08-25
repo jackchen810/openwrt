@@ -1,0 +1,26 @@
+#div1 {
+	width: 36px;
+	height: 18px;
+	position: relative;
+	border: 1px solid #999;
+}
+#div2 {
+	width: 16px;
+	height: 16px;
+	border-radius: 48px;
+	position: absolute;
+	background-color: #fff/0;
+}
+.open1{ background-color: #33c633;}         /*css3背景色，前三位参数为red、green、blue，最后一个表透明度*/
+.open2 {
+	top: 1px;
+	right: 1px;
+}
+.close1 {
+	border: 3px solid #e5e5e5;
+}
+.close2 {
+	left: 0;
+	top: 0;
+	border: 1px solid #040404;
+}

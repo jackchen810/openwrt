@@ -1,0 +1,292 @@
+<%
+    local uci = require "luci.model.uci".cursor()
+	local BoxTaxNumber = uci:get("aisino", "global", "taxnumber") or ""
+
+	include("top")
+%>
+<div class="box">
+	<div class="main">
+
+		<%include("application/menuer")%>
+		
+		<div class="">
+			<div class="article">
+				<div class="diag-new">
+					<div class="diag-new-img"><img src="<%=resource%>/images/newimg/fast-test.png" alt=""></div>
+					<div class="diag-new-cont">
+						<p class="diag-new-cont-tit"><span>一键检测</span><i class="diag-loading"><img src="<%=resource%>/images/loading2.gif" alt=""/></i></p>
+						<p class="diag-new-cont-msg">一键检测给你提供网络、51盒子和打印机设备的智能检测</p>
+						<p class="diag-new-cont-btn"><button id="diagbtn">开始检测</button></p>
+					</div>
+				</div>
+
+				<div class="wifimon-result-cont fast-test-tit">
+					<div class="wifimon-img"><img src="<%=resource%>/images/newimg/fast-test-ing.png" alt=""></div>
+					<div class="wifimon-txt">
+						<p class="wifimon-txt-tit">正在检测，请耐心等待</p>
+						<p class="wifimon-txt-msg">一键检测给你提供网络、51盒子和打印机设备的智能检测<span></span></p>
+					</div>
+					<div class="wifimon-btn"><button class="btn-agin">正在检测</button></div>
+				</div>
+				<style>
+					.progressbar {
+						width: 100%;
+						/*margin-bottom: 35px;*/
+						position: relative;
+						background-color: #EEEEEE;
+						/*box-shadow: inset 0px 1px 1px rgba(0,0,0,.1);*/
+					}
+					.proggress{
+						height: 8px;
+						width: 10px;
+						background-color: #3498db;
+					}
+					#progressbar1{
+						display: none;
+						width:100%;
+						height:2px;
+					}
+				</style>
+				<div id="progressbar1"></div>
+				<style>
+					.new-result-cont{
+						padding:60px;
+						display: none;
+					}
+					.new-result-item{
+						width:100%;
+						/*overflow: hidden;*/
+						border-bottom:1px solid #f3f3f3;
+						padding-bottom: 10px;
+						color:#666;
+						font-size:15px;
+					}
+					.item-msg{
+						width:100%;
+						height:60px;
+					}
+					.new-result-item h3{
+						float:left;
+						font-size:18px;
+						color:#272f47;
+						width:100px;
+						height: 60px;
+						line-height: 90px;
+						margin-right:40px;
+					}
+					.new-result-item-right{
+						float:left;
+						height: 60px;
+						line-height: 90px;
+					}
+					.new-result-item-right span{
+						display: inline-block;
+						margin-right:30px;
+					}
+					.new-result-item-right span i{
+						display: inline-block;
+						margin-right:8px;
+						vertical-align: middle;
+					}
+					.result-tip i{
+						vertical-align: middle;
+						display: inline-block;
+						margin-right:4px;
+					}
+					.result-tip{
+						width: 100%;
+						padding-left:140px;
+						font-size:13px;
+						color:#ff4242;
+					}
+				</style>
+				<div class="new-result-cont">
+					<div class="new-result-item result-internet">
+						<div class="item-msg">
+							<h3 class="new-result-item-left">网络检测</h3>
+							<div class="new-result-item-right">
+								<span id="wan_port"><i><img src="<%=resource%>/images/loading.gif" alt=""></i>WAN口状态</span>
+								<span id="wan_set"><i><img src="<%=resource%>/images/loading.gif" alt=""></i>上网设置</span>
+								<span id="wan_ppp"><i><img src="<%=resource%>/images/loading.gif" alt=""></i>网络拨号</span>
+								<span id="wan_con"><i><img src="<%=resource%>/images/loading.gif" alt=""></i>网络连接</span>
+							</div>
+						</div>
+						<p class="result-tip" style="display: none;"><i><img src="<%=resource%>/images/newimg/icon-tip.png" alt=""></i><span>未检测到打印机连接，是否正确插入</span></p>
+					</div>
+					<div class="new-result-item result-51box">
+						<div class="item-msg">
+							<h3 class="new-result-item-left">51盒子</h3>
+							<div class="new-result-item-right">
+								<span><i><img src="<%=resource%>/images/loading.gif" alt=""></i>51盒子连接是否成功</span>
+							</div>
+						</div>
+						<div class="result-tip">
+						</div>
+					</div>
+					<div class="new-result-item result-printer">
+						<div class="item-msg">
+							<h3 class="new-result-item-left">打印机</h3>
+							<div class="new-result-item-right">
+								<span><i><img src="<%=resource%>/images/loading.gif" alt=""></i>打印机是否连接</span>
+							</div>
+						</div>
+						<p class="result-tip" style="display: none;"><i><img src="<%=resource%>/images/newimg/icon-tip.png" alt=""></i><span>未检测到打印机连接，请检查打印机是否已开启，连接线是否正确插入</span></p>
+					</div>
+				</div>
+
+			</div>
+
+		</div>
+	</div>
+</div>
+<script src="<%=resource%>/js/jquery.lineProgressbar.js"></script>
+<script>
+	function show_message(code, title,text) {
+		$('.diag-loading').css('display','none');
+		$("#diagbtn").html("重新诊断");
+		$(".diag-new-cont-tit span").html(title);
+		$(".diag-new-cont-msg").html(text);
+
+		if (code != 0) {
+			$(".diag-new-img img").attr("src","<%=resource%>/images/newimg/diag-error.png");
+		}else{
+			$(".diag-new-img img").attr("src","<%=resource%>/images/newimg/diag-success.png");
+		}
+	}
+
+	function normalCss(){
+		$('#progressbar1').css('display','block');
+		$('#progressbar1').LineProgressbar({
+			height:"3px",
+			fillBackgroundColor: '#2a5cff',
+			ShowProgressCount:false,
+			duration: 5500,
+			percentage: 80
+		});
+		$('.wifimon-img img').attr('src','<%=resource%>/images/newimg/fast-test-ing.png');
+		$('.wifimon-txt-tit').html('正在检测，请耐心等待');
+		$('.btn-agin').html('正在检测');
+		$('.item-msg img').attr("src","<%=resource%>/images/loading.gif");
+		$('.result-tip').css('display','none');
+	}
+
+	function clickCheck(){
+		normalCss();
+		$('.diag-new').css('display','none');
+		$('.fast-test-tit').css('display','block');
+		$('.new-result-cont').css('display','block');
+		$('.result-51box .result-tip').empty();
+		$('.result-51box .result-tip').css('display','block');
+		//检查网络
+		 $.getJSON("<%=luci.dispatcher.build_url("admin", "system", "getDeviceInfo")%>", null, function(data) {
+			$('.result-internet .item-msg img').attr("src","<%=resource%>/images/newimg/icon-success.png");
+			if (data.wanState.code != 0) {
+				$('#wan_con img').attr("src","<%=resource%>/images/newimg/icon-error.png");
+				$('#wan_ppp img').attr("src","<%=resource%>/images/newimg/icon-error.png");
+			}
+
+			if (data.wanInfo.proto != "pppoe") {
+				$('#wan_ppp img').attr("src","<%=resource%>/images/newimg/icon-error.png");
+			}
+
+			if (data.port.wan != 1) {
+				$('#wan_port img').attr("src","<%=resource%>/images/newimg/icon-error.png");
+			}
+
+			var BoxNormalState = {
+				"51盒子与金税盘绑定状态" : "绑定",
+				"专票抄报清卡状态" : "已清卡",
+				"普票抄报清卡状态" : "已清卡",
+				"卷票抄报清卡状态" : "已清卡",
+				"电子票抄报清卡状态" : "已清卡",
+				"金税盘授权状态" : "已授权",
+				"未上传的发票" : "没有",
+				"51平台登录状态" : "已登录",
+			}
+			// 查询51盒子状态
+			
+			$.getJSON("/cgi-bin/aisino/spooler/manage", {id: "boxlist"}, function(data) {
+				// console.log(data);
+				if (data.BOXES.length == 0) {
+					// 未连接
+					$('.result-51box .item-msg img').attr('src','<%=resource%>/images/newimg/icon-error.png');
+					var tip = '<p><i><img src="<%=resource%>/images/newimg/icon-tip.png" alt=""></i>\
+							<span>未检测到51盒子连接，请检查连接线是否正确插入</span></p>';
+					$('.result-51box .result-tip').append(tip);
+				} else {
+					$.ajaxSettings.async = false;
+					taxnumber = "<%=BoxTaxNumber%>";
+					checkflag = true;
+					if (taxnumber != "") {
+						
+						$.getJSON("/cgi-bin/aisino/spooler/manage", {id:"boxcheck", boxip:data.BOXES[0].IPADDR, boxnum:taxnumber}, function(data) {
+							if (data.CODE == 0) {
+								msg = data.DATA;
+								var resultarr = msg.split('~');
+								var obj = {};
+								for (var i in resultarr) {
+									obj[resultarr[i].split(':')[0]] = resultarr[i].split(':')[1];
+								}
+
+								Object.keys(obj).forEach(function(key) {
+									if (BoxNormalState[key]) {
+										if (BoxNormalState[key] != obj[key]) {
+											checkflag = false;
+
+											$('.result-51box .item-msg img').attr('src','<%=resource%>/images/newimg/icon-error.png');
+											var tip = '<p><i><img src="<%=resource%>/images/newimg/icon-tip.png" alt=""></i><span>' + key + ':' + obj[key] + '</span></p>';
+											$('.result-51box .result-tip').append(tip);
+										}
+									}
+								});
+								
+								$(".m-top-box b em").addClass('line').removeClass('unline');
+								if (checkflag) {
+									$('.result-51box .item-msg img').attr('src','<%=resource%>/images/newimg/icon-success.png');
+								}
+							}
+						});
+						$.ajaxSettings.async = true;
+					}
+				}
+
+				// 打印机状态
+				$.getJSON("/cgi-bin/aisino/spooler/manage", {id: "list"}, function(data) {
+						// console.log(data);
+					if (data.PRINTERS.length == 0) {
+						// 未连接
+						$('.result-printer .item-msg img').attr('src','<%=resource%>/images/newimg/icon-error.png');
+						$('.result-printer .result-tip').css('display','block');
+					} else {
+						// 已连接
+						$('.result-printer .item-msg img').attr('src','<%=resource%>/images/newimg/icon-success.png');
+					}
+					$('.wifimon-img img').attr('src','<%=resource%>/images/newimg/wifimon-success.png');
+					$('.wifimon-txt-tit').html('完成检测！');
+					$('.btn-agin').html('再次检测');
+
+					$('#progressbar1').LineProgressbar({
+						height:"3px",
+						fillBackgroundColor: '#2a5cff',
+						duration:0,
+						ShowProgressCount:false,
+						percentage: 100
+					});
+				});
+			});
+		});
+	};
+
+	$(function(){
+
+
+		$("#diagbtn").click(function(){
+			clickCheck();
+		});
+		$('.btn-agin').click(function(){
+			clickCheck();
+		});
+	})
+</script>
+
+<%include("bottom")%>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+    <meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+	<meta HTTP-EQUIV="Pragma"   CONTENT="no-cache">    
+	<meta HTTP-EQUIV="Cache-Control"   CONTENT="no-cache">    
+	<meta HTTP-EQUIV="Expires"   CONTENT="0">  
+    <!--[if lt IE 9]
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+    <![endif]>-->
+    <title><%:Router Management Page%></title>
+    <link rel="shortcut icon" href="<%=media%>/favicon.ico">
+    <link rel="stylesheet" href="<%=resource%>/ktcss/1.3login.css"/>
+    <script src="<%=resource%>/js/jquery-1.9.0.min.js"></script>
+
+</head>
+<body>
+
+	<div id="block" class="block"  onkeydown="onKeyDown()" onload="pw.focus();">
+
+		<script type="text/javascript">	
+
+			    function onKeyDown(){
+					e=arguments.callee.caller.arguments[0] || window.event;
+					if (e.keyCode == 13){
+						check_form(loginform);
+					}
+					
+					if (e.keyCode == 116) {  
+						window.location = "http://" + window.location.hostname ;
+					}                                                       
+
+				}
+			function check_form(obj){		
+				if(obj.luci_password.value==""){
+					obj.luci_password.focus();
+					return false;
+				}
+				obj.submit();		
+			}	
+			
+		</script>
+			
+		<div class="container">
+			<div class="loginbg">
+				<img src="<%=resource%>/icons/images/login/WIFI.png"/>
+
+				<p class="a"><%:Authorization Required%></p>
+				<form id="loginform" name="loginform" method="post" action="<%=pcdata(luci.http.getenv("REQUEST_URI"))%>" >
+					<input type="password" id="pw" value="" name="luci_password" autofocus="autofocus"/>
+					<input type="text" id="usrname" name="luci_username" style="display:none;" value="<%=duser%>"/>
+				
+				</form>
+				
+				<div id="submit1" class="button" style="cursor:pointer;" onclick="check_form(loginform)"><%:Login%></div>
+				<%- if fuser then %>
+					<span style="font-size:12px; color:#B31515;">
+					<%:Invalid password! Please try again.%>
+					</span>			
+				<% end -%>
+			</div>
+		</div>
+	</div>
+
+</body>
+</html>

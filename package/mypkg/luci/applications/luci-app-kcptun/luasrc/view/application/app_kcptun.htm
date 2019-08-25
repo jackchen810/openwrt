@@ -1,0 +1,423 @@
+<%
+    include("top")
+%>
+
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+<div class="box">
+    <div class="main">
+        <%include("application/menuer")%>
+
+        <div class="content">
+            <div class="title">
+                <h3>KCP加速</h3>
+            </div>
+            <div class="article">
+                <a href="https://github.com/liudf0716/xkcptun"><img style="position: absolute; top: 10; left: 30; border: 0;" src="<%=resource%>/images/fork.png" alt="Fork me on GitHub"></a>
+
+                <div class="input-info">
+                    <p class="adbyby-p" style="margin-top:50px;margin-bottom:10px;">
+                        当前配置支持Kcptun 和 Xkcptun. Kcptun需自行下载客户端程序并指定路径.
+                        </br>
+                        Xkcptun是 C 语言实现的kcp加速通道.主要应用于LEDE/OpenWrt中.
+                        </br></br>
+                        <a class="github-button" href="https://github.com/liudf0716/xkcptun/subscription" data-icon="octicon-eye" data-style="mega" data-count-href="/liudf0716/xkcptun/watchers" data-count-api="/repos/liudf0716/xkcptun#subscribers_count">Watch</a>
+                        <a class="github-button" href="https://github.com/liudf0716/xkcptun" data-icon="octicon-star" data-style="mega" data-count-href="/liudf0716/xkcptun/stargazers" data-count-api="/repos/liudf0716/xkcptun#stargazers_count">Star</a>
+                        <a class="github-button" href="https://github.com/liudf0716/xkcptun/fork" data-icon="octicon-repo-forked" data-style="mega" data-count-href="/liudf0716/xkcptun/network" data-count-api="/repos/liudf0716/xkcptun#forks_count">Fork</a>
+                        </p>
+                </div>
+                <hr style="padding-top:30px;margin-left:106px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                <ul class="wd-tab">
+                    <li class="current tab1">基本设置</li>
+                    <li class="tab2">高级选项</li>
+                </ul>
+                <div class="set-content">
+                    <div class="wf_tab_cont" id="tab1">
+                        <div class="input-info">
+                            <label style="float: left;margin-top: 22px;">启用</label>
+                            <div id="kcptun_onoff" class="switch open1" style="margin:17px 0 2px 36px">
+                                <div class="slide open2"></div>
+                            </div>
+                            <span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+                            <div class="clean"></div>
+                        </div>
+
+                        <div class="input-info">
+                            <label>程序路径</label>
+                            <input class="wid140" type="text" id="command_path" placeholder="/usr/bin/xkcp-client"/>
+                        </div>
+
+                        <div class="input-info" style="margin-top:20px;">
+                            <label>配置文件</label>
+                            <input class="inp-checkbox ml32" type="checkbox" id="json_conf"/>
+                            <label for="json_conf" style="width:auto;"><span>直接编辑json</span></label>
+                        </div>
+
+                        <div class="input-info" id="json_tab" style="margin-top:20px; display:none">
+                            <label></label>
+                            <textarea class="inp_area" id="json_config" rows="25" cols="40"></textarea>
+                        </div>
+
+                        <div id="config_tab">
+                            <div class="input-info">
+                                <label>本地端口</label>
+                                <input class="wid140" type="text" id="local_port"/>
+                            </div>
+
+                            <div class="input-info">
+                                <label>服务器地址</label>
+                                <input class="wid140" type="text" id="server_addr"/>
+                            </div>
+
+                            <div class="input-info">
+                                <label>服务器端口</label>
+                                <input class="wid140" type="text" id="server_port"/>
+                            </div>
+
+                            <div class="input-info">
+                                <label>加密方式</label>
+                                <select class="opt" id="crypt">
+                                    <option value="none">none</option>
+                                    <option value="aes-128">aes-128</option>
+                                    <option value="aes-192">aes-192</option>
+                                    <option value="salsa20">salsa20</option>
+                                    <option value="blowfish">blowfish</option>
+                                    <option value="cast5">cast5</option>
+                                    <option value="3des">3des</option>
+                                    <option value="tea">tea</option>
+                                    <option value="xtea">xtea</option>
+                                    <option value="xor">xor</option>
+                                <select/>
+                            </div>
+
+                            <div class="input-info" id="key_tab" style="display:none">
+                                <label>加密秘钥</label>
+                                <input class="wid140" type="text" id="key"/>
+                            </div>
+
+                            <div class="input-info">
+                                <label>加速模式</label>
+                                <select class="opt" id="mode">
+                                    <option value="normal">normal</option>
+                                    <option value="fast">fast</option>
+                                    <option value="fast2">fast2</option>
+                                    <option value="fast3">fast3</option>
+                                <select/>
+                                <a style="color: rgb(1, 154, 48); margin-left: 5px; display: inline-block;" href="<%=luci.dispatcher.build_url("admin", "application", "shadowsocks")%>">→ Shadowsocks设置</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="wf_tab_cont mt64" id="tab2" style="display: none;">
+                        <div class="input-info">
+                            <label>mtu</label>
+                            <input class="wid140" type="text"  id="mtu" placeholder="1350"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>sndwnd</label>
+                            <input class="wid140" type="text"  id="sndwnd" placeholder="1024"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>rcvwnd</label>
+                            <input class="wid140" type="text"  id="rcvwnd" placeholder="1024"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>datashard</label>
+                            <input class="wid140" type="text"  id="datashard" placeholder="10"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>parityshard</label>
+                            <input class="wid140" type="text"  id="parityshard" placeholder="3"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>dscp</label>
+                            <input class="wid140" type="text"  id="dscp" placeholder="0"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>nocomp</label>
+                            <input class="wid140" type="text"  id="nocomp" placeholder="1"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>acknodelay</label>
+                            <input class="wid140" type="text"  id="acknodelay" placeholder="0"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>nodelay</label>
+                            <input class="wid140" type="text"  id="nodelay" placeholder="0"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>interval</label>
+                            <input class="wid140" type="text"  id="interval" placeholder="20"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>resend</label>
+                            <input class="wid140" type="text"  id="resend" placeholder="2"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>nc</label>
+                            <input class="wid140" type="text"  id="nc" placeholder="1"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>sockbuf</label>
+                            <input class="wid140" type="text"  id="sockbuf" placeholder="4194304"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>keepalive</label>
+                            <input class="wid140" type="text"  id="keepalive" placeholder="10"/>
+                        </div>
+                    </div>
+                        
+                    <hr id="hr2" style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                    <div class="operate-btn">
+                        <input type="button" value="保 存" class="s off" id="save"/>
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+        T_alert._css.lineHeight = "40px";
+    var requestData = {};
+
+    function showJsonOption() {
+        var i = document.getElementById("json_conf");
+        if (i.checked == true) {
+            $("#json_tab").css("display", "block");
+            $("#config_tab").css("display", "none");
+            $(".tab2").css("display", "none");
+        } else {
+            $("#json_tab").css("display", "none");
+            $("#config_tab").css("display", "block");
+            $(".tab2").css("display", "block");
+        }
+    }
+
+    function checkRequestData() {
+        requestData = {};
+        requestData.command = $("#command_path").val();
+        if (requestData.command.length < 1) {
+            requestData.command="/usr/bin/xkcp-client";
+        }
+
+        if ($("#json_conf").prop("checked")) {
+            requestData.jsonData = $.trim($("#json_config").val());
+            return true;
+        }
+
+        requestData.localPort = $("#local_port").val();
+        if (requestData.localPort.length < 1 || !validators.port(requestData.localPort)) {
+            T_alert.show("本地端口不正确",2000);
+            $("#local_port").focus();
+            return false;
+        }
+
+        requestData.serverAddr = $("#server_addr").val();
+        if (requestData.serverAddr.length < 1) {
+            T_alert.show("服务器地址不能为空",2000);
+            $("#server_addr").focus();
+            return false;
+        }
+
+        requestData.serverPort = $("#server_port").val();
+        if (requestData.serverPort.length < 1 || !validators.port(requestData.localPort)) {
+            T_alert.show("服务器端口不正确",2000);
+            $("#server_port").focus();
+            return false;
+        }
+
+        requestData.crypt = $("#crypt").val();
+        requestData.mode = $("#mode").val();
+        requestData.mtu = $("#mtu").val();
+
+        requestData.sndwnd = $("#sndwnd").val();
+        requestData.rcvwnd = $("#rcvwnd").val();
+        requestData.datashard = $("#datashard").val();
+        requestData.parityshard = $("#parityshard").val();
+        requestData.nocomp = $("#nocomp").val();
+        requestData.acknodelay = $("#acknodelay").val();
+        requestData.nodelay = $("#nodelay").val();
+        requestData.interval = $("#interval").val();
+        requestData.resend = $("#resend").val();
+        requestData.nc = $("#nc").val();
+        requestData.sockbuf = $("#sockbuf").val();
+        requestData.keepalive = $("#keepalive").val();
+
+        return true;
+    }
+
+    function changeTab(tabnum) {
+        $(".wd-tab li").removeClass("current");
+        $('.'+tabnum).addClass("current");
+        $(".wf_tab_cont").css("display","none");
+        $("#"+tabnum).css("display","block");
+    }
+
+    function turnOffService() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "kcptun", "turnOffService")%>", null, function(rsp) {
+            $(".loadImg").css("display","none");
+            if (rsp.code == 0) {
+                T_alert.show("Kcptun 已关闭",2000);
+            } else {
+                T_alert.show("操作失败，请重试",2000);
+            }
+        });
+    }
+
+    function switchButton(action) {
+        if (action == "off") {
+            $("#kcptun_onoff").removeClass('open1');
+            $("#kcptun_onoff").addClass('close1');
+            $("#kcptun_onoff").children().removeClass('open2');
+            $("#kcptun_onoff").children().addClass('close2');
+
+            // 页面表单禁用
+            $(".set-content").find(":input").attr("disabled","disabled");
+            $("#save").css("display", "none")
+        } else {
+            $("#kcptun_onoff").removeClass('close1');
+            $("#kcptun_onoff").addClass('open1');
+            $("#kcptun_onoff").children().removeClass('close2');
+            $("#kcptun_onoff").children().addClass('open2');
+
+            // 页面表单激活
+            $(".set-content").find(":input").removeAttr("disabled");
+            $("#save").css("display", "inline-block")
+        }
+    }
+
+    function showCryptOption() {
+        if ($("#crypt").val() == "none") {
+            $("#key_tab").css("display", "none");
+        } else {
+            $("#key_tab").css("display", "block");
+        }
+    }
+    function setConfigData(rsp) {
+        if (!rsp.code) return;
+
+        var data = rsp.code;
+
+        switchButton((data.enable == "1") ? "on" : "off");
+        $("#command_path").val(data.command);
+
+        if (rsp.conf) $('#json_config').val(rsp.conf);
+
+        if (data.jsonfile == 1) {
+            $('#json_conf').attr("checked", "checked");
+            showJsonOption();
+        }
+
+        $("#local_port").val(data.localport);
+        $("#server_addr").val(data.remoteaddr);
+        $("#server_port").val(data.remoteport);
+        $("#key").val(data.key);
+        $("#crypt").val(data.crypt);
+        $("#mode").val(data.mode);
+        $("#mtu").val(data.mtu);
+        $("#sndwnd").val(data.sndwnd);
+        $("#rcvwnd").val(data.rcvwnd);
+        $("#datashard").val(data.datashard);
+        $("#parityshard").val(data.parityshard);
+        $("#nocomp").val(data.nocomp);
+        $("#acknodelay").val(data.acknodelay);
+        $("#nodelay").val(data.nodelay);
+        $("#interval").val(data.interval);
+        $("#resend").val(data.resend);
+        $("#nc").val(data.nc);
+        $("#sockbuf").val(data.sockbuf);
+        $("#keepalive").val(data.keepalive);
+        showCryptOption();
+    }
+
+    function getServiceStatus() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "kcptun", "getServiceInfo")%>", null, function(rsp) {
+            setConfigData(rsp);
+        });
+    }
+
+    $(function() {
+        getServiceStatus();
+
+        $("#kcptun_onoff").click(function() {
+            if ($(this).hasClass('open1')) {
+                $(".loadImg").css("display","inline-block");
+                switchButton("off");
+                // 提交关闭
+                turnOffService();
+            } else {
+                switchButton("on");
+            }
+        });
+
+        $(".wd-tab li").click(function(){
+            $(".wd-tab li").removeClass("current");
+            $(this).addClass("current");
+            var i = $(".wd-tab li").index($(this));
+            $(".wf_tab_cont").css("display","none");
+            if(i == 0){
+                $("#tab1").css("display","block");
+            }else if(i == 1){
+                $("#tab2").css("display","block");
+            }
+        });
+
+        $("#json_conf").click(function () {
+            showJsonOption();
+        });
+
+        $("#crypt").click(function () {
+            showCryptOption();
+        });
+
+        $("#save").click(function () {
+            if (!checkRequestData()) return false;
+
+            loadSave("before", "save");
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "kcptun", "setKcptun")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>',  reqdata: JSON.stringify(requestData)},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.code == 0) {
+                        T_alert.show("保存成功！",2000);
+                    } else {
+                        T_alert.show("保存失败！",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    T_alert.show("保存错误！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("保存超时！",2000);
+                    loadSave("after", "save");
+                }
+            });
+        });
+    })
+</script>
+
+<%include("bottom")%>

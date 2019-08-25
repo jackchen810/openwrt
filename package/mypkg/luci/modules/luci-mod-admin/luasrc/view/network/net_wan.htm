@@ -1,0 +1,1067 @@
+<%
+	local util = require "luci.util"
+	local _uci = require "luci.model.uci".cursor()
+
+	local boardinfo = luci.util.ubus("system", "board") or { }
+	local target_board = boardinfo.release.target	
+	local has_wifi = ((fs.stat("/etc/config/wireless", "size") or 0) > 0)
+	local lan_addr = _uci:get("network", "lan", "ipaddr") or "0.0.0.0"
+	
+	if luci.http.formvalue("status") == "1" then
+		local rv = {}
+		rv.wan = {
+			proto   = _uci:get("network", "wan", "proto"),
+			macaddr = _uci:get("network", "wan", "macaddr"),
+			password = _uci:get("network", "wan", "password"),
+			username = _uci:get("network", "wan", "username"),
+			ipaddr  = _uci:get("network", "wan", "ipaddr"),
+			gwaddr  = _uci:get("network", "wan", "gateway"),
+			netmask = _uci:get("network", "wan", "netmask"),
+			dns     = _uci:get("network", "wan", "dns"),
+			ntp     = ntp,
+			--中继状态
+			apclientset = _uci:get("network", "wan", "apclient"),			
+		}
+	
+		luci.http.prepare_content("application/json")
+		luci.http.write_json(rv)
+		return
+	end
+%>
+
+<%+header%>
+	<script type="text/javascript">
+	
+		var internet_set = {
+			"proto": "",
+			"username": "",
+			"password": "",
+			"ipaddr": "",
+			"netmask": "",
+			"gateway": "",
+			"backup_dns": "",
+			"main_dns": "",
+		}
+		
+		var lan_addr = "<%=lan_addr%>";
+		
+		$(function () {
+			set_header_icon_lighted("pic_fun_crm");
+			get_wan_info();
+		});
+
+		function get_wan_info() {
+			xhr = new XHR();
+			xhr.get('<%=REQUEST_URI%>', {status: 1}, function (x, data) {
+				internet_set.proto = data.wan.proto;
+				internet_set.ipaddr = data.wan.ipaddr;
+				internet_set.netmask = data.wan.netmask;
+				internet_set.gateway = data.wan.gwaddr;
+				internet_set.username = data.wan.username;
+				internet_set.password = data.wan.password;
+				internet_set.ntp = data.ntp;
+				
+				//获取中继状态
+				internet_set.apclientset = data.wan.apclientset;
+
+				switch (typeof data.wan.dns)
+				{
+					case "object":
+					internet_set.backup_dns =  data.wan.dns[1];
+					internet_set.main_dns = data.wan.dns[0];
+					break;
+					case "string":
+					internet_set.main_dns = data.wan.dns;
+					break;
+					default:
+					;
+				}				
+				set_wan_info();
+			});
+		}
+		
+		function set_wan_info() {
+			
+            var type;
+            switch (internet_set.proto) {
+                case "pppoe":
+                    type = "pppoe";
+
+                    document.getElementById('static_ip').value = "";
+                    document.getElementById('static_netmask').value = "";
+                    document.getElementById('static_gateway').value = "";
+                    document.getElementById('main_dns_dhcp').value = "";
+                    document.getElementById('backup_dns_dhcp').value = "";
+                    document.getElementById('main_dns_static').value = "";
+                    document.getElementById('backup_dns_static').value = "";
+
+                    break;
+                case "dhcp":
+                    type = "dhcp";
+
+                    document.getElementById('static_ip').value = "";
+                    document.getElementById('static_netmask').value = "";
+                    document.getElementById('static_gateway').value = "";
+                    document.getElementById('pppoe_table_account').value = "";
+                    document.getElementById('pppoe_table_passwd').value = "";
+                    document.getElementById('main_dns_pppoe').value = "";
+                    document.getElementById('backup_dns_pppoe').value = "";
+
+                    break;
+                case "static":
+                    type = "ip";
+
+                    document.getElementById('pppoe_table_account').value = "";
+                    document.getElementById('pppoe_table_passwd').value = "";
+                    document.getElementById('main_dns_pppoe').value = "";
+                    document.getElementById('backup_dns_pppoe').value = "";
+                    document.getElementById('main_dns_dhcp').value = "";
+                    document.getElementById('backup_dns_dhcp').value = "";
+
+                    break;
+                default:
+                    type = "dhcp";
+                    break;
+            }
+			
+			//选择到中继
+			if(internet_set.apclientset == '1') {
+				type = "wire";
+			}
+			
+            $("input[name='internetWay']").each(function (index) {
+                if ($("input[name='internetWay']").get(index).value == type) {
+                    $("input[name='internetWay']").get(index).checked = true;
+                }
+            });
+
+            if(type == "pppoe"){
+                var pppoe_element;
+                if (pppoe_element = document.getElementById('pppoe_table_account')) {
+                    if (internet_set.username) {
+                        pppoe_element.value = internet_set.username;
+                        setTimeout(function () {
+                            document.getElementById("pppoe_table_account").focus();
+                        }, 0);
+                    }
+
+                }
+                if (pppoe_element = document.getElementById('pppoe_table_passwd')) {
+                    if (internet_set.password) {
+                        pppoe_element.value = internet_set.password;
+                    }
+                }
+                if (pppoe_element = document.getElementById('backup_dns_pppoe')) {
+                    if (internet_set.backup_dns) {
+                        pppoe_element.value = internet_set.backup_dns;
+                    }
+                }
+                if (pppoe_element = document.getElementById('main_dns_pppoe')) {
+                    if (internet_set.main_dns) {
+                        pppoe_element.value = internet_set.main_dns;
+                        document.getElementById('dns_switch_pppoe').checked = true;
+                        show_dns_pppoe();
+                    }
+                }
+            }
+            if(type == "ip"){
+                var static_element;
+                if (static_element = document.getElementById('static_ip')) {
+                    if (internet_set.ipaddr) {
+                        static_element.value = internet_set.ipaddr;
+                    }
+                }
+                if (static_element = document.getElementById('static_netmask')) {
+                    if (internet_set.netmask) {
+                        static_element.value = internet_set.netmask;
+                    }
+                }
+                if (static_element = document.getElementById('static_gateway')) {
+                    if (internet_set.gateway) {
+                        static_element.value = internet_set.gateway;
+                    }
+                }
+                if (static_element = document.getElementById('backup_dns_static')) {
+                    if (internet_set.backup_dns) {
+                        static_element.value = internet_set.backup_dns;
+                    }
+                }
+                if (static_element = document.getElementById('main_dns_static')) {
+                    if (internet_set.main_dns) {
+                        static_element.value = internet_set.main_dns;
+                    }
+                }
+            }
+            if(type == "dhcp"){
+                var dhcp_element;
+                if (dhcp_element = document.getElementById('backup_dns_dhcp')) {
+                    if (internet_set.backup_dns) {
+                        dhcp_element.value = internet_set.backup_dns;
+                    }
+                }
+                if (dhcp_element = document.getElementById('main_dns_dhcp')) {
+                    if (internet_set.main_dns) {
+                        dhcp_element.value = internet_set.main_dns;
+                        document.getElementById('dns_switch_dhcp').checked = true;
+                        show_dns_dhcp();
+                    }
+                }
+            } 
+        }
+		
+		function check_pppoe_status() {
+
+			$("#pppoeStatus").html("<%:Connecting...%>");
+			$.getJSON("<%=luci.dispatcher.build_url("admin", "network", "get_pppoe_status")%>", {}, function(rsp)
+			{
+				if (rsp.code == 0) {						
+					$("#pppoeStatus").css("color", "#2573bf");
+					$("#pppoeStatus").html("<%:Connected%>");
+				} else if (rsp.code == 1) {
+					if (rsp.msg) {
+						$("#pppoeStatus").html(rsp.msg);
+						$("#pppoeStatus").css("color", "red");						
+					} else {
+						setTimeout("check_pppoe_status();",4000);
+					}
+				} else {
+					$("#pppoeStatus").html("<%:Not connected%>");
+					//setTimeout("check_pppoe_status();",4000);
+				}
+			})
+		}
+		
+        function check_dhcp_data() {
+			if (document.getElementById("dns_switch_dhcp").checked == true) {
+				if (!check_ip_by_tag_id("main_dns_dhcp")) {
+					tip_dialog({msg:"<%:Invalid primary DNS address.%>", id:"dns_switch_dhcp"});
+					return false;				
+				}
+				
+				var second_dns = document.getElementById("backup_dns_dhcp").value;
+				if (second_dns != "") {
+					if (!check_ip_by_tag_id("backup_dns_dhcp")) {
+						tip_dialog({msg:"<%:Invalid Secondary DNS address.%>", id:"backup_dns_pppoe"});
+						return false;
+					}
+				}
+			}
+			return true;	
+		}
+		
+        function check_pppoe_data() {
+			var username = document.getElementById("pppoe_table_account").value;
+			
+			if (username.length < 1) {
+				tip_dialog({msg:"<%:User name cannot be empty!%>", id:"pppoe_table_account"});
+				return false;
+			}
+			
+			var pwd = document.getElementById("pppoe_table_passwd").value;
+			if (pwd.length < 1) {
+				tip_dialog({msg:"<%:Password cannot be empty!%>", id:"pppoe_table_passwd"});
+				return false;
+			}
+
+			if (document.getElementById("dns_switch_pppoe").checked == true) {
+				if (!check_ip_by_tag_id("main_dns_pppoe")) {
+					tip_dialog({msg:"<%:Invalid primary DNS address.%>", id:"main_dns_pppoe"});	
+					return false;				
+				}
+				
+				var second_dns = document.getElementById("backup_dns_pppoe").value;
+				if (second_dns != "") {
+					if (!check_ip_by_tag_id("backup_dns_pppoe")) {
+						tip_dialog({msg:"<%:Invalid Secondary DNS address.%>", id:"backup_dns_pppoe"});
+						return false;
+					}
+				}		
+			}
+			return true;			
+		}
+		
+		function check_static_data() {
+			
+			if (!check_ip_by_tag_id("static_ip")) {
+				tip_dialog({msg:"<%:Invalid IP address.%>", id:"static_ip"});	
+				return false;				
+			}			
+
+			var wan_addr = document.getElementById("static_ip").value;			
+			var pos_of_lan_addr = parseInt(wan_addr.lastIndexOf("."));
+			var pos_of_wan_addr = parseInt(lan_addr.lastIndexOf("."));
+			if (lan_addr.substring(0, pos_of_lan_addr) == wan_addr.substring(0, pos_of_wan_addr)) {
+				tip_dialog({msg:"<%:IP addresses with LAN on the same IP subnet.%>", id:"static_ip"});
+				return false;
+			}
+			
+			if (!check_ip_by_tag_id("static_netmask")) {
+				tip_dialog({msg:"<%:Invalid netmask address.%>", id:"static_netmask"});	
+				return false;				
+			}
+			
+			if (!check_ip_by_tag_id("static_gateway")) {
+				tip_dialog({msg:"<%:Invalid gateway address.%>", id:"static_gateway"});	
+				return false;				
+			}
+			
+			if (!check_ip_by_tag_id("main_dns_static")) {
+				tip_dialog({msg:"<%:Invalid primary DNS address.%>", id:"main_dns_static"});	
+				return false;				
+			}
+			
+			var second_dns = document.getElementById("backup_dns_static").value;
+			if (second_dns != "") {
+				if (!check_ip_by_tag_id("backup_dns_static")) {
+					tip_dialog({msg:"<%:Invalid Secondary DNS address.%>", id:"backup_dns_static"});
+					return false;
+				}
+			}
+			
+			return true;
+		}
+		
+		function save_pppoe() {
+			if (check_pppoe_data()) {
+			
+				wan_set_cache("pppoe");
+				
+				var set = JSON.stringify(internet_set);
+				$("#wwsz-prov2").prop("disabled", true);
+				$(".wwsz-prov2").show();
+				
+				$.ajax({
+					url: '<%=luci.dispatcher.build_url("admin", "network", "set_wan_info")%>',
+					cache: false,
+					dataType: "json",
+					data: {token: '<%=token%>', wanset :set},
+					timeout:10000,
+					type: "POST",
+					success: function(rsp) {
+						if (rsp.result == true) {
+							success_prop("wwsz-prov2");
+							setTimeout("check_pppoe_status();",4000);
+						} else {
+							failed_prop(rsp.result,"wwsz-prov2");
+						}
+					},
+					error: function(x) {
+						error_prop(x.statusText,"wwsz-prov2");
+					},
+					ontimeout:function() {
+						timeout_prop();
+					}
+				});
+			}
+		}
+	</script>
+	
+<!--外网设置-->
+<div class="soft_con">
+	<div id="wwsz" class="soft_con2">
+		<div class="function1" style="border: none;">
+			<div id="nr2" class="nav2">
+				
+				<!-- Menu -->
+				<div id="wwsz-nr1" style="clear: both">
+					<table class="bohao" id="internetWay_table" style="margin-top:30px;">
+						<tr>
+							<td><input type="radio" id="inter_1" name="internetWay" value="pppoe"/></td>
+							<td><label for="inter_1"><%:Broadband (PPPoE)%></label></td>
+						</tr>
+						<tr>
+							<td><input type="radio" id="inter_2" name="internetWay" value="dhcp"/></td>
+							<td><label for="inter_2"><%:Automatic (DHCP)%></label></td>
+						</tr>
+						<tr>
+							<td><input type="radio" id="inter_3" name="internetWay" value="ip"/></td>
+							<td><label for="inter_3"><%:Static IP Address%></label></td>
+						</tr>
+						<% if target_board:find("ramips") and has_wifi then %>
+						<tr>
+							<td><input type="radio" id="inter_4" name="internetWay" value="wire"/></td>
+							<td><label for="inter_4"><%:Client Mode Wireless%></label></td>
+						</tr>
+						<%end%>
+					</table>
+					<div id="wwsz-next1" onclick="Networksettingsjump()" class="btn center"
+						 style="margin: 20px auto"><%:Next%>
+					</div>
+				</div>
+				
+				<!-- PPPOE -->
+				<div id="wwsz-nr2" style="display: none; clear: both">
+					<table class="tr tableMAR" style="margin-top:30px;">
+						<tr>
+							<td style="width:83px;text-align:right;"><%:Username%>：</td>
+							<td>
+								<input type="text" id="pppoe_table_account" class="inputwidth"/>
+								<span id="checkUserNameResult"
+									  style="color: red;font-size:13px;margin:0 auto;display:inline;"></span>
+							</td>
+							<td></td>
+						</tr>
+						<tr>
+							<td style="width:83px;text-align:right;"><%:Password%>：</td>
+							<td>
+								<input id="pppoe_table_passwd" type="password" class="inputwidth"/>
+								<span id="checkPasswordResult"
+									  style="color: red;font-size:13px;margin:0 auto;display:inline;"></span>
+							</td>
+							<td style="font-size: 12px;width:100px;">
+								<input type="checkbox"
+									   style="margin-right:5px;display:inline-block;width:15px;height:15px;position:relative;top:2px;"
+									   id="togglePassword" autocomplete="off"/>
+								<label for="togglePassword"><%:Reveal%></label>
+							</td>
+						</tr>
+						
+						<tr>
+							<td style="width:83px;text-align:right;"><%:Status%>：</td>
+							<td colspan="2">
+								<span id="pppoeStatus" style="color: red;font-size:13px;margin:0 auto;display:inline;"><%:Not connected%></span>
+							</td>
+
+						</tr>
+						
+						<tr >
+							<td style="width:83px;text-align:right;"><%:Help%>：</td>
+							<td><a id="show_ppp_log" style="color:#2573bf;font-size:14px;"><%:Dialing log%></a></td>
+							<td style="font-size: 12px;"></td>
+						</tr>
+
+					</table>
+					<table class="tr tableMAR" width=431>
+						<tr>
+							<td style="width:83px;"></td>
+							<td id="dns_onoff" style="text-align:left;">
+								<input type="checkbox" autocomplete="off" id="dns_switch_pppoe" style="margin-right:5px;display:inline-block;width:15px;height:15px;position:relative;top:2px;"/>
+								<label for="dns_switch_pppoe"><%:Use These DNS Servers%></label>
+							</td>
+							<td></td>
+						</tr>
+						<tr class="dns_kuai" style="display: none;">
+							<td style="width:83px;text-align:right;"><%:Primary DNS%>：</td>
+							<td><input type="text" id="main_dns_pppoe"/></td>
+							<td></td>
+						</tr>
+						<tr class="dns_kuai" style="display: none;">
+							<td style="width:83px;text-align:right;"><%:Secondary DNS%>：</td>
+							<td><input type="text" id="backup_dns_pppoe"/></td>
+							<td></td>
+						</tr>
+						<!--自定义DNS设置-->
+						<script>
+							function show_dns_pppoe(){
+								var dns_switch = document.getElementById("dns_switch_pppoe");
+								if(dns_switch.checked == true){
+									$(".dns_kuai").css("display","table-row");
+								}else{
+									$(".dns_kuai").css("display","none");
+								}
+							}
+							$(function(){
+								$('#pppoe_table_passwd').togglePassword({
+									el: '#togglePassword'
+								});
+								
+								$("#dns_onoff").click(function(){
+									show_dns_pppoe();
+								})
+								
+								$("#show_ppp_log").click(function(){
+									top.dialog({
+										url: "<%=luci.dispatcher.build_url("admin", "network", "show_pppoe_log")%>",
+										title: "<%:Dialing log%>",
+										width: 930,
+										height: 500,
+										onclose: function () {
+										},
+										oniframeload: function () {
+										//console.log('iframe ready')
+										}
+									})
+									.showModal();
+									return false;
+								})
+							})
+						</script>
+					</table>
+					<div style="width:290px;margin:0 auto;">
+						<p id="wwsz-next2" class="hold" onclick="pppoe_prov()" style="cursor: pointer;float:left;margin-right: 30px;"><%:Back%></p>
+						<div style="width:140px;float:left;">
+							<button class="hold" id="wwsz-prov2" onclick="save_pppoe()" style="cursor: pointer;"><%:Save%></button>
+							<img class="wwsz-prov2" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+						</div>
+					</div>
+				</div>
+				
+				<!-- DHCP -->
+				<div id="wwsz-nr2-1" style="display: none;clear: both;margin-top:30px;">
+					<p style="text-align: center;padding-top:25px;"><%:Get Automatically from Server%></p>
+
+					<table class="tr tableMAR" width=320>
+						<tr>
+							<td colspan=2 id="dns_onoff2" style="text-align:left;padding-left:30px">
+								<input type="checkbox" autocomplete="off" id="dns_switch_dhcp" style="margin-right:5px;display:inline-block;width:15px;height:15px;position:relative;top:2px;"/>
+								<label for="dns_switch_dhcp" ><%:Use These DNS Servers%></label>
+							</td>
+						</tr>
+						<tr class="dns_kuai2" style="display: none;">
+							<td style="width:83px;text-align:right;"><%:Primary DNS%>：</td>
+							<td><input type="text" id="main_dns_dhcp"/></td>
+						</tr>
+						<tr class="dns_kuai2" style="display: none;">
+							<td style="width:83px;text-align:right;"><%:Secondary DNS%>：</td>
+							<td><input type="text" id="backup_dns_dhcp"/></td>
+						</tr>
+						<!--自定义DNS设置-->
+						<script>
+							function show_dns_dhcp(){
+								var dns_switch_pppoe = document.getElementById("dns_switch_dhcp");
+								if(dns_switch_dhcp.checked == true){
+									$(".dns_kuai2").css("display","table-row");
+								}else{
+									$(".dns_kuai2").css("display","none");
+								}
+							}
+							$(function(){
+								$("#dns_onoff2").click(function(){
+									show_dns_dhcp();
+								})
+							})
+						</script>
+					</table>
+
+					<div style="width:290px;margin:20px auto;">
+						<p id="wwsz-prov2-1" class="hold" onclick="dhcp_prov()" style="cursor: pointer;float:left;margin-right: 30px;"><%:Back%></p>
+						<div style="width:140px;float:left;">
+							<button class="hold" id="wwsz-next2-1" onclick="save_dhcp()" style="cursor: pointer;"><%:Save%></button>
+							<img class="wwsz-next2-1" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Static -->
+				<div id="wwsz-nr2-2" style="clear: both;display: none;margin-top:30px;">
+					<table class="bohao">
+						<tr>
+							<td><span class="function1_left2"><%:IP Address%></span></td>
+							<td><span class="function1_m">:</span></td>
+							<td><input id="static_ip" type="text"/></td>
+						</tr>
+						<tr>
+							<td><span class="function1_left2"><%:Subnet Mask%></span></td>
+							<td><span class="function1_m">:</span></td>
+							<td><input id="static_netmask" type="text"/></td>
+						</tr>
+						<tr>
+							<td><span class="function1_left2"><%:Gateway IP%></span></td>
+							<td><span class="function1_m">:</span></td>
+							<td><input id="static_gateway" type="text"/></td>
+						</tr>
+						<tr>
+							<td><span class="function1_left2"><%:Primary DNS%></span></td>
+							<td><span class="function1_m">:</span></td>
+							<td><input id="main_dns_static" type="text"/></td>
+						</tr>
+						<tr>
+							<td><span class="function1_left2"><%:Secondary DNS%></span></td>
+							<td><span class="function1_m">:</span></td>
+							<td><input id="backup_dns_static" type="text"/></td>
+						</tr>
+					</table>
+					<script>
+						
+						$(function(){
+							//        静态IP设置
+							$("#static_netmask").focus(function() {
+								if($(this).val() == "") {
+									$(this).val("255.255.255.0");
+								}
+							});
+							
+							$("#static_gateway").focus(function() {
+								if (check_ip_by_tag_id("static_ip") == true) {
+									if (check_ip_by_tag_id("static_gateway") == true) {
+										return false;
+									}
+									var str = $("#static_ip").val();
+									var arr = str.split(".");
+									var arr2 = "";
+									for (var i = 0; i < arr.length - 1; i++) {
+										arr[i] = arr[i] + ".";
+										arr2 += arr[i];
+									}
+										arr2 += "1";
+									$(this).val(arr2);
+								} else {
+									$("#static_ip").focus();
+									dialog({
+										title: '<%:Notify%>',
+										okValue: '<%:OK%>',
+										content: '<%:Invalid IP address.%>',
+										ok: function () {
+											setTimeout(function () {
+												$("#static_ip").focus();
+											}, 0);
+										},
+										cancel: false
+									}).showModal();
+								}
+							})
+						})
+					</script>
+					<div style="width:290px;margin:30px auto;">
+						<p onclick="static_prov()" class="hold" id="wwsz-prov2-2" style="cursor: pointer;float:left;margin-right: 30px;"><%:Back%></p>
+						<div style="width:140px;float:left;">
+							<button class="hold" onclick="save_static()" id="wwsz-next2-2" style="cursor: pointer;"><%:Save%></button>
+							<img class="wwsz-next2-2" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Wifi sta -->
+				<div id="wwsz-nr2-3" style="clear: both;display: none;margin-top:30px;">
+
+					<!--无线中继设置-->
+					<table class="bohao">
+						<tbody>
+						<tr>
+							<td class="function1_left"><%:Name (SSID)%></td>
+							<td>：</td>
+							<td id="wire_middle" width="232px">
+								<div class="loading">
+									<img src="<%=resource%>/icons/images/loading.gif" alt=""/><%:Scanning...%>
+								</div>
+								<div class="wname">
+									<div class="wire-name">
+										<input readonly="readonly" id="wire_name" class="wn" type="text" placeholder="<%:Choose a wireless network%>"/>
+										<p id="wire_data" style="display: none;"></p>
+										<button id="chosew" class="choose_wire"><%:Select%></button>
+									</div>
+									<div id="wn_list" class="wn_list">
+
+									</div>
+								</div>
+							</td>
+							<td width="56px"><a id="rescan" onclick="scan_ap_list();" href="#" style="color:#2573bf;font-size: 14px;"><%:Rescan%></a></td>
+						</tr>
+						<tr class="showpwd" id="showlock" style="display:none;">
+							<td class="function1_left"><%:Network Key%></td>
+							<td>：</td>
+							<td><input type="password" id="apclient_pwd"/></td>
+							<td></td>
+						</tr>
+						<tr>
+							<td class="function1_left"><%:Status%></td>
+							<td>：</td>
+							<td>
+								<span style="font-size:14px;color:#666;" id="apclient_status"></span>
+								<a onclick="ctrl_apclient(0);" href="#" style="font-size:14px;color:#2573bf;display: none;" id="apclient_break"><%:Disconnect%></a>
+								<a onclick="ctrl_apclient(1);" href="#" style="font-size:14px;color:#2573bf;display: none;" id="apclient_reconn"><%:Reconnect%></a>
+							</td>
+							<td></td>
+						</tr>
+						</tbody>
+					</table>
+					<script>
+						function ctrl_apclient(x) {
+							$.getJSON("<%=luci.dispatcher.build_url("admin", "wireless","ctrl_apclient")%>",{cmd : x},function(rsp) {
+								if (x == "1") {
+									get_apclient_status(0);									
+								} else {
+									$("#apclient_break").css("display","none");
+									$("#apclient_status").html("<%:Not connected%>");
+									$("#apclient_reconn").css("display","inline");									
+								}
+							});
+						}
+						
+						function scan_ap_list(x) {
+							$(".wname").css("display","none");
+							$(".loading").css("display","block");
+							$("#rescan").hide();
+
+							$.ajax({
+								url: '<%=luci.dispatcher.build_url("admin", "wireless","scan_ap_list")%>',
+								cache: false,
+								dataType: "json",
+								timeout: 20000,
+								success: function(rsp){
+									if(rsp.code == 0) {
+										set_ap_list_info(rsp.aplist);
+									}
+									$(".loading").css("display","none");
+									$(".wname").css("display","block");
+									$("#rescan").show();										
+								},
+								error: function(x){
+									$(".loading").css("display","none");
+									$(".wname").css("display","block");
+									$("#rescan").show();
+								},
+								ontimeout:function(){
+									$(".loading").css("display","none");
+									$(".wname").css("display","block");
+									$("#rescan").show();
+								}
+							});
+						}
+
+						function get_apclient_status(x) {						
+							var request_data = {};
+							if (x < 1) {
+								$("#showlock").css("display","none");
+							}
+							
+							$("#apclient_break").css("display","none");
+							$("#apclient_reconn").css("display","none");
+							
+							$.getJSON("<%=luci.dispatcher.build_url("admin", "wireless","get_apclient_status")%>",request_data,function(rsp) 
+							{
+								if(rsp.result == false) {
+									$("#apclient_status").html("<%:Not connected%>");
+								} else {
+									if(rsp.wanConn == '1') {
+										$("#apclient_status").html("<%:Connected%>");
+										$("#apclient_break").css("display","inline");
+									} else {
+										x += 1;
+										if (x < 10){
+											setTimeout("get_apclient_status("+x+");",5000);
+											$("#apclient_status").html("<%:Connecting...%>");
+										} else {
+											$("#apclient_status").html("<%:Not connected%>");
+											$("#apclient_reconn").css("display","inline");
+										}								
+									}
+									
+									if (x <= 1) {
+										
+										//记录已配置的ssid和密码, 当在SSID列表里切换到已设置的SSID时显示
+										apclient_request_data.rsp_ssid = rsp.apcliSsid;
+										apclient_request_data.ssid = rsp.apcliSsid;
+										
+										$("#wire_name").val(rsp.apcliSsid);
+										apclient_request_data.bssid = rsp.apcliBssid;
+										apclient_request_data.authmode = rsp.apcliAuthmode;
+										
+										if (rsp.apcliAuthmode == "NONE" || rsp.apcliAuthmode == "none") {
+											$("#showlock").css("display","none");
+										} else {
+											apclient_request_data.key = rsp.apcliWpapsk;
+											$("#apclient_pwd").val(rsp.apcliWpapsk);
+											$("#showlock").css("display","table-row");
+										}
+									}
+								}
+							})
+						}
+						
+						function set_apclient_default() {
+							$("#apclient_status").html("<%:Loading%>");
+							$("#apclient_break").css("display","none");
+							$("#apclient_reconn").css("display","none");
+							
+							scan_ap_list("init");
+							setTimeout("get_apclient_status(0);",4000);
+						}
+						
+						function set_ap_list_info(list) {
+							$("#wn_list").empty();
+							
+							for(var i = 0; i<list.length; i++) {
+								var $a = $('<a></a>');
+								var img;
+								var span;
+								var p;
+								
+								if(list[i].security.toLowerCase() == "none") {
+									img = '<i><img src="<%=resource%>/icons/images/signal_png/signal'+ list[i].signal + '.png"/></i>'
+								} else {
+									img = '<i><img src="<%=resource%>/icons/images/signal_png/signal'+ list[i].signal + 'lock.png"/></i>'
+								}
+								
+								span = '<span>'+ list[i].ssid +'</span>';
+								p = '<p style="display:none">'+ list[i].ssid + '?' + list[i].channel + '?' + list[i].bssid + '?'+ list[i].security +'</p>';								
+								$a.append(span).append(p).append(img);								
+								$("#wn_list").append($a);
+								
+								//同步当前设置的中继网络的信道, 防止上级网络重新设置信道, 可以直接保存
+								if(list[i].ssid == apclient_request_data.rsp_ssid) {
+									apclient_request_data.channel = list[i].channel;
+								}
+							}
+						}
+						
+						function stopPropagation(e) {
+							if (e.stopPropagation)
+								e.stopPropagation();
+							else
+								e.cancelBubble = true;
+						}
+						
+						var apclient_request_data = {};
+
+						$(function () {
+							$("#chosew").click(function (e) {
+								$("#wn_list").css({"display": "block"});
+								stopPropagation(e);
+								$("#wn_list").find("a").bind("click",function(){
+									var value = $(this).find("span").html();
+									var lock = $(this).find("img").attr("src");									
+									
+									//设置中继数据
+									$("#wire_data").html($(this).find("p").html());
+									var str = $("#wire_data").html();
+									var str2 = str.split("?");
+									apclient_request_data.ssid = str2[0];
+									apclient_request_data.channel = str2[1];
+									apclient_request_data.bssid = str2[2];
+									apclient_request_data.authmode = str2[3];
+									
+									if(lock.indexOf("lock") > 0){
+										if (apclient_request_data.ssid != apclient_request_data.rsp_ssid) {
+											$("#apclient_pwd").val("");
+										} else {
+											$("#apclient_pwd").val(apclient_request_data.rsp_key);
+										}											
+										$("#showlock").css("display","table-row");
+									}else{
+										$("#showlock").css("display","none");
+									}
+									$("#wire_name").val(value);
+									$("#wn_list").css("display","none");
+								});
+							
+							});
+							$(document).bind('click',function(){
+								$('#wn_list').css('display','none');
+							});
+						})
+						
+						function save_apclient(){
+							$("#wiresave").prop("disabled", true);
+							$(".wiresave").show();
+							$("#apclient_status").html("<%:Connecting...%>");
+							apclient_request_data.key = document.getElementById('apclient_pwd').value;
+
+							$.ajax({
+								url: "<%=luci.dispatcher.build_url("admin", "wireless", "set_apclient")%>",
+								cache: false,
+								dataType: "json",
+								data: apclient_request_data,
+								success: function(rsp){
+									if(rsp.result == true){
+										success_prop("wiresave");
+										setTimeout("get_apclient_status(0);",5000);
+									}else{
+										failed_prop(rsp.result,"wiresave");
+									}
+								},
+								error: function(x){
+									error_prop(x.statusText,"wiresave");
+								},
+							});	
+						}
+						
+					</script>
+					<div class="next">
+						<p onclick="wireprov()" id="wwsz-prov2-3" style="cursor: pointer;"><%:Back%></p>
+						<button onclick="save_apclient()" id="wiresave"  class="hold" style="cursor: pointer;"><%:Save%></button>
+						<img class="wiresave" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+					</div>
+				</div>
+			
+				<div id="wwsz-nr3" style="display: none;clear: both">
+					<p style="text-align: center"><%:Finish%></p>
+					<div class="next2" style="width:275px;margin:30px auto;padding-left:28px;">
+						<p class="hold" onclick="save_prov()" id="wwsz-prov3" style="cursor: pointer;float:left;margin-right:16px;"><%:Back%></p>
+						<p id="wwsz-next3" style="width:140px;background-color:#fff;float:left;">
+							<button style="cursor: pointer;" id="wan_save" class="hold" onclick="wan_save()"><%:Save%></button>
+							<img class="wan_save" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+	
+	<script type="text/javascript">
+	    //        上一步下一步选择性跳转
+        function Networksettingsjump() {
+            var radios = document.getElementsByName("internetWay");
+            for (var i = 0; i < radios.length; i++) {
+                if (radios[i].checked == true) {
+                    console.log(radios[i].value);
+                }
+                if (radios[i].checked == true && radios[i].value == "pppoe") {
+                    document.getElementById("wwsz-nr2").style.display = "block";
+                    document.getElementById("wwsz-nr1").style.display = "none";
+
+                    var ppoeval = document.getElementById("pppoe_table_account").value;
+                    document.getElementById("pppoe_table_account").focus();
+                    document.getElementById("pppoe_table_account").value = "";
+                    document.getElementById("pppoe_table_account").value = ppoeval;
+
+					check_pppoe_status();
+                }
+                if (radios[i].checked == true && radios[i].value == "dhcp") {
+                    document.getElementById("wwsz-nr2-1").style.display = "block";
+                    document.getElementById("wwsz-nr1").style.display = "none";
+                }
+                if (radios[i].checked == true && radios[i].value == "ip") {
+                    document.getElementById("wwsz-nr2-2").style.display = "block";
+                    document.getElementById("wwsz-nr1").style.display = "none";
+
+                    var ipval = document.getElementById("static_ip").value;
+                    document.getElementById("static_ip").focus();
+                    document.getElementById("static_ip").value = "";
+                    document.getElementById("static_ip").value = ipval;
+                }
+                if(radios[i].checked == true && radios[i].value == "wire"){
+                    document.getElementById("wwsz-nr2-3").style.display = "block";
+                    set_apclient_default();
+                    document.getElementById("wwsz-nr1").style.display = "none";
+                }
+            }
+        }
+		
+		function wan_set_cache(type) {
+		
+			internet_set.backup_dns = "";
+			internet_set.main_dns = "";
+			
+            switch (type) {
+                case    "pppoe":
+                    internet_set.proto = "pppoe";
+                    internet_set.username = document.getElementById('pppoe_table_account').value;
+                    internet_set.password = document.getElementById('pppoe_table_passwd').value;
+					
+					if (document.getElementById('dns_switch_pppoe').checked == true) {
+						internet_set.backup_dns = document.getElementById('backup_dns_pppoe').value;
+						internet_set.main_dns = document.getElementById('main_dns_pppoe').value;
+					}
+					
+                    break;
+                case  "dhcp":
+                    internet_set.proto = "dhcp";
+					
+					if (document.getElementById('dns_switch_dhcp').checked == true){
+						internet_set.backup_dns = document.getElementById('backup_dns_dhcp').value;
+						internet_set.main_dns = document.getElementById('main_dns_dhcp').value;					
+					}
+
+                    break;
+                case  "static":
+                    internet_set.proto = "static";
+                    internet_set.ipaddr = document.getElementById('static_ip').value;
+                    internet_set.netmask = document.getElementById('static_netmask').value;
+                    internet_set.gateway = document.getElementById('static_gateway').value;
+                    internet_set.backup_dns = document.getElementById('backup_dns_static').value;
+					internet_set.main_dns = document.getElementById('main_dns_static').value;
+                    break;
+                default:
+                    break;
+            }
+        }	
+
+        function pppoe_prov() {
+            document.getElementById("wwsz-nr1").style.display = "block";
+            document.getElementById("wwsz-nr2").style.display = "none";
+        }
+		
+        function save_dhcp() {
+            if (check_dhcp_data()) {
+                wan_setting_prestate = "dhcp";
+                wan_set_cache("dhcp");
+                wan_save("wwsz-next2-1");
+            }
+        }
+		
+        function dhcp_prov() {
+            document.getElementById("wwsz-nr1").style.display = "block";
+            document.getElementById("wwsz-nr2-1").style.display = "none";
+        }
+		
+        function save_static() {
+            if (check_static_data() == true) {
+                wan_setting_prestate = "static";
+                wan_set_cache("static");
+                wan_save("wwsz-next2-2");
+            }
+        }
+		
+        function static_prov() {
+            document.getElementById("wwsz-nr1").style.display = "block";
+            document.getElementById("wwsz-nr2-2").style.display = "none";
+        }
+		
+        function wireprov() {
+            document.getElementById("wwsz-nr1").style.display = "block";
+            document.getElementById("wwsz-nr2-3").style.display = "none";
+        }
+		
+        function save_prov() {
+            switch (wan_setting_prestate) {
+                case "pppoe":
+                    document.getElementById("wwsz-nr2").style.display = "block";
+                    document.getElementById("wwsz-nr3").style.display = "none";
+                    setTimeout(function () {
+                        document.getElementById("pppoe_table_account").focus();
+                    }, 0);
+                    break;
+                case "dhcp":
+                    document.getElementById("wwsz-nr2-1").style.display = "block";
+                    document.getElementById("wwsz-nr3").style.display = "none";
+                    break;
+                case "static":
+                    document.getElementById("wwsz-nr2-2").style.display = "block";
+                    document.getElementById("wwsz-nr3").style.display = "none";
+                    setTimeout(function () {
+                        document.getElementById("static_ip").focus();
+                    }, 0);
+                    break;
+                default:
+                    document.getElementById("wwsz-nr1").style.display = "block";
+                    document.getElementById("wwsz-nr3").style.display = "none";
+                    break;
+            }
+        }
+		
+		function wan_save(ele){		
+			$("#" + ele).prop("disabled", true);
+			$("." + ele).show();
+			var set = JSON.stringify(internet_set);
+			
+			$.ajax({
+				url: '<%=luci.dispatcher.build_url("admin", "network", "set_wan_info")%>',
+				cache: false,
+				dataType: "json",
+				data: {token: '<%=token%>', wanset :set},
+				timeout:10000,
+				type: "POST",
+				success: function(rsp){
+					if (rsp.result == true) {
+						success_prop(ele);
+						//$("#" + ele).removeAttr("disabled");
+					} else {
+						failed_prop(rsp.result,ele);
+						//$("#" + ele).removeAttr("disabled");
+					}
+				},
+				error: function(x){
+				error_prop(x.statusText,ele);
+					$("#" + ele).removeAttr("disabled");
+				},
+				ontimeout:function(){
+				timeout_prop();
+					$("#" + ele).removeAttr("disabled");
+				}
+			});
+		}
+	</script>
+	
+<%+footer%>

@@ -1,0 +1,5 @@
+config box 'global'
+	option taxnumber '0'
+
+config box 'network'
+	option proto 'dhcp'

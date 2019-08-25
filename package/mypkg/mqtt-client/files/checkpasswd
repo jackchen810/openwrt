@@ -1,0 +1,20 @@
+#!/usr/bin/lua
+
+local sys = require "ktapi.system"
+
+if #arg >= 2 then
+    local username = arg[1] or "root"
+    local pwd = arg[2]
+    ret = sys.checkpasswd(username,pwd)
+elseif #arg == 1 then
+    local username = "root"
+    ret = sys.checkpasswd(username,arg[1])
+else
+    ret = false   
+end
+
+if ret == true then
+    print(1)
+else
+    print(0)    
+end

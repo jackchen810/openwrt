@@ -1,0 +1,347 @@
+<%
+    local uci = require("luci.model.uci").cursor()
+    local client = require "ktapi.ktClient"
+    local _, z
+    local rds = {}
+
+    uci:foreach("firewall", "redirect",
+        function(s)
+            local t = {}
+            t.sname = s[".name"]
+            t.name = s.name
+            t.proto = (s.proto == "all") and "DMZ" or s.proto
+            t.destip = s.dest_ip
+            t.srcport = tonumber(s.src_dport)
+            t.destport = tonumber(s.dest_port)
+
+            table.insert(rds, t)
+        end
+    )
+
+    local clientAddr = client.getClientList()
+
+--[[
+    luci.sys.net.ipv4_hints(function(ip, name)
+        clientAddr[#clientAddr+1] = ip
+    end)
+--]]
+
+    include("top")
+%>
+
+<div class="box">
+<div class="main">
+
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+
+    <div class="">
+        <!--<div class="title">-->
+            <!--<h3>端口映射</h3>-->
+        <!--</div>-->
+        <div class="article">
+            <div class="section top" style="border: 1px solid #ececec;border-radius: 8px;border-bottom:none;">
+                <!-- <div class="section-head2 mb20">
+                    <h5>端口转发</h5>
+                </div> -->
+                <table class="tab-list">
+                    <thead>
+                    <tr>
+                        <th class="portname-css" width="150px">名称</th>
+                        <th width="190px">协议/DMZ</th>
+                        <th width="120px">外部端口</th>
+                        <th width="200px">IP地址</th>
+                        <th width="120px">内部端口</th>
+                        <th width="150px">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody id="list_rule">
+                    <%for _, z in ipairs(rds) do%>
+                        <tr class="addedtr" name="rule_<%=z.srcport%>">
+                            <td class="portname-css"><%=z.name%></td><td><%=z.proto%></td><td><%=z.srcport%></td><td><%=z.destip%></td><td><%=z.destport%></td><td><a class="fw_rule" href="javascript:;" data-sport="<%=z.srcport%>">删除</a></td>
+                        </tr>
+                    <%end%>
+                        <tr class="tr">
+                            <td>
+                                <input id="f_name" class="p-inp" type="text"/>
+                            </td>
+                            <td style="position:relative;width:160px;height:50px;">
+                                <div class="select-div select-div-2">
+                                    <select id="f_proto" class="sel_select aabb2" name="aabb2" style="width:100px">
+                                        <option value="tcp">TCP</option>
+                                        <option value="udp">UDP</option>
+                                        <option value="tcpudp">TCP+UDP</option>
+                                        <option value="all">DMZ</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <style>
+                                div.select-div{
+                                    width:150px;
+                                    height:36px;
+                                    padding:0;
+                                    margin:0;
+                                    border:1px solid #ddd;
+                                }
+                                div.select-div-2{
+                                    width:100px;
+                                }
+                                div.select-div:after{
+                                    right:0;
+                                }
+                                div.select-div select{
+                                    height:35px;
+                                    padding:0;
+                                }
+                                .sel_span1{
+                                    /*height:36px;*/
+                                }
+                                .sel_span2{
+                                    border:none;
+                                }
+                                .wid70 {
+                                     width: 45px;
+                                 }
+                            </style>
+                            <td>
+                                <input id="f_src_port" class="p-inp wid70" type="text"/>
+                            </td>
+                            <td style="position:relative;width:160px;height:50px;">
+                                <span class="sel_span1 selwid110">
+                                    <input id="f_dst_ip" class="sel_inp mac" type="text" name="mac" value="">
+                                </span>
+                                <span class="sel_span2 selwid110 clip110">
+                                    <div class="select-div">
+                                        <select id="sel-hide" class="sel_select aabb sel_sel_wid130" name="aabb" onclick="simOptionClick4IE()">
+                                        <option value="" onclick="showOptionValue( this )">自定义</option>
+                                        <%for _, z in ipairs(clientAddr) do
+                                            if #z.ipaddr > 0 then
+                                        %>
+                                            <option value="<%=z.ipaddr%>" onclick="showOptionValue( this )"><%=z.ipaddr%></option>
+                                        <%  end
+                                        end%>
+
+                                        </select>
+                                    </div>
+                                </span>
+                            </td>
+                            <td>
+                                <input id="f_dst_port" class="p-inp wid70" type="text" value=""/>
+                            </td>
+                            <td style="padding-left:30px;">
+                                <a href="javascript:;" class="addTr">添加</a>
+                                <img id="add-btn" style="display:none;margin-left:30px" src="<%=resource%>/images/loading.gif" alt=""/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var oHeight;
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    // 删除行
+    function delone(port){
+//        var a=otr.parentNode.parentNode;
+//        a.parentNode.removeChild(a);
+
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "firewall", "delPortForward")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', srcport:port},
+            timeout:2000,
+            type: "POST",
+            success: function(rsp){
+                if(rsp.code == 0){
+                    $('tr[name=rule_'+ port +']').remove();
+                    T_alert.show("删除成功",2000);
+                }
+                else{
+                    $('tr[name=rule_'+ port +']').css("display", "table-row");
+                    T_alert.show("删除失败",2000);
+                }
+            },
+            error: function(x){
+                $('tr[name=rule_'+ port +']').css("display", "table-row");
+                T_alert.show("删除失败, 请重试",2000);
+            },
+            ontimeout:function(){
+                $('tr[name=rule_'+ port +']').css("display", "table-row");
+                T_alert.show("删除失败, 请重试",2000);
+            }
+        });
+    }
+
+    function checkAll(){
+        var pname = $("#f_name").val();
+        var pout = $("#f_src_port").val();
+        var pin = $("#f_dst_port").val();
+        var pip = $("#f_dst_ip").val();
+        var inp_ip = $("#f_dst_ip");
+
+        if ($("#f_proto").val() == "all") {
+            pout = "65535";
+            pin = "65535";
+        }
+
+        if(pname == "") {
+            T_alert.show("名称不能为空！",2000);
+            setTimeout(function () {$("#f_name").focus();}, 0);
+            return false;
+        }else if(pout == "") {
+            T_alert.show("外部端口不能为空！",2000);
+            setTimeout(function () {$("#f_src_port").focus();}, 0);
+            return false;
+        }else if(pip == "") {
+            T_alert.show("IP地址不能为空！",2000);
+            setTimeout(function () {$("#f_dst_ip").focus();}, 0);
+            return false;
+        }else if(pin == "") {
+            T_alert.show("内部端口不能为空！",2000);
+            setTimeout(function () {$("#f_dst_port").focus();}, 0);
+            return false;
+        }
+
+        if(!validators.ipaddr(pip)) {
+            T_alert.show("IP地址格式错误",2000);
+            setTimeout(function () {inp_ip.focus();}, 0);
+            return false;
+        }
+
+        if(!validators.port(pout)){
+            T_alert.show("外部端口输入不正确！",2000);
+            setTimeout(function () {$("#f_src_port").focus();}, 0);
+            return false;
+        }
+
+        if(!validators.port(pin)){
+            T_alert.show("内部端口输入不正确！",2000);
+            setTimeout(function () {$("#f_dst_port").focus();}, 0);
+            return false;
+        }
+
+        return true;
+
+    }
+
+    function simOptionClick4IE(){
+        var evt=window.event;
+        var selectObj=evt?evt.srcElement:null;
+        // IE Only
+        if (evt && selectObj &&  evt.offsetY && evt.button!=2 && (evt.offsetY > selectObj.offsetHeight || evt.offsetY<0 ) ) {
+            // 记录原先的选中项
+            var oldIdx = selectObj.selectedIndex;
+            setTimeout(function(){
+                var option=selectObj.options[selectObj.selectedIndex];
+                // 此时可以通过判断 oldIdx 是否等于 selectObj.selectedIndex
+                // 来判断用户是不是点击了同一个选项,进而做不同的处理.
+                $("#f_dst_ip").val($(option).val());
+            }, 60);
+        }
+    }
+
+    function showOptionValue(opt){
+        $("#f_dst_ip").val($(opt).val());
+    }
+    $(function () {
+        $("#f_proto").bind("change",function(){
+            var proto = $(this).val();
+            if (proto == "all") {
+                $("#f_dst_port").css("display","none");
+                $("#f_src_port").css("display","none");
+            } else {
+                $("#f_dst_port").css("display","block");
+                $("#f_src_port").css("display","block");
+            }
+        });
+
+        $("#list_rule").on("click", ".fw_rule", function(){
+            //console.log($(this).data('sport'));
+            var port = $(this).data('sport');
+            $('tr[name=rule_'+ port +']').css("display", "none");
+            delone(port);
+        });
+
+        $(".addTr").click(function(){
+            if (!checkAll()) return false;
+
+            $(".addTr").css("display","none");
+            $("#add-btn").css("display","block");
+
+            var pname = $("#f_name").val();
+            var proto = $("#f_proto").val();
+            var pout = $("#f_src_port").val();
+            var pin = $("#f_dst_port").val();
+            var pip = $("#f_dst_ip").val();
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "firewall", "setPortForward")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', ip:pip, name: pname, proto: proto, sport: pout, dport: pin},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp){
+                    if(rsp.code == 0){
+                            if (proto == "all") proto = "DMZ";
+                            var strTr = '<tr class="addedtr" name="rule_'+ pout +'">'+
+                                '<td class="portname-css">'+ pname +'</td>'+
+                                '<td>'+ proto +'</td>'+
+                                '<td>'+ pout +'</td>'+
+                                '<td>'+ pip +'</td>'+
+                                '<td>'+ pin +'</td>'+
+                                '<td>'+
+                                '<a class="fw_rule" href="javascript:;" data-sport="'+ pout +'">删除</a>'+
+                                '</td>'+
+                                '</tr>';
+                            $(".tr").before(strTr);
+                            $("#f_name").val("");
+                            $("#f_src_port").val("");
+                            $("#f_dst_port").val("");
+                            $("#f_dst_ip").val("");
+
+                           //$("#sel-hide option[value='']").attr("selected", true);
+                        T_alert.show("添加成功",2000);
+                    }else if(rsp.code == 2){
+                        T_alert.show("外部端口有重复！",2000);
+                        setTimeout(function () {$("#f_src_port").focus();}, 0);
+                    }else if(rsp.code == 3){
+                        T_alert.show("您已添加DMZ主机, 无法映射其他端口",4000);
+                    }else if(rsp.code == 4){
+                        T_alert.show("冲突! 需清空已添加规则后再使用DMZ功能",5000);
+                    }
+                    $("#add-btn").css("display","none");
+                    $(".addTr").css("display","block");
+                },
+                error: function(x){
+                    T_alert.show("添加失败, 请重试")
+                    $("#add-btn").css("display","none");
+                    $(".addTr").css("display","block");
+                },
+                ontimeout:function(){
+                    T_alert.show("添加失败, 请重试")
+                    $("#add-btn").css("display","none");
+                    $(".addTr").css("display","block");
+                }
+            });
+
+            //$("#sel-hide").find("option[value='']").attr("selected",true);
+        })
+
+    });
+
+</script>
+
+
+<%include("bottom")%>

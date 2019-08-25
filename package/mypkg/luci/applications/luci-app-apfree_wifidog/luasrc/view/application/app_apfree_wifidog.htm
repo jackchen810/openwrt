@@ -1,0 +1,436 @@
+<%
+    local uci = require "luci.model.uci".cursor()
+
+    local WifiDog = {}
+    uci:foreach("wifidog", "wifidog", function(s) WifiDog[s[".index"]]=s end)
+
+    local Enable        = WifiDog[0].enable or 1
+    local HostName      = WifiDog[0].auth_server_hostname
+    local Port          = WifiDog[0].auth_server_port
+    local Path          = WifiDog[0].auth_server_path
+    local PoolMode      = WifiDog[0].pool_mode
+    local ThreadNum     = WifiDog[0].thread_number
+    local QueueSize     = WifiDog[0].queue_size
+    local WiredPass     = WifiDog[0].wired_passed
+
+    -- 访问规则
+    local TrustedPanDomains = WifiDog[0].trusted_pan_domains or ""
+    local TrustedDomains    = WifiDog[0].trusted_domains or ""
+    local TrustedIPList     = WifiDog[0].trusted_iplist or ""
+    local TrustedMACList    = WifiDog[0].trusted_maclist or ""
+    local UNTrustedMACList  = WifiDog[0].untrusted_maclist or ""
+
+    function _listSplit(s)
+        if s == nil or s == "" then
+            return nil
+        end
+
+        local d = ","
+        local r = {}
+        for m in (s .. d):gmatch("(.-)" .. d) do
+            table.insert(r, m)
+        end
+
+        return r
+    end
+
+    include("top")
+%>
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+<div class="box">
+    <div class="main">
+        <%include("application/menuer")%>
+
+        <div class="content">
+            <div class="title">
+                <h3>Apfree_WifiDog</h3>
+            </div>
+            <div class="article">
+            <a href="https://github.com/liudf0716/apfree_wifidog"><img style="position: absolute; top: 10; left: 30; border: 0;" src="<%=resource%>/images/fork.png" alt="Fork me on GitHub"></a>
+                <div class="input-info">
+                    <p class="adbyby-p" style="margin-top:50px;margin-bottom:10px;">
+                        ApFree WiFiDog 在完全兼容原版WiFiDog的基础上，在功能、性能和稳定性方面做了大量工作、改进及优化，目前在坤腾固件中广泛使用且完全开源。
+                        </br></br>
+                        <!-- Place this tag where you want the button to render. -->
+                        <a class="github-button" href="https://github.com/liudf0716/apfree_wifidog/subscription" data-icon="octicon-eye" data-style="mega" data-count-href="/liudf0716/apfree_wifidog/watchers" data-count-api="/repos/liudf0716/apfree_wifidog#subscribers_count" data-count-aria-label="# watchers on GitHub" aria-label="Watch liudf0716/apfree_wifidog on GitHub">Watch</a>
+                        <!-- Place this tag where you want the button to render. -->
+                        <a class="github-button" href="https://github.com/liudf0716/apfree_wifidog" data-icon="octicon-star" data-style="mega" data-count-href="/liudf0716/apfree_wifidog/stargazers" data-count-api="/repos/liudf0716/apfree_wifidog#stargazers_count" data-count-aria-label="# stargazers on GitHub" aria-label="Star liudf0716/apfree_wifidog on GitHub">Star</a>
+                        <!-- Place this tag where you want the button to render. -->
+                        <a class="github-button" href="https://github.com/liudf0716/apfree_wifidog/fork" data-icon="octicon-repo-forked" data-style="mega" data-count-href="/liudf0716/apfree_wifidog/network" data-count-api="/repos/liudf0716/apfree_wifidog#forks_count" data-count-aria-label="# forks on GitHub" aria-label="Fork liudf0716/apfree_wifidog on GitHub">Fork</a>
+                        </p>
+                </div>
+                <hr style="padding-top:30px;margin-left:106px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                <ul class="wd-tab">
+                    <li class="current tab1">基本设置</li>
+                    <li class="tab2">域名/IP 访问规则</li>
+                    <li class="tab3">MAC访问控制</li>
+                </ul>
+                <div class="set-content">
+                    <div class="wf_tab_cont" id="tab1">
+                        <div class="input-info">
+                            <label style="float: left;margin-top: 22px;">Portal 开关</label>
+                            <div id="wifidog_onoff" class="switch open1" style="margin:17px 0 2px 36px">
+                                <div id="wifi2g_btno" class="slide open2"></div>
+                            </div>
+                            <span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+                            <div class="clean"></div>
+                        </div>
+
+                        <div class="input-info">
+                            <label>认证服务器</label>
+                            <input class="wid140" type="text"  id="auth_server" placeholder="entrance.kunteng.org.cn" value="<%=HostName%>"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>服务器端口</label>
+                            <input class="wid140" type="text"  id="auth_port" placeholder="80" value="<%=Port%>"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>服务器路径</label>
+                            <input class="wid140" type="text"  id="auth_path" placeholder="/wifidog/" value="<%=Path%>"/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>线程池模式</label>
+                            <select class="opt" id="pool_mode">
+                                <option value="1" <%if PoolMode == "1" then%>selected="selected"<%end%>>开启</option>
+                                <option value="0" <%if PoolMode == "0" then%>selected="selected"<%end%>>关闭</option>
+                            </select>
+                        </div>
+
+                        <div id="pool_opt_table" <%if PoolMode == "0" then%> style="display:none" <%end%>>
+                            <div class="input-info">
+                                <label>线程数</label>
+                                <input class="wid140" type="text"  id="thread_number" placeholder="5" value="<%=ThreadNum%>"/>
+                            </div>
+
+                            <div class="input-info">
+                                <label>队列大小</label>
+                                <input class="wid140" type="text"  id="queue_size" placeholder="20" value="<%=QueueSize%>"/>
+                            </div>
+                        </div>
+
+                        <div class="input-info">
+                            <label>有线免认证</label>
+                            <select class="opt" id="wired_pass">
+                                <option value="1" <%if WiredPass == "1" then%>selected="selected"<%end%>>开启</option>
+                                <option value="0" <%if WiredPass == "0" then%>selected="selected"<%end%>>关闭</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="wf_tab_cont mt64" id="tab2" style="display: none;">
+                        <div class="input-info mb30">
+                            <label class="vera_top">泛域名白名单</label>
+                            <textarea class="inp_area" id="white_extdomain" rows="5" cols="40"><%=TrustedPanDomains:gsub(",", "\n")%></textarea>
+                        </div>
+
+                        <div class="input-info mb30">
+                            <label class="vera_top">域名白名单</label>
+                            <textarea class="inp_area" id="white_domain" rows="5" cols="40"><%=TrustedDomains:gsub(",", "\n")%></textarea>
+                        </div>
+
+                        <div class="input-info mb30">
+                            <label class="vera_top">IP 白名单</label>
+                            <textarea class="inp_area" id="white_ip" rows="5" cols="40"><%=TrustedIPList:gsub(",", "\n")%></textarea>
+                        </div>
+
+                    </div>
+
+                    <div class="wf_tab_cont mt64" id="tab3" style="display: none;">
+                        <div class="input-info mb30">
+                            <label class="vera_top">MAC白名单</label>
+                            <textarea class="inp_area" id="white_mac" rows="5" cols="40"><%=TrustedMACList:gsub(",", "\n")%></textarea>
+                        </div>
+                        <div class="input-info mb30">
+                            <label class="vera_top">MAC黑名单</label>
+                            <textarea class="inp_area" id="black_mac" rows="5" cols="40"><%=UNTrustedMACList:gsub(",", "\n")%></textarea>
+                        </div>
+                    </div>
+
+                    <hr id="hr2" style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                    <div class="operate-btn">
+                        <input type="button" value="保 存" class="s off" id="save"/>
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+        T_alert._css.lineHeight = "40px";
+    var requestData = {};
+
+    function TransferString(content) {  
+        var string = content;  
+        try {  
+            string = string.replace(/\r\n/g, ",")  
+            string = string.replace(/\n/g, ",");  
+        }catch(e) {  
+        console.log(e.message);  
+        }
+        return string;  
+    }
+
+    function showPoolOption() {
+        if ($("#pool_mode").val() == "1") {
+            $("#pool_opt_table").css("display", "block");
+        } else {
+            $("#pool_opt_table").css("display", "none");
+        }
+    }
+
+    function checkRequestData() {
+        requestData.HostName = $("#auth_server").val();
+
+        requestData.Port = $("#auth_port").val();
+        if (requestData.Port.length < 1 || !validators.port(requestData.Port)) {
+            T_alert.show("认证服务器端口不正确",2000);
+            $("#auth_port").focus();
+            return false;
+        }
+
+        requestData.Path = $("#auth_path").val();
+        if (requestData.Path.length < 1) {
+            T_alert.show("路径不能为空",2000);
+            $("#auth_path").focus();
+            return false;
+        }
+
+        requestData.PoolMod = $("#pool_mode").val();
+        requestData.ThreadNum = $("#thread_number").val();
+        requestData.QueueSize = $("#queue_size").val();
+        
+        if (requestData.PoolMod == "1") {
+            if (requestData.ThreadNum.length < 1 || !validators.integer(requestData.ThreadNum)) {
+                T_alert.show("线程数填写不正确",2000);
+                $("#thread_number").focus();
+                return false;
+            }
+
+            if (requestData.QueueSize.length < 1 || !validators.integer(requestData.QueueSize)) {
+                T_alert.show("队列大小填写不正确",2000);
+                $("#queue_size").focus();
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    function changeTab(tabnum) {
+        $(".wd-tab li").removeClass("current");
+        $('.'+tabnum).addClass("current");
+        $(".wf_tab_cont").css("display","none");
+        $("#"+tabnum).css("display","block");
+    }
+    
+    function checkList() {
+        var flag = true;
+        requestData.WiredPass = $("#wired_pass").val();
+        requestData.TrustedPanDomains    = TransferString($.trim($("#white_extdomain").val()));
+        requestData.TrustedDomains        = TransferString($.trim($("#white_domain").val()));
+        requestData.TrustedIPList        = TransferString($.trim($("#white_ip").val()));
+        requestData.TrustedMACList        = TransferString($.trim($("#white_mac").val()));
+        requestData.UNTrustedMACList    = TransferString($.trim($("#black_mac").val()));
+        var arrPanDomains = requestData.TrustedPanDomains.split(",");
+        var arrDomains = requestData.TrustedDomains.split(",");
+        var arrIPLists = requestData.TrustedIPList.split(",");
+        var arrMACList = requestData.TrustedMACList.split(",");
+        var arrUnMACList = requestData.UNTrustedMACList.split(",");
+
+        if(arrPanDomains.length> 20){
+            T_alert.show('泛域名白名单不能超过20条',2000);
+            return false;
+        }
+        if(arrDomains.length > 20){
+            T_alert.show('域名白名单不能超过20条',2000);
+            return false;
+        }
+        if(arrIPLists.length > 20){
+            T_alert.show('IP白名单不能超过20条',2000);
+            return false;
+        }
+        if(arrMACList.length > 20){
+            T_alert.show('MAC白名单不能超过20条',2000);
+            return false;
+        }
+        if(arrUnMACList.length > 20){
+            T_alert.show('MAC黑名单不能超过20条',2000);
+            return false;
+        }
+
+        if(requestData.TrustedPanDomains){
+            $.each(arrPanDomains,function(i,ele){
+                if(!validators.domain(ele)){
+                    T_alert.show("泛域名白名单地址不正确",2000);
+                    $("#white_extdomain").focus();
+                    flag = false;
+                    changeTab("tab2");
+                    return false;
+                }
+            });
+            if(!flag){return false;}
+        }
+        if(requestData.TrustedDomains){
+            $.each(arrDomains,function(i,ele){
+                if(!validators.domain(ele)){
+                    T_alert.show("域名白名单地址不正确",2000);
+                    $("#white_domain").focus();
+                    flag = false;
+                    changeTab("tab2");
+                    return false;
+                }
+            });
+            if(!flag){return false;}
+        }
+        if(requestData.TrustedIPList){
+            $.each(arrIPLists,function(i,ele){
+                if(!validators.ipaddr(ele)){
+                    T_alert.show("IP白名单地址不正确",2000);
+                    $("#white_ip").focus();
+                    flag = false;
+                    changeTab("tab2");
+                    return false;
+                }
+            });
+            if(!flag){return false;}
+        }
+        if(requestData.TrustedMACList){
+            $.each(arrMACList,function(i,ele){
+                if(!validators.macaddr(ele)){
+                    T_alert.show("MAC白名单格式不正确",2000);
+                    $("#white_mac").focus();
+                    flag = false;
+                    changeTab("tab3");
+                    return false;
+                }
+            });
+            if(!flag){return false;}
+        }
+        if(requestData.UNTrustedMACList){
+            $.each(arrUnMACList,function(i,ele){
+                if(!validators.macaddr(ele)){
+                    T_alert.show("MAC黑名单格式不正确",2000);
+                    $("#black_mac").focus();
+                    flag = false;
+                    changeTab("tab3");
+                    return false;
+                }
+            });
+            if(!flag){return false;}
+        }
+        return flag;
+    }
+    
+    function turnOffWifiDog() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "apfreeWifiDog", "turnOffWifiDog")%>", null, function(rsp) {
+            $(".loadImg").css("display","none");
+            if (rsp.code == 0) {
+                T_alert.show("WifiDog 已关闭",2000);
+            } else {
+                T_alert.show("操作失败，请重试",2000);
+            }
+        });
+    }
+
+    function switchButton(action) {
+        if (action == "off") {
+            $("#wifidog_onoff").removeClass('open1');
+            $("#wifidog_onoff").addClass('close1');
+            $("#wifidog_onoff").children().removeClass('open2');
+            $("#wifidog_onoff").children().addClass('close2');
+
+            // 页面表单禁用
+            $(".set-content").find(":input").attr("disabled","disabled");
+            $("#save").css("display", "none")
+        } else {
+            $("#wifidog_onoff").removeClass('close1');
+            $("#wifidog_onoff").addClass('open1');
+            $("#wifidog_onoff").children().removeClass('close2');
+            $("#wifidog_onoff").children().addClass('open2');
+
+            // 页面表单激活
+            $(".set-content").find(":input").removeAttr("disabled");
+            $("#save").css("display", "inline-block")
+        }
+    }
+
+    $(function(){
+
+        var status = "<%=Enable%>"
+        switchButton((status == "1") ? "on" : "off");
+
+        $("#wifidog_onoff").click(function() {
+            if ($(this).hasClass('open1')) {
+                $(".loadImg").css("display","inline-block");
+                switchButton("off");
+                // 提交关闭
+                turnOffWifiDog();
+            } else {
+                switchButton("on");
+            }
+        });
+
+        $(".wd-tab li").click(function(){
+            $(".wd-tab li").removeClass("current");
+            $(this).addClass("current");
+            var i = $(".wd-tab li").index($(this));
+            $(".wf_tab_cont").css("display","none");
+            if(i == 0){
+                $("#tab1").css("display","block");
+            }else if(i == 1){
+                $("#tab2").css("display","block");
+            }else if(i == 2){
+                $("#tab3").css("display","block");
+            }
+        });
+
+        $("#pool_mode").click(function () {
+            showPoolOption();
+        });
+
+        $("#save").click(function () {
+            if (!checkRequestData() || !checkList()){
+                return false;
+            }
+
+            //requestData = JSON.stringify(requestData);
+            loadSave("before", "save");
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "apfreeWifiDog", "setWifiDog")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>',  reqdata: JSON.stringify(requestData)},
+                timeout:20000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.code == 0) {
+                        T_alert.show("保存成功！",2000);
+                    } else {
+                        T_alert.show("保存失败！",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    T_alert.show("保存错误！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("保存超时！",2000);
+                    loadSave("after", "save");
+                }
+            });
+
+        });
+    })
+</script>
+
+<%include("bottom")%>

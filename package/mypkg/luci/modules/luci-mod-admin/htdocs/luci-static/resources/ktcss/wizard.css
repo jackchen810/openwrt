@@ -1,0 +1,388 @@
+* {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+    font-weight: normal;
+    font-family: "Microsoft Yahei";
+}
+
+a {
+    text-decoration: none;
+    color: #FFFFFF
+}
+html{
+	overflow: scroll;
+	}
+.header {
+    /*width: 910px;*/
+    height: 198px;
+    margin: 0 auto;
+    background-image: url("../icons/images/topback.png");
+    background-size: cover;
+    background-position:center center;
+    text-align: center;
+}
+
+.header img {
+   padding:40px 0 20px 0;
+}
+
+body {
+    margin: 0 auto;
+    background-color: #fafafa;
+}
+
+/*div1里面内容样式设置*/
+.header span {
+    color: #ffffff;
+    font-size: 20px;
+    display: block;
+    /*margin: 0 410px 34px 410px;*/
+
+}
+
+/*外网设置里面的内容样式*/
+.next{
+    width:910px;
+    margin:0 auto;
+    text-align:center;
+}
+.next p {
+    display: inline-block;
+    width: 115px;
+    height: 38px;
+    background-color: #2573bf;
+    color: #FFFFFF;
+    font-size: 16px;
+    border-radius: 6px;
+    line-height: 16px;
+    text-align: center;
+    line-height: 38px;
+    margin:44px 8px;
+    cursor: pointer;
+
+}
+.next p:hover{
+    background-color:#2573FE;
+}
+
+.tableMAR {
+    margin: 0px auto;
+}
+
+.bac {
+    background-color: #f7f7f7
+}
+
+.xbk {
+    color: #2573bf;
+    border-bottom: 1px solid #2573bf;
+    background-color: #efefef;
+}
+/*外网设置*/
+.div2-waiwang {
+    font-size: 18px;
+    color: #5a9ad7;
+    margin: 18px 0px 10px 28px;
+    text-align: left;
+}
+
+.xiangdao {
+    width: 115px;
+    height: 38px;
+    float: right;
+    background-color: #2573bf;
+    color: #ffffff;
+    margin-right: 75px;
+    margin-top: 32px;
+    text-align: center;
+    line-height: 38px;
+    border-radius: 3px;
+    margin-bottom: 32px;
+}
+
+/** 外网设置 **/
+/*#nr2 {*/
+    /*width: 910px;*/
+    /*background-color: #f7f7f7;*/
+    /*height: 900px;*/
+    /*display: none;*/
+    /*border: 1px solid red;*/
+/*}*/
+
+#nr2 ul li {
+    float: left;
+    width: 227.5px;
+    height: 54px;
+    text-align: center;
+    line-height: 54px;
+    font-size: 14px;
+    color: #333333;
+
+}
+
+#nr2 ul {
+    width: 910px;
+    margin:0 auto;
+    overflow: hidden;
+}
+
+.bohao {
+    margin: 0px auto;
+    border-collapse: separate;
+    border-spacing: 22px;
+}
+.btn {
+    width: 115px;
+    height: 38px;
+    border-radius: 6px;
+    color: #FFFFFF;
+    font-size: 16px;
+    background-color: #2573bf;
+    line-height: 38px;
+    text-align: center;
+    margin: 0 auto;
+    cursor: pointer;
+}
+.btn:hover{
+    background-color:#2573FE;
+}
+.tableMAR {
+    margin: 0px auto;
+}
+.tr {
+    border-collapse: separate;
+    border-spacing: 23px;
+}
+/*SSID设置*/
+.ssid {
+    width: 178px;
+    height: 22px;
+    border-radius: 2px;
+    border: 1px solid #e4e4e4;
+}
+#wwsz-nr3 > p {
+    color: #333333;
+    font-size: 14px;
+    font-family: 微软雅黑;
+}
+
+.ssid_div {
+    clear: both;
+    text-align: center;
+    padding-top: 40px;
+}
+.syl{
+    background-color:#fff;
+    margin:0 auto;
+    padding-bottom:40px;
+}
+.backbtn{
+    text-align:center;
+    height:70px;
+    line-height:70px;
+}
+/*响应式*/
+@media screen and(min-width:910px){
+    .header{
+        width:910px;
+    }
+    .backbtn{
+        width:910px;
+        margin:0 auto;
+    }
+    #nr2 ul{
+        width:910px;
+    }
+    .syl{
+        width:910px;
+        height:460px;
+    }
+}
+@media screen and (min-width:768px) and (max-width:909px){
+    .syl{
+        width:100%;
+        height:460px;
+        background-color:#fff;
+        margin:0 auto;
+    }
+    .backbtn{
+        width:100%;
+    }
+    #nr2 ul{
+        width:100%;
+    }
+    #nr2 ul li{
+        width:25%;
+    }
+    .header{
+        width:100%;
+    }
+    .next{
+        width:100%;
+    }
+}
+@media screen and (max-width:767px){
+    .syl{
+        width:100%;
+        height:560px;
+        background-color:#fff;
+        margin:0 auto;
+    }
+    .backbtn{
+        width:100%;
+    }
+    #nr2 ul{
+        width:100%;
+    }
+    #nr2 ul li{
+        width:100%;
+    }
+    .header{
+        width:100%;
+    }
+    .next{
+        width:100%;
+    }
+}
+
+
+/*无线中继*/
+.wire-name .wn{
+    width:160px;
+    height:32px;
+    line-height:32px;
+    outline:none;
+    padding-left:6px;
+}
+.wn_list{
+    width:230px !important;
+    max-height:160px;
+}
+.wn_list a:hover{
+    background-color:#2573bf;
+    color:#fff;
+}
+.wn_list a{
+    font-size:14px;
+    padding-left:6px;
+}
+.wn_list a span{
+    width:160px;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    overflow:hidden;
+}
+.wn_list a span{
+    display:block;
+    float:left;
+    max-width:160px;   /*IE不能解释该属性，而FF可以*/
+}
+/*.wn_list a span:after{*/
+/*content:"...";*/
+/*}*/
+.wn_list a i{
+    display:inline-block;
+    float:left;
+    padding-left:5px;
+}
+.showpwd input{
+    height:32px;
+    line-height:32px;
+    padding-left:6px;
+    width:222px;
+}
+
+.wire_title {
+    color: #5a9ad7;
+}
+
+.wire_kuai {
+    padding-bottom: 30px;
+}
+
+.wire_table a {
+    color: #333;
+}
+
+.wire_table {
+}
+
+.wire_table td {
+    height: 40px;
+
+}
+
+.wire_table tr {
+    margin: 10px 0;
+}
+
+.wire_table input {
+    height: 36px;
+    padding-left: 6px;
+    width: 220px;
+}
+
+.choose_wire {
+    /*width:70px;*/
+    height: 30px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    background-color: #fff;
+}
+
+.wire-name {
+    /*width:292px;*/
+    width: 230px;
+    border: 1px solid #999;
+}
+
+.wire-name .wn {
+    border: none;
+    width: 150px;
+}
+
+.wname {
+    /*position: relative;*/
+}
+
+.wn_list {
+    width: 233px;
+    border-left: 1px solid #999;
+    border-right: 1px solid #999;
+    min-height: 120px;
+    overflow-y: auto;
+	overflow-x: hidden;
+    position: absolute;
+    background-color: #fff;
+    display: none;
+}
+
+.wn_list a {
+    width: 100%;
+    height: 28px;
+    border-bottom: 1px solid #999;
+    display: block;
+    padding-left: 14px;
+    line-height: 28px;
+    color: #666;
+}
+
+.wtext {
+    font-size: 16px;
+}
+
+.wbtn {
+    width: 115px;
+    height: 38px;
+    border-radius: 2px;
+    color: #FFFFFF;
+    font-size: 16px;
+    background-color: #2573bf;
+    line-height: 38px;
+    text-align: center;
+    margin: 0 auto;
+    cursor: pointer;
+}
+

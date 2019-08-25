@@ -1,0 +1,233 @@
+<%
+	local uci = require "luci.model.uci".cursor()
+	local fs = require "nixio.fs"
+
+	local SyncDial = uci:get_all("syncdial")
+
+	local Enable	= SyncDial.config.enabled or 0
+	local WanNum	= SyncDial.config.wannum or 2
+	local WaitSec	= SyncDial.config.dialwait or 25
+	local DialNum	= SyncDial.config.dialnum or 1
+	local DialChk	= SyncDial.config.dialchk or 0
+	local oldFrame	= SyncDial.config.old_frame or 0
+
+	include("top")
+%>
+
+<div class="box">
+	<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+
+		<div class="">
+			<!--<div class="title">-->
+				<!--<h3>SyncDial</h3>-->
+			<!--</div>-->
+			<div class="article syncdial">
+				<div class="set-content">
+					<div class="input-info">
+						<label style="float: left;margin-top: 22px;">启用单线多播</label>
+						<div id="on-off" class="switch open1" style="margin:17px 0 2px 36px">
+							<div class="slide open2"></div>
+						</div>
+						<span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+						<div class="clean"></div>
+					</div>
+
+					<div class="input-info">
+						<label>虚拟WAN接口数</label>
+						<input class="wid140" type="text"  id="wan-num" value="<%=WanNum%>"/>
+						<!--<span style="color:#999;">-->
+							<!--<input type="checkbox" class="inp-checkbox" id="old-fram" <%if oldFrame == "1" then%>checked="checked"<%end%>/>-->
+							<!--<label class="checkbox-txt" for="old-fram">macvlan</label>-->
+						<!--</span>-->
+						<span style="color:#999;">
+                            <input class="magic-checkbox" type="checkbox" id="old-fram" <%if oldFrame == "1" then%>checked="checked"<%end%>/>
+                            <label for="old-fram" class="checkbox-txt" style="line-height:22px;">macvlan</label>
+                        </span>
+					</div>
+
+					<div class="input-info">
+						<label>最低在线接口数</label>
+						<input class="wid140" type="text"  id="dial-num" value="<%=DialNum%>"/>
+						 <!--<span style="color:#999;">-->
+							<!--<input type="checkbox" class="inp-checkbox" id="dial-chk" <%if DialChk == "1" then%>checked="checked"<%end%>/>-->
+							<!--<label class="checkbox-txt" for="dial-chk">掉线检测</label>-->
+						<!--</span>					   -->
+						<span style="color:#999;">
+                            <input class="magic-checkbox" type="checkbox" id="dial-chk" <%if DialChk == "1" then%>checked="checked"<%end%>/>
+                            <label for="dial-chk" class="checkbox-txt" style="line-height:22px;">掉线检测</label>
+                        </span>
+					</div>
+
+					<div class="input-info">
+						<label>重拨等待时间</label>
+						<input class="wid140" type="text"  id="wait-sec" value="<%=WaitSec%>"/>
+					</div>
+
+					<hr id="hr2" class="hr-new">
+					<div class="operate-btn">
+						<input type="button" value="保 存" class="s off" id="save"/>
+						<img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+					</div>
+
+					<div id="status" style="display:none"> 
+						<hr style="padding-top:10px;margin-bottom:10px;border-bottom:1px solid #eee;width:610px;"/>
+						<pre style="margin-bottom:30px;" id="mwan3-status"></pre>
+					</div>
+
+				</div>
+
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+	var T_alert = new Toast();
+		T_alert._css.lineHeight = "40px";
+	var RequestData = {};
+
+	function checkRequestData() {
+		RequestData.WanNum = $("#wan-num").val();
+		if (RequestData.WanNum.length < 1 || !validators.integer(RequestData.WanNum)) {
+			T_alert.show("虚拟WAN接口数量不正确",2000);
+			$("#wan-num").focus();
+			return false;
+		}
+		RequestData.WaitSec = $("#wait-sec").val();
+		if (RequestData.WaitSec.length < 1 || !validators.integer(RequestData.WaitSec)) {
+			T_alert.show("重拨等待时间不正确",2000);
+			$("#wait-sec").focus();
+			return false;
+		}
+		RequestData.DialNum = $("#dial-num").val();
+		if (RequestData.DialNum.length < 1 || !validators.integer(RequestData.DialNum)) {
+			T_alert.show("最低在线接口数不正确",2000);
+			$("#dial-num").focus();
+			return false;
+		}
+
+		RequestData.DialChk = 0;
+		if ($("#dial-chk").prop("checked")) {
+			RequestData.DialChk = 1;
+		}
+
+		RequestData.oldFram = 0;
+		if ($("#old-fram").prop("checked")) {
+			RequestData.oldFram = 1;
+		}
+
+		return true;
+	}
+
+	function turnOffService() {
+		$.getJSON("<%=luci.dispatcher.build_url("admin", "application", "syncdial", "turnOffService")%>", null, function(rsp) {
+			$(".loadImg").css("display","none");
+			if (rsp.code == 0) {
+				T_alert.show("多拨已关闭",2000);
+			} else {
+				T_alert.show("操作失败，请重试",2000);
+			}
+		});
+	}
+
+	function getStatus() {
+		$.ajax({
+			url: '<%=luci.dispatcher.build_url("admin", "application", "syncdial", "status")%>',
+			cache: false,
+			success: function(rsp) {
+				if (rsp) {
+					$("#mwan3-status").html(rsp);
+					$("#status").css("display", "block");
+				} else {
+					$("#status").css("display", "none");
+				}
+			}
+		});
+		setTimeout("getStatus()", 8000);
+	}
+
+	function switchButton(action) {
+		if (action == "off") {
+			$("#on-off").removeClass('open1');
+			$("#on-off").addClass('close1');
+			$("#on-off").children().removeClass('open2');
+			$("#on-off").children().addClass('close2');
+
+			// 页面表单禁用
+			$(".set-content").find(":input").attr("disabled","disabled");
+			$("#save").css("display", "none")
+		} else {
+			$("#on-off").removeClass('close1');
+			$("#on-off").addClass('open1');
+			$("#on-off").children().removeClass('close2');
+			$("#on-off").children().addClass('open2');
+
+			// 页面表单激活
+			$(".set-content").find(":input").removeAttr("disabled");
+			$("#save").css("display", "inline-block")
+		}
+	}
+
+	$(function(){
+		var status = "<%=Enable%>";
+
+		switchButton((status == "1") ? "on" : "off");
+
+		getStatus();
+
+		$("#on-off").click(function() {
+			if ($(this).hasClass('open1')) {
+				$(".loadImg").css("display","inline-block");
+				switchButton("off");
+				// 提交关闭
+				turnOffService();
+			} else {
+				switchButton("on");
+			}
+		});
+
+		$("#save").click(function () {
+			if (!checkRequestData()){
+				return false;
+			}
+
+			loadSave("before", "save");
+
+			$.ajax({
+				url: '<%=luci.dispatcher.build_url("admin", "application", "syncdial", "configure")%>',
+				cache: false,
+				dataType: "json",
+				data: {token: '<%=token%>',  reqdata: JSON.stringify(RequestData)},
+				timeout:30000,
+				type: "POST",
+				success: function(rsp) {
+					if (rsp.code == 0) {
+						T_alert.show("保存成功！",2000);
+					} else if (rsp.code == 1) {
+						T_alert.show("失败! 当前外网设置不是PPPOE拨号模式",3000);
+					} else {
+						T_alert.show("保存失败！",2000);
+					}
+					loadSave("after", "save");
+				},
+				error: function(x){
+					T_alert.show("保存成功！",2000);
+					loadSave("after", "save");
+				},
+				ontimeout:function(){
+					T_alert.show("保存超时！",2000);
+					loadSave("after", "save");
+				}
+			});
+
+		});
+	})
+</script>
+
+<%include("bottom")%>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="<%=luci.i18n.context.lang%>">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1" />
+<meta http-equiv="pragma" content="no-cache"/>
+<meta http-equiv="Cache-Control" content="no-cache",must-revalidate/>
+<meta http-equiv="expires" content="Thu, 01 jan 1970 00:00:01 GMT"/>
+<meta http-equiv="expires" content="0"/>
+
+<title>花生壳动态域名（支持内网穿透，无需公网IP）</title>
+<script type="text/javascript" src="<%=resource%>/js/jquery-1.9.0.min.js"></script>
+<link type="text/css" rel="stylesheet" href="<%=resource%>/appcss/oray.css"/>
+
+<script type="text/javascript">
+
+$(function () {
+
+		//var dialog = top.dialog.get(window);
+		//dialog.width(850);
+		//dialog.height(540);
+		//dialog.reset();     // 重置对话框位置
+	});
+</script>
+
+</head>
+<body>
+<div class="header">
+        <a href="http://hsk.oray.com/" class="logo" target="_blank"><img src="<%=resource%>/icons/apps/logo_hsk.png"></a>
+</div>
+<div class="container">
+	<div class="hsk-box">
+		<div class="title">
+			全球用户量最大的动态域名服务提供商<br />
+			（支持内网穿透，无需公网IP）
+		</div>
+		 <caption>
+				<col width="40%;">
+			<col>
+		</caption>
+		<table width="100%" height="100%" border="0" cellspacing="0" cellpadding="0">
+			<td align="center" valign="middle">  
+				<table class="table-info" border="0" cellspacing="10" cellpadding="0">
+					<tr>
+						<th align="center">状态 : </th>
+						<td><span id="status"></td>
+					</tr>
+					<tr>
+						<th align="center">SN码 : </th>
+						<td><span id="sn"></td>
+				</table>
+			</td>
+		</table>
+		<div style="text-align:center; margin-top:30px;margin-bottom: 50px;">
+			<a href="" id="login" target="_blank" class="btn btn-primary">登陆管理</a>&nbsp;&nbsp;&nbsp;
+			<a onClick="check()" style="width:100px; cursor:pointer;">重置</a>
+		</div>
+		</br>
+		<ul class="clear">
+			<a href="http://hsk.oray.com/case/" class="udl" target="_blank">
+			<li><span class="icon-big ib-remote"></span><p>远程监控</p></li>
+			<li><span class="icon-big ib-website"></span><p>建站</p></li>
+			<li><span class="icon-big ib-vpn"></span><p>VPN</p></li>
+			<li><span class="icon-big ib-ftp"></span><p>FTP</p></li>
+			<li><span class="icon-big ib-oa"></span><p>办公OA</p></li>
+			<li><span class="icon-big ib-more"></span><p>更多案例</p></li>
+			</a>
+		</ul>
+        <div class="footer">
+            <div style="text-align:left;float:left;color:#999;">
+                官网 : <a href="http://www.oray.com/"  target="_blank" style="color:#999">www.oray.com</a>
+            </div>
+            <div style="text-align:left; float:left;  margin-left: 70px;color:#999;">
+                社区 : <a href="http://bbs.oray.com/"  target="_blank" style="color:#999">bbs.oray.com</a>
+            </div>    
+            <div style="text-align:left; float:right;color:#999; ">
+                售前热线 : 020-62219018
+            </div>
+        </div>		
+	</div>
+</div>
+
+<script type='text/javascript'>
+var refresh_timeout = 3000; // 3 seconds
+
+var status_map =
+{
+   ONLINE:"在线",
+   OFFLINE:"离线",
+   RETRY:"重试",
+};
+
+function update_ui(config_data, init) {
+  config_data = config_data || "";	
+   document.getElementById("status").innerHTML  = status_map[config_data.status];
+	if(init){
+		document.getElementById("sn").innerHTML  = config_data.sn;
+		document.getElementById("login").href="http://hsk.oray.com/bang/passport/login?sn="+$("#sn").html();
+	}
+  
+}
+function check()
+{
+	var se = confirm("是否重置当前账户?");
+	if (se == true)
+	{
+		$.ajax({
+		url:"<%=luci.dispatcher.build_url("admin", "application", "oray", "reset_service")%>",
+		cache:false,
+		dataType:"json",
+		timeout:6000,
+		success: function(rsp){
+			if (rsp.result == true) {
+				alert("重置成功");
+			} else {
+				alert("重置失败或当前账户未登录");
+			}						
+		}
+	});
+	} else {
+	}
+}
+function update(init)
+{
+		return function() {
+		$.ajax({
+			url:"<%=luci.dispatcher.build_url("admin", "application", "oray", "get_oray_status")%>",
+			cache:false,
+			dataType:"json",
+			timeout:6000,
+			success: function(rsp){
+				if (rsp.result == true) {
+					update_ui(rsp, init);
+				}
+				if(init) {
+					setTimeout(update(init), refresh_timeout);  
+				}						
+			}
+		});
+	}
+}
+window.onload=function() {
+  update(true)();
+}
+
+</script>
+</body>
+</html>
+

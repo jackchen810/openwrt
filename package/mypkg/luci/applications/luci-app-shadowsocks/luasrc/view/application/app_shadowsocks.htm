@@ -1,0 +1,307 @@
+<%
+	local uci = require "luci.model.uci".cursor()
+	local fs = require "nixio.fs"
+
+	local Shadowsocks = uci:get_all("shadowsocks")
+
+	local Encrypt = {
+			"rc4",
+			"rc4-md5",
+			"salsa20",
+			"chacha20",
+			"bf-cfb",
+			"des-cfb",
+			"idea-cfb",
+			"rc2-cfb",
+			"seed-cfb",
+			"cast5-cfb",
+			"aes-128-cfb",
+			"aes-192-cfb",
+			"aes-256-cfb",
+			"aes-128-ctr",
+			"aes-192-ctr",
+			"aes-256-ctr",
+			"chacha20-ietf",
+			"camellia-128-cfb",
+			"camellia-192-cfb",
+			"camellia-256-cfb"
+	}
+
+	local Disabled	= Shadowsocks.proxy.disabled or 0
+	local ProxyMode	= Shadowsocks.proxy.proxy_mode
+	local UdpRelay	= Shadowsocks.proxy.udp_relay
+	local GFWList	= Shadowsocks.proxy.gfwlist
+	local Custom	= Shadowsocks.proxy.custom
+
+	local Server	= Shadowsocks.server.address
+	local Port		= Shadowsocks.server.port
+	local Encry		= Shadowsocks.server.encryption
+	local PassWord	= Shadowsocks.server.password
+	local NoAuth	= Shadowsocks.server.auth
+
+	local DnsPort	= Shadowsocks.dns_forward.local_port
+
+	local CustomList = fs.readfile("/usr/local/shadowsocks/custom.txt")
+
+	include("top")
+%>
+
+<div class="box">
+	<div class="main">
+		<%include("application/menuer")%>
+
+		<div class="content">
+			<div class="title">
+				<h3>Shadowsocks</h3>
+			</div>
+			<div class="article">
+				<div class="set-content">
+					<div class="input-info">
+						<label style="float: left;margin-top: 22px;">启用</label>
+						<div id="on-off" class="switch open1" style="margin:17px 0 2px 36px">
+							<div class="slide open2"></div>
+						</div>
+                        <span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+						<div class="clean"></div>
+					</div>
+
+					<div class="input-info">
+						<label>服务器</label>
+						<input class="wid140" type="text"  id="ss_server" value="<%=Server%>"/>
+					</div>
+
+					<div class="input-info">
+						<label>端口</label>
+						<input class="wid140" type="text"  id="ss_port" value="<%=Port%>"/>
+					</div>
+
+					<div class="input-info">
+						<label>加密</label>
+						<select class="opt" id="ss_encrypt">
+						<%for i, v in pairs(Encrypt) do%>
+							<option value="<%=v%>" <%if Encry == v then%>selected="selected"<%end%>><%=v%></option>
+						<%end%>
+						</select>
+					</div>
+
+					<div class="input-info">
+						<label>密码</label>
+						<input class="wid140" type="password"  id="ss_password" value="<%=PassWord%>"/>
+					</div>
+
+					<div class="input-info">
+						<label>代理模式</label>
+						<select class="opt" id="ss_proxy_type">
+							<option value="S" <%if ProxyMode == "S" then%>selected="selected"<%end%>>自动代理</option>
+							<option value="F" <%if ProxyMode == "F" then%>selected="selected"<%end%>>全局代理</option>
+						</select>
+					</div>
+
+					<div class="input-info" id="list-lab" style="margin-top:20px; <%if ProxyMode == "F" then%>display:none<%end%>">
+						<div class="input-info" >
+							<label>GFWList</label>
+							<input class="inp-checkbox ml32" type="checkbox" id="gfwlist-box" <%if GFWList == "1" then%>checked="checked"<%end%>/>
+							<label for="gfwlist-box" style="width:auto;"><span class="gfw-ver">2016-12-14 9:10:14</span> </label>
+							<a href="#" class="gfw-btn" style="color:#019a30;margin-left:5px;">更新</a>
+							<img class="gfw-up-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+						</div>
+
+						<div class="input-info" style="margin-top:20px;">
+							<label></label>
+							<input class="inp-checkbox ml32" type="checkbox" id="custom-box" <%if Custom == "1" then%>checked="checked"<%end%>/>
+							<label for="custom-box" style="width:auto;"><span>自定义列表</span></label>
+							<input class="inp-checkbox ml32" type="checkbox" id="udp-box" <%if UdpRelay == "1" then%>checked="checked"<%end%>/>
+							<label for="udp-box" style="width:auto;"><span>UDP转发</span></label>
+						</div>
+
+						<div class="input-info" id="custom-tab" <%if Custom ~= "1" then%>style="display:none"<%end%>>
+							<label></label>
+							<textarea class="inp_area" id="custom-area" rows="8" cols="30" style="margin-top:10px;"><%=CustomList%></textarea>
+						</div>
+					</div>
+
+					<hr id="hr2" style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+					<div class="operate-btn">
+						<input type="button" value="保 存" class="s off" id="save"/>
+						<img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+					</div>
+
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+	var T_alert = new Toast();
+		T_alert._css.lineHeight = "40px";
+	var RequestData = {};
+
+	function checkRequestData() {
+		RequestData.Server = $("#ss_server").val();
+
+		RequestData.Port = $("#ss_port").val();
+		if (RequestData.Port.length < 1 || !validators.port(RequestData.Port)) {
+			T_alert.show("服务器端口不正确",2000);
+			$("#ss_port").focus();
+			return false;
+		}
+
+		RequestData.Encrypt = $("#ss_encrypt").val();
+		RequestData.PassWord = $("#ss_password").val();
+
+		RequestData.ProxyType = $("#ss_proxy_type").val();
+		RequestData.UdpRelay= 0;
+
+		if (RequestData.ProxyType == "S") {
+			RequestData.Gfwlist= 0;
+			RequestData.Custom= 0;
+			if ($("#gfwlist-box").prop("checked")) {
+				RequestData.Gfwlist= 1;
+			}
+
+			if ($("#custom-box").prop("checked")) {
+				RequestData.Custom= 1;
+			}
+		}
+
+		if ($("#udp-box").prop("checked")) {
+			RequestData.UdpRelay= 1;
+		}
+
+		RequestData.CustomList = $.trim($("#custom-area").val());
+
+		return true;
+	}
+
+	function changeTab(tabnum){
+		$(".wd-tab li").removeClass("current");
+		$('.'+tabnum).addClass("current");
+		$(".wf_tab_cont").css("display","none");
+		$("#"+tabnum).css("display","block");
+	}
+
+	function updateGFW(n) {
+		$(".gfw-btn").css("display", "none");
+		$(".gfw-up-loading").css("display", "inline-block");
+
+		$.getJSON("<%=luci.dispatcher.build_url("admin", "application", "shadowsocks", "updateGFWList")%>", {action:n}, function(rsp) {
+			if (rsp.code == 1) {
+				$(".gfw-up-loading").css("display","none");
+				$(".gfw-btn").css("display", "inline-block");
+			} else {
+				setTimeout("updateGFW(1);", 5000);
+			}
+				$(".gfw-ver").text(rsp.ver);
+		});
+	}
+
+	function turnOffService() {
+		$.getJSON("<%=luci.dispatcher.build_url("admin", "application", "shadowsocks", "turnOffService")%>", null, function(rsp) {
+            $(".loadImg").css("display","none");
+			if (rsp.code == 0) {
+				T_alert.show("Shadowsocks服务已关闭",2000);
+			} else {
+				T_alert.show("操作失败，请重试",2000);
+			}
+		});
+	}
+
+	function switchButton(action) {
+		if (action == "off") {
+			$("#on-off").removeClass('open1');
+			$("#on-off").addClass('close1');
+			$("#on-off").children().removeClass('open2');
+			$("#on-off").children().addClass('close2');
+
+			// 页面表单禁用
+			$(".set-content").find(":input").attr("disabled","disabled");
+			$("#save").css("display", "none")
+		} else {
+			$("#on-off").removeClass('close1');
+			$("#on-off").addClass('open1');
+			$("#on-off").children().removeClass('close2');
+			$("#on-off").children().addClass('open2');
+
+			// 页面表单激活
+			$(".set-content").find(":input").removeAttr("disabled");
+			$("#save").css("display", "inline-block")
+		}
+	}
+
+	$(function(){
+		var status = "<%=Disabled%>";
+
+		switchButton((status == "0") ? "on" : "off");
+		updateGFW(1);
+
+		$("#on-off").click(function() {            
+			if ($(this).hasClass('open1')) {
+				$(".loadImg").css("display","inline-block");
+                switchButton("off");
+				// 提交关闭
+				turnOffService();
+			} else {
+				switchButton("on");
+			}
+		});
+
+		$(".gfw-btn").click(function() {
+			updateGFW(0);
+		});
+
+		$("#custom-box").click(function(){
+			var i = document.getElementById("custom-box");
+			if (i.checked == true) {
+				$("#custom-tab").css("display", "block");
+			} else {
+				$("#custom-tab").css("display", "none");
+			}
+		});
+
+		$("#ss_proxy_type").click(function() {
+			if ($(this).val() == "S") {
+				$("#list-lab").css("display", "block");
+			} else {
+				$("#list-lab").css("display", "none");
+			}
+		});
+
+		$("#save").click(function () {
+			if (!checkRequestData()){
+				return false;
+			}
+
+			loadSave("before", "save");
+
+			$.ajax({
+				url: '<%=luci.dispatcher.build_url("admin", "application", "shadowsocks", "setShadowsocks")%>',
+				cache: false,
+				dataType: "json",
+				data: {token: '<%=token%>',  reqdata: JSON.stringify(RequestData)},
+				timeout:20000,
+				type: "POST",
+				success: function(rsp) {
+					if (rsp.code == 0) {
+						T_alert.show("保存成功！",2000);
+					} else {
+						T_alert.show("保存失败！",2000);
+					}
+					loadSave("after", "save");
+				},
+				error: function(x){
+					T_alert.show("保存错误！",2000);
+					loadSave("after", "save");
+				},
+				ontimeout:function(){
+					T_alert.show("保存超时！",2000);
+					loadSave("after", "save");
+				}
+			});
+
+		});
+	})
+</script>
+
+<%include("bottom")%>

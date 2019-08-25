@@ -1,0 +1,636 @@
+<%
+	local _uci = require "luci.model.uci".cursor()
+	local kt_stat = require "ktapi.status"
+	local kt_nw = require "ktapi.network"
+
+	local lan_ip_addr = _uci:get("network", "lan", "ipaddr")
+	
+	if luci.http.formvalue("dhcp") == "1" then
+	
+		local dhcp = {}
+		dhcp.leases      = kt_stat.dhcp_leases()
+		dhcp.start       = _uci:get("dhcp","lan","start")%256
+		dhcp.limit       = _uci:get("dhcp","lan","limit")
+		dhcp.leasetime   = _uci:get("dhcp","lan","leasetime")
+		dhcp.ip_mac_banding_list = kt_nw.get_mac_ip_banding_list()
+		
+		luci.http.prepare_content("application/json")
+		luci.http.write_json(dhcp)
+    return
+	end
+	
+%>
+
+<%+header%>
+
+<script type="text/javascript">
+
+	var advance_dhcp = {
+		"leases": "",
+		"start": "",
+		"limit": "",
+		"leasetime": "",
+		"mac_ip_banding_list":"",
+	}
+	
+	$(function () {
+		set_header_icon_lighted("pic_fun_gj");
+		get_dhcp_info();
+		add_table_input("init");
+		
+		$(".table_add").click(function () {
+			add_table_input();
+		});
+
+		$("#dhcp_submit").click(function () {
+			dhcp_save();
+		})
+		
+	});
+	
+	function add_table_input(action){
+		if (action == "init") {
+			idx = 1;
+		} else {
+			var tr = $("#bangding").find("tbody").find("tr").last();
+			var idx = $(tr).find("td:eq(0)").text();
+			idx = parseInt(idx) + 1;			
+		}
+
+		var line = '<tr><td class="bangbing_left">'+idx+'</td><td><input type="text"/></td><td><input type="text"/></td><td><span class="clearVal"><%:Clear%></span></td></tr>';
+		$("#bangding").append(line);
+		
+		
+		$(".clearVal").bind("click",function(){
+			var tr = $(this).parent().parent("tr");
+			tr.find("input").val("");
+			tr.find("input:eq(0)").focus();
+			$(this).hide();
+		});	
+		
+		$("#bangding").find("input").bind("blur",function(){
+			var clearBtn = $(this).parent().parent("tr").find("td:eq(3)").find("span");
+			if($(this).val() != ""){
+			clearBtn.show();
+			}
+		});
+	}
+
+		
+	function get_dhcp_info() {
+		var timeout;
+		xhr = new XHR();
+		xhr.get('<%=REQUEST_URI%>', {dhcp: 1}, function (x, data) {
+			if (data) {
+					advance_dhcp.leases = data.leases;
+					advance_dhcp.start = data.start;
+					advance_dhcp.limit = data.limit;
+					advance_dhcp.leasetime = data.leasetime;
+					advance_dhcp.ip_mac_banding_list = data.ip_mac_banding_list;
+			}
+			set_dhcp_data();
+		})
+	}
+	
+	function set_dhcp_data() {
+		var dhcp_list = advance_dhcp.leases;
+		$(".decive-list table tbody").empty();
+		
+		if (dhcp_list.length > 0) {
+			$.each(dhcp_list, function (i, item) {
+				if(item.mac_source == "wireless"){
+					item.mac_source = "<img style='padding-right:5px;' src='<%=resource%>/icons/images/wireless.png'><%:Wifi%>";
+				}else if(item.mac_source == "wired"){
+					item.mac_source = "<img style='padding-right:5px;' src='<%=resource%>/icons/images/wired_1.png'><%:Wired%>";
+				}else{
+					item.mac_source = "<img style='padding-right:5px;' src='<%=resource%>/icons/images/offline.png'><%:offline%>";
+				}
+				var tr = '<tr><td>' + item.ipaddr + '</td><td>' + item.macaddr + '</td><td class="hostname" title="' + item.hostname + '">' + item.hostname + '</td><td>'+ item.mac_source + '</td><td><span class="addipmac"><%:Bind%></span></td></tr>';
+				$(".decive-list table tbody").append(tr);
+			});
+			var dhcp_ipaddr = advance_dhcp.leases[0].ipaddr;
+			var arr = dhcp_ipaddr.split(".");
+			var arr2 = "";
+			for (var i = 0; i < arr.length - 1; i++) {
+				arr[i] = arr[i] + ".";
+				arr2 += arr[i];
+			}
+			$(".dhcp_ip_range").text(arr2);
+		}
+
+		$(".addipmac").bind("click",function(){
+			add_table_input();
+			
+			var ipx = $(this).parent().parent("tr").find("td:eq(0)").text();
+			var macx = $(this).parent().parent("tr").find("td:eq(1)").text();
+			var tr = $("#bangding").find("tbody").find("tr");
+			
+			tr.each(function(){
+				var inp_ip = $(this).find("td:eq(1)").find("input");
+				var ip_val = inp_ip.val();
+				var inp_mac = $(this).find("td:eq(2)").find("input");
+				var mac_val = inp_mac.val();
+				var spn = $(this).find("td:eq(3)").find("span");
+				if (ip_val == "" || mac_val == "") {
+					inp_ip.val(ipx);
+					inp_mac.val(macx);
+					inp_mac.focus();
+					spn.show();
+					return false;
+				}
+			});
+
+		});
+
+		var start = advance_dhcp.start;
+		var end = parseInt(start) + parseInt(advance_dhcp.limit) - 1;
+		$("input[name='start']").val(start);
+		$("input[name='end']").val(end);
+		var time = advance_dhcp.leasetime;
+		if (time.indexOf("h") > 0) {
+			$("input[name='time']").val(parseInt(time));
+			$("#time_select").val("h");
+		}else if(time.indexOf("m") > 0) {
+			$("input[name='time']").val(parseInt(time));
+			$("#time_select").val("m");
+		}
+		var mac_ip_list = advance_dhcp.ip_mac_banding_list;
+		var tr2 = $("#bangding tbody").find("tr");
+		tr2.each(function(){
+			$(this).find("input:eq(0)").val("");
+			$(this).find("input:eq(1)").val("");
+		});
+		
+		if (mac_ip_list.length > 0){
+			for (var i = 0; i <mac_ip_list.length; i++) {
+				add_table_input();
+			}
+			
+			var tr = $("#bangding tbody").find("tr");
+			$.each(mac_ip_list,function(i, item){
+				$(tr[i]).find("input:eq(0)").val(item.ip);
+				$(tr[i]).find("input:eq(1)").val(item.mac);
+				$(tr[i]).find(".clearVal").show();
+			})
+		}
+	}
+	
+	       function check_dhcp_input_data() {
+            var start = $("input[name='start']").val();
+            var end = $("input[name='end']").val();
+            var time_number = $("input[name='time']").val();
+            var time_select = $("#time_select").val();
+            var reg = /^[0-9]+$/;
+            if (start == "" || end == "") {
+                dialog({
+                    title: '<%:Notify%>',
+                    okValue: '<%:OK%>',
+                    content: '<%:Invalid DHCP starting/ending IP address.%>',
+                    ok: function () {
+                        setTimeout(function () {
+                            $("input[name='start']").focus();
+                        }, 0);
+                    },
+                    cancel: false
+                }).showModal();
+                return false;
+//            } else if (start.indexOf(".") > 0 || end.indexOf(".") > 0) {
+            } else if (!reg.test(start) || !reg.test(end)) {
+                dialog({
+                    title: '<%:Notify%>',
+                    okValue: '<%:OK%>',
+                    content: '<%:Invalid DHCP starting/ending IP address.%>',
+                    ok: function () {
+                        setTimeout(function () {
+                            $("input[name='start']").focus();
+                        }, 0);
+                    },
+                    cancel: false
+                }).showModal();
+                return false;
+            }else if (parseInt(start) < 1 || parseInt(start) > 254 || parseInt(end) < 1 || parseInt(end) > 254) {
+                dialog({
+                    title: '<%:Notify%>',
+                    okValue: '<%:OK%>',
+                    content: '<%:Invalid DHCP starting/ending IP address.%>',
+                    ok: function () {
+                        setTimeout(function () {
+                            $("input[name='start']").focus();
+                        }, 0);
+                    },
+                    cancel: false
+                }).showModal();
+                return false;
+            } else if (parseInt(start) >= parseInt(end)) {
+                dialog({
+                    title: '<%:Notify%>',
+                    okValue: '<%:OK%>',
+                    content: '<%:Invalid DHCP starting/ending IP address.%>',
+                    ok: function () {
+                        setTimeout(function () {
+                            $("input[name='start']").focus();
+                        }, 0);
+                    },
+                    cancel: false
+                }).showModal();
+                return false;
+            }else if(time_number == ""){
+                dialog({
+                    title: '<%:Notify%>',
+                    okValue: '<%:OK%>',
+                    content: '<%:Leases cannot be empty.%>',
+                    ok: function () {
+                        setTimeout(function () {
+                            $("input[name='time']").focus();
+                        }, 0);
+                    },
+                    cancel: false
+                }).showModal();
+                return false;
+            } else if (!reg.exec(time_number) || time_number == 0) {
+                dialog({
+                    title: '<%:Notify%>',
+                    okValue: '<%:OK%>',
+                    content: '<%:Character is not allowed in Leases.%>',
+                    ok: function () {
+                        setTimeout(function () {
+                            $("input[name='time']").focus();
+                        }, 0);
+                    },
+                    cancel: false
+                }).showModal();
+                return false;
+            } else if (time_select == "h") {
+                if (parseInt(time_number) > 24) {
+                    dialog({
+                        title: '<%:Notify%>',
+                        okValue: '<%:OK%>',
+                        content: '<%:Leases time more than 24 hours.%>',
+                        ok: function () {
+                            setTimeout(function () {
+                                $("input[name='time']").focus();
+                            }, 0);
+                        },
+                        cancel: false
+                    }).showModal();
+                    return false;
+                }
+            } else if (time_select == "m") {
+                if (parseInt(time_number) > 1440) {
+                    dialog({
+                        title: '<%:Notify%>',
+                        okValue: '<%:OK%>',
+                        content: '<%:Leases time more than 24 hours.%>',
+                        ok: function () {
+                            setTimeout(function () {
+                                $("input[name='time']").focus();
+                            }, 0);
+                        },
+                        cancel: false
+                    }).showModal();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function check_bind_data(){
+            var tr = $("#bangding").find("tbody").find("tr");
+            var myflag = true;
+            tr.each(function(){
+                var inp_ip = $(this).find("td:eq(1)").find("input");
+                var ip_val = inp_ip.val();
+                var inp_mac = $(this).find("td:eq(2)").find("input");
+                var mac_val = inp_mac.val();
+                var reg_name=/^[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}$/;
+                if(ip_val != ""){
+                    var maclength = mac_val.length;
+                    var strlength = ip_val.length;
+                    var patrn = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+                    var laststr;
+                    laststr = ip_val.split(".");     //用.把字符串str分开
+                    var last_patrn = /^\d{1,3}$/;
+                    if (strlength > 15 || strlength < 7){          //IP的字段长度的限制
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Invalid IP address.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_ip.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }else if (!patrn.exec(ip_val)) {
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Invalid IP address.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_ip.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }else if (parseInt(laststr[0]) > 255 || parseInt(laststr[1]) > 255 || parseInt(laststr[2]) > 255 || parseInt(laststr[3]) > 255){ //判断IP每位的大小
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Invalid IP address.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_ip.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }else if (!last_patrn.exec(laststr[3])) {
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Invalid IP address.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_ip.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }else if (parseInt(laststr[0]) == 223 && parseInt(laststr[1]) == 255 && parseInt(laststr[2]) == 255 && parseInt(laststr[3]) == 255) {
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Invalid IP address.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_ip.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }else if (parseInt(laststr[0]) > 223) {
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Invalid IP address.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_ip.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }else if(maclength < 1){
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Mac address cannot be empty.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_mac.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }else{
+                        if(!reg_name.test(mac_val)){
+                            dialog({
+                                title: '<%:Notify%>',
+                                okValue: '<%:OK%>',
+                                content: '<%:Invalid MAC address.This is formatted FF:FF:FF:FF:FF:FF%>',
+                                ok: function () {
+                                    setTimeout(function () {
+                                        inp_mac.focus();
+                                    }, 0);
+                                },
+                                cancel: false
+                            }).showModal();
+                            myflag = false;
+                            return false;
+                        }
+//     
+                    }
+                }else if(mac_val != ""){
+                    if(!reg_name.test(mac_val)){
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:Invalid MAC address.This is formatted FF:FF:FF:FF:FF:FF%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_mac.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }
+
+                    if(ip_val.length < 1){
+                        dialog({
+                            title: '<%:Notify%>',
+                            okValue: '<%:OK%>',
+                            content: '<%:IP address cannot be empty.%>',
+                            ok: function () {
+                                setTimeout(function () {
+                                    inp_ip.focus();
+                                }, 0);
+                            },
+                            cancel: false
+                        }).showModal();
+                        myflag = false;
+                        return false;
+                    }
+                }
+            });
+            return myflag;
+        }
+		
+        function check_repeat_data(data, msg){
+            var tr = $("#bangding").find("tbody").find("tr");
+            var ips = tr.find(data).find("input");
+            var iparr = [];
+            var iphash = {};
+            var flag = true;
+            ips.each(function(){
+                if($(this).val() != ""){
+                    iparr.push($(this).val());
+                }
+            });
+            var count = 1;
+            for(var i=0; i<iparr.length; i++){
+                if(!iphash[iparr[i]]){
+                    flag = true;
+                    iphash[iparr[i]] = count;
+                }else{
+                    iphash[iparr[i]] = count+1;
+                    flag = false;
+                    dialog({
+                        title: '<%:Notify%>',
+                        okValue: '<%:OK%>',
+                        content: msg +' <%:is not unique.%>',
+                        ok: function () {
+
+                        },
+                        cancel: false
+                    }).showModal();
+                    return false;
+                }
+            }
+            return flag;
+        }
+
+        function dhcp_save() {
+            var check = false;
+            check = (check_dhcp_input_data() == true && check_bind_data() == true && check_repeat_data("td:eq(1)", "IP") && check_repeat_data("td:eq(2)", "MAC"));
+            if (check == true) {
+                var start = $("input[name='start']").val();
+                var end = $("input[name='end']").val();
+                var time_number = $("input[name='time']").val();
+                var time_select = $("#time_select").val();
+                var obj = {};
+                var limit = parseInt(end) - parseInt(start) + 1;
+                var leasetime = time_number + time_select;
+                obj.start = start;
+                obj.limit = limit;
+                obj.leasetime = leasetime;
+
+                var tr = $("#bangding").find("tbody").find("tr");
+                var banding_list = [];
+                tr.each(function() {
+                    var inp_ip = $(this).find("td:eq(1)").find("input");
+                    var ip = inp_ip.val();
+                    var inp_mac = $(this).find("td:eq(2)").find("input");
+                    var mac = inp_mac.val();
+                    if(inp_ip.val() != ""){
+                        banding_list.push({"ip" : ip,"mac" : mac});
+                    }
+                })
+                obj.ip_mac_banding_list = banding_list;
+                $("#dhcp_submit").prop("disabled" , true);
+                $(".dhcp_submit").show();
+                submit_data(obj);
+            }
+        }
+		
+        function submit_data(obj){
+            var setting = JSON.stringify(obj);
+            $.ajax({
+                url: '/cgi-bin/luci/admin/system/dhcp_set',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', dhcp_setting:setting},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp){
+                    if(rsp.result == true){
+                        success_prop("dhcp_submit");
+                    }
+                    else{
+                        failed_prop(rsp.result,"dhcp_submit");
+                    }
+                },
+                error: function(x){
+                    error_prop(x.statusText,"dhcp_submit");
+                },
+                ontimeout:function(){
+                    timeout_prop();
+                }
+            });
+        }
+
+
+</script>
+	
+</script>	
+<div class="soft_con">
+	<div id="M_dhcp" class="soft_con2 dhcp">
+		<div class="banben gaoji_box">
+			<div class="gaoji_left">
+				<ul>
+					<% include("themes/" .. theme .. "/menuer") %>
+				</ul>
+			</div>
+			
+			<!--dhcp设置-->
+			<div id="dhcp" class="function1 gaoji_right">
+				<div id="dhcp_box" class="" style="display: block;">
+					<div class="decive-list">
+						<p class="dh_title"><%:Active DHCP Leases%>：</p>
+						<table width="100%" border="0" cellpadding="0" cellspacing="0">
+							<thead>
+							<tr>
+								<th width="24%"><%:IP Address%></th>
+								<th width="24%"><%:MAC Address%></th>
+								<th width="24%"><%:Hostname%></th>
+								<th width="14%"><%:Conn Type%></th>
+								<th width="*"><%:Handle%></th>
+							</tr>
+							</thead>
+							<tbody>
+
+							</tbody>
+						</table>
+					</div>
+					<div class="dhcp_kuai">
+						<span style="margin-right:6px" class="dh_title"><%:IP Address Range%>:</span>
+						<span class="dhcp_ip_range"><%=lan_ip_addr:gsub("%d+$", "")%></span>
+						<input type="text" name="start" style="width:40px;" value="2"/>
+						&nbsp;-&nbsp;
+						<span class="dhcp_ip_range"><%=lan_ip_addr:gsub("%d+$", "")%></span>
+						<input type="text" name="end" style="width:40px;" value="254"/>
+					</div>
+					<div class="dhcp_kuai">
+						<span style="margin-right:6px" class="dh_title"><%:DHCP Leases%>:</span>
+						<input type="text" name="time" style="width:60px;"/>
+						<select name="time" id="time_select">
+							<option value="m"><%:minute%></option>
+							<option value="h"><%:hour%></option>
+						</select>
+					</div>
+					<div class="dhcp_kuai">
+						<p class="dh_title"><%:IP | MAC binding%></p>
+						<table id="bangding" class="bangding" width="100%" cellpadding="0" cellspacing="0" border="0">
+							<thead>
+							<tr>
+								<th class="bangbing_left"></th>
+								<th class="bangding_middle"><%:IP Address%></th>
+								<th class="bangding_right"><%:MAC Address%></th>
+								<th class="bangbing_qingchu"></th>
+							</tr>
+							</thead>
+							<tbody>
+
+							</tbody>
+						</table>
+						<span class="table_add" style="color: #149dd9; cursor: pointer;"><%:Add%></span>
+					</div>
+
+					<div class="dhcp_kuai">
+						<button id="dhcp_submit" style="margin-left:7px;outline:none;border:none;" class="hold"><%:Save%></button>
+						<img class="dhcp_submit" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<%+footer%>

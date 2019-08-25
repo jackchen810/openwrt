@@ -1,0 +1,171 @@
+               .tc_list{
+                    width:550px;
+                    margin:15px auto;
+                }
+                .tc_title{
+                    font-size:14px;
+                    color:#2573bf;
+                }
+                .tc_meg{
+                    background-color:#f3f7f8;
+                    display: block;
+                    width:526px;
+                    margin:5px auto;
+                    padding:10px;
+                    font-size:14px;
+                    color:#666;
+                    border-radius: 5px;
+                    border:1px solid #ccc;
+                }
+                .tc_btns{
+                    width:240px;
+                    margin:0 auto 50px;
+                    text-align:center;
+                    overflow:hidden;
+                }
+                .tc_btn{
+                    float: left;
+                    width: 95px;
+                    height: 34px;
+                    line-height:38px;
+                    background-color: #2573bf;
+                    color: #FFFFFF;
+                    font-size: 16px;
+                    display: block;
+                    cursor: pointer;
+                    outline:none;
+                    margin-top:15px;
+                }
+                .tc_btn_exit{
+                    margin-right:19px;
+                    background-color:#ccc;
+                }
+                .sendcode_b{
+                    width:100%;
+                    height:30px;
+                    background-color:#2573bf;
+                    text-align: center;
+                    color:#fff;
+                    outline:none;
+                    cursor: pointer;
+                }
+						.ipv6_nav {
+                            margin-bottom: 20px;
+                        }
+                        .ipv6_nav li {
+                            list-style-type:none;
+                            background-color: #f7f7f7;
+                            float: left;
+                            margin-bottom: 0;
+                            /*width: 25%;*/
+                            width:50%;
+                            height: 50px;
+                            line-height: 50px;
+                            text-align: center;
+                        }
+                        .ipv6_nav a {
+                            display: block;
+                            color: #939599;
+                            /*font-weight: bold;*/
+                        }
+                        .ipv_current {
+                            border-top: 2px solid #2573bf;
+                            background-color: #fff !important;
+                            height: 48px !important;
+                            line-height: 46px !important;
+                        }
+                        .ipv_current a {
+                            color: #2573bf;
+                        }
+                        .ipv_cont {
+                            width: 100%;
+                        }
+
+                        .zh_line p {
+                            display: block;
+                            float: left;
+                            /* width: 33%; */
+                            margin:0 20px;
+                            text-align: center;
+                            height: 28px;
+                            line-height: 28px;
+                        }
+                        .zh_line span {
+                            font-weight: bold;
+                            color: #666;
+                            font-size: 15px;
+                        }
+                        .recharge {
+                            /*float: right;*/
+                            display:block;
+                            width: 90px;
+                            height: 28px;
+                            border-radius: 2px;
+                            color: #FFFFFF;
+                            font-size: 14px;
+                            background-color: #2573bf;
+                            line-height: 28px;
+                            text-align: center;
+                            margin: 0 auto;
+                            cursor: pointer;
+                            /*margin-right: 40px;*/
+                        }
+                        .zh_table {
+                            margin: 10px auto;
+                            border-spacing: 18px;
+                        }
+                        .zht_right {
+                            text-align: right;
+                            font-weight: bold;
+                            color: #333;
+                            font-size:14px;
+                        }
+                        .zht_btn {
+                            width: 210px !important;
+                            height: 38px !important;
+                            line-height: 38px;
+                            border-radius: 2px;
+                            color: #fff;
+                            font-size: 16px;
+                            background-color: #2573bf;
+                            text-align: center;
+                            outline: none;
+                            border: none;
+                            margin-top:20px;
+                        }
+                        .sendcode{
+                            width:95px;
+                            height:34px;
+                            text-align:center;
+                            background-color: #2573bf;
+                            color:#fff;
+                            outline:none;
+                            cursor: pointer;
+                        }
+                        .col33{
+                            color:#333;
+                            font-weight: bold;
+                            font-size:16px;
+                        }
+                        .zh_table input{
+                            width:200px;
+                            height:30px;
+                            padding-left:6px;
+                        }
+                        .zh_table input[type="radio"]{
+                            width:14px;
+                            height:14px;
+                        }
+                        .colcc{
+                            background-color:#ccc;
+                        }
+                        .tal_right{
+                            text-align: right;
+                        }
+                        .codeinp{
+                            width:100px !important;
+                        }
+                        @media screen and (max-width: 535px) {
+                            .gaoji_right .ipv6_nav li{width:100%;}
+                            .zh_line p{width:100%;}
+                        }

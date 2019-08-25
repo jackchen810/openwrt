@@ -1,0 +1,89 @@
+<%
+local uci = require "luci.model.uci".cursor()
+
+local Disabled    = uci:get("adbyby", "proxy", "disabled") or 1
+
+include("top")
+%>
+
+<div class="box">
+    <div class="main">
+        <%include("application/menuer")%>
+
+        <div class="content">
+            <div class="title">
+                <h3>广告屏蔽大师</h3>
+            </div>
+            <div class="article">
+                <div class="set-content">
+                    <div class="input-info">
+                        <label style="float: left;margin-top: 22px;">启用</label>
+
+                        <div id="on-off" class="switch open1" style="margin:17px 0 2px 36px">
+                            <div class="slide open2"></div>
+                        </div>
+                        <span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+                        <div class="clean"></div>
+                    </div>
+                </div>
+                <div class="input-info">
+                    <p class="adbyby-p">广告屏蔽大师(adbyby)可以全面过滤各种横幅、弹窗、视频广告，同时阻止跟踪、隐私窃取及各种恶意网站. 更多详情请关注官网 <a target="_blank" href="http://www.adbyby.com/">www.adbyby.com/<a/></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    function turnOnOffAdbyby(flag) {
+        var msg = flag == 0 ? "开启" : "关闭";
+
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "adbyby", "switchService")%>", {action: flag}, function (rsp) {
+            $(".loadImg").css("display","none");
+            if (rsp.code == 0) {
+                T_alert.show("Adbyby服务已" + msg, 2000);
+            } else {
+                T_alert.show("操作失败，请重试", 2000);
+            }
+        }
+        );
+    }
+
+    function switchButton(action) {
+        if (action == "off") {
+            $("#on-off").removeClass('open1');
+            $("#on-off").addClass('close1');
+            $("#on-off").children().removeClass('open2');
+            $("#on-off").children().addClass('close2');
+        } else {
+            $("#on-off").removeClass('close1');
+            $("#on-off").addClass('open1');
+            $("#on-off").children().removeClass('close2');
+            $("#on-off").children().addClass('open2');
+        }
+    }
+
+    $(function () {
+
+        var status = "<%=Disabled%>";
+
+        switchButton((status == "0") ? "on" : "off");
+
+        $("#on-off").click(function () {
+            $(".loadImg").css("display","inline-block");
+            if ($(this).hasClass('open1')) {
+                switchButton("off");
+                // 提交关闭
+                turnOnOffAdbyby(1);
+            } else {
+                switchButton("on");
+                turnOnOffAdbyby(0);
+            }
+        });
+    })
+</script>
+
+<%include("bottom")%>

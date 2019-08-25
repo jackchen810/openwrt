@@ -1,0 +1,166 @@
+<%
+local uci = require "luci.model.uci".cursor()
+
+local Disabled = uci:get("adbyby", "proxy", "disabled") or 1
+
+include("top")
+%>
+
+<div class="box">
+    <div class="main">
+        <%include("application/menuer")%>
+
+        <div class="content">
+            <div class="title">
+                <h3>WiFi 负载均衡</h3>
+            </div>
+            <div class="article">
+                <div class="set-content">
+                    <div class="input-info">
+                        <label style="float: left;margin-top: 22px;">启用负载均衡</label>
+                        <div id="on-off" class="switch open1" style="margin:17px 0 2px 36px">
+                            <div class="slide open2"></div>
+                        </div>
+                        <span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+                        <div class="clean"></div>
+                    </div>
+                    <div class="input-info">
+                        <p class="adbyby-p">本功能适用于高密度无线网络环境中, 有效保证该环境中客户端的合理接入。可以准确地在WLAN网络中平衡客户端的负载，充分地保证每个客户端的性能和带宽。在同一局域网下将不同设备配置为统一的SSID即可。</p>
+                    </div>
+                    <hr class="hr">
+                </div>
+                <style>
+                    .loadCont{width:610px;margin:20px auto;color:#666;background-color:#fafafa;padding:10px 0 20px;}
+                    .loadList{width:90%;margin:40px auto 20px;background-color:#fff;;}
+                    .loadTitle{font-weight: bold;}
+                    .loadCont .loadList .loaditem td{border:1px solid #ddd;}
+                    .loaditem{width:100%;border-top:1px solid #7d7d7d;border-left:1px solid #7d7d7d;overflow: hidden;}
+                </style>
+                <div class="loadCont tiptable">
+                    <!--<table class="loadList" border="0" cellspacing="1" cellpadding="0">
+                        <caption class="loadTitle">SSID：东区树霖办公打卡Wi-Fi</caption>
+                        <tr class="loaditem">
+                            <td>MAC地址：55FFB3AA3FCC</td>
+                            <td>连接数：5</td>
+                            <td>无线类型：5G</td>
+                        </tr>
+                        <tr class="loaditem">
+                            <td>MAC地址：55FFB3AA3FCC</td>
+                            <td>连接数：5</td>
+                            <td>无线类型：5G</td>
+                        </tr>
+                        <tr class="loaditem">
+                            <td>MAC地址：55FFB3AA3FCC</td>
+                            <td>连接数：5</td>
+                            <td>无线类型：5G</td>
+                        </tr>
+                    </table>-->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    function turnOnOffAdbyby(flag) {
+        var msg = flag == 0 ? "开启" : "关闭";
+
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "loadbalance", "switchService")%>", {action: flag}, function (rsp) {
+            $(".loadImg").css("display","none");
+            if (rsp.code == 0) {
+                T_alert.show("负载均衡服务已" + msg, 2000);
+            } else {
+                T_alert.show("操作失败，请重试", 2000);
+            }
+        }
+        );
+    }
+
+    function switchButton(action) {
+        if (action == "off") {
+            $("#on-off").removeClass('open1');
+            $("#on-off").addClass('close1');
+            $("#on-off").children().removeClass('open2');
+            $("#on-off").children().addClass('close2');
+        } else {
+            $("#on-off").removeClass('close1');
+            $("#on-off").addClass('open1');
+            $("#on-off").children().removeClass('close2');
+            $("#on-off").children().addClass('open2');
+        }
+    }
+
+    function getRemoteConnect() {        
+        if ($("#on-off").hasClass('switch close1')) {
+            $(".loadCont").empty();
+            return false;
+        }
+
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "loadbalance", "getConnect")%>", null, function (rsp) {
+            if (rsp.code == 0) {
+                //console.log(rsp);
+                $(".loadCont").empty();
+                var arr = rsp.remote;
+//                arr.push(
+//                        {drvcount:"0",group : "21",lbcount:"0",'mac address':"d4:ee:07:40:43:55",no:"0",ssid:"西区树霖办公打卡Wi-Fi",type:"5G"},
+//                        {drvcount:"0",group : "21",lbcount:"0",'mac address':"d4:ee:07:40:43:a9",no:"0",ssid:"西区树霖办公打卡Wi-Fi",type:"5G"}
+//                )
+
+                var newssidarr = [];
+                for(var i = 0;i<arr.length;i++){
+                    if(newssidarr.indexOf(arr[i].ssid) == -1){
+                        newssidarr.push(arr[i].ssid);
+                    }
+                }
+                //console.log(newssidarr);
+                for(var i = 0;i<newssidarr.length;i++){
+                    var $table = $('<table class="loadList" border="0" cellspacing="1" cellpadding="0"></table>');
+                    var $caption = $('<caption class="loadTitle">SSID：'+ newssidarr[i] +'</caption>');
+                    $table.append($caption);
+                    $('.loadCont').append($table);
+                    $.each(arr,function(index,ele){
+                        var $tr;
+                        if(newssidarr[i] == ele.ssid){
+                            $tr = $('<tr class="loaditem"></tr>')
+                            var $td = $('<td>MAC地址：'+ ele["mac address"] +'</td><td>连接数：'+ ele.drvcount +'</td><td>无线类型：'+ ele.type +'</td>');
+                            $tr.append($td);
+                            $table.append($tr);
+                        }
+                     })
+                }
+            }
+        });
+
+        setTimeout("getRemoteConnect()", 15000);
+    }
+
+    function getServiceStatus() {        
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "loadbalance", "getServiceStatus")%>", null, function (rsp) {
+            if (rsp.disabled) {
+                switchButton((rsp.disabled == "0") ? "on" : "off");
+            }
+        });        
+    }
+
+    $(function () {
+        getServiceStatus();
+        getRemoteConnect();
+
+        $("#on-off").click(function () {
+            $(".loadImg").css("display","inline-block");
+            if ($(this).hasClass('open1')) {
+                switchButton("off");
+                // 提交关闭
+                turnOnOffAdbyby(1);
+            } else {
+                switchButton("on");
+                turnOnOffAdbyby(0);
+            }
+        });
+    })
+</script>
+
+<%include("bottom")%>

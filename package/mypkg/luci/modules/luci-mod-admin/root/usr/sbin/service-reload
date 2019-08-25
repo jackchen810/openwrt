@@ -1,0 +1,50 @@
+#!/bin/sh
+. /lib/functions.sh
+
+foreach_affects() {
+	config_load ucitrack
+	config_foreach apply_config $1
+	echo "Reloading $1 ..." >> "/var/run/service-reload-status"
+}
+
+apply_config() {
+	config_get init "$1" init
+	config_get exec "$1" exec
+	[ -n "$2" ] && echo "Reloading $2 ..." >> "/var/run/service-reload-status"
+
+	[ -n "$init" ] && reload_init "$2" "$init"
+	[ -n "$exec" ] && reload_exec "$2" "$exec"
+	config_list_foreach "$1" affects foreach_affects
+}
+
+reload_exec() {
+	local service="$1"
+	set -- $2
+	local cmd="$1"; shift
+	
+	[ -x "$cmd" ] && {
+		echo "Exec reloading $service... commond: $cmd $@" >> "/var/run/service-reload-status"
+		( $cmd "$@" ) 2>/dev/null 1>&2
+		[  "$?" != "0" ] && echo '!!! Failed to reload' $service '!!!'
+	}
+}
+
+reload_init() {
+	local service="$1"
+	
+	[ -x /etc/init.d/$2 ] && /etc/init.d/$2 enabled && {
+		echo "Reloading $service... " >> "/var/run/service-reload-status"
+		/etc/init.d/$2 restart >/dev/null 2>&1
+		[  "$?" != "0" ] && echo '!!! Failed to reload' $2 '!!!'
+	}
+}
+
+lock "/var/run/service-reload"
+rm -f "/var/run/service-reload-status"
+config_load ucitrack
+
+for i in $*; do
+	config_foreach apply_config $i $i
+done
+
+lock -u "/var/run/service-reload"

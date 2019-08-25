@@ -1,0 +1,17 @@
+#!/bin/sh /etc/rc.common
+
+START=97
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+QUECTEL_CM=/usr/bin/quectel-CM
+
+start() {
+        service_start $QUECTEL_CM
+}
+
+stop() {
+        service_stop $QUECTEL_CM
+}

@@ -1,0 +1,347 @@
+<%
+	include("top")
+%>
+
+<style>
+	.printer-list {
+		width:100%;
+		/*padding-left:3px;*/
+	}
+
+	.printer-list thead {
+		font-size:16px;
+		color:#333;
+		border-bottom:1px solid #f3f3f3;
+		text-align:left;
+	}
+	.printer-list thead th{
+		padding-left:20px;
+	}
+
+	.printer-list tr {
+		height: 120px;
+		color: #666;
+		padding-left:3px;
+	}
+	.printer-list tr:hover{
+		background-color:#f3f3f3;
+		padding-left:0;
+		border-left:3px solid #2a5cff;
+	}
+	.printer-list tr td {
+		text-align: left;
+		color: #333;
+		padding-left:20px;
+	}
+
+	.printer-list tbody tr {
+		border-bottom: 1px solid #f5f5f5;
+		color: #0b0b0b;
+		font: 14px/20px 'Microsoft YaHei';
+	}
+
+	.printer-list tbody td {
+		height: 100px;
+	}
+
+	.printer-list tbody td img{
+		max-width:100%;
+	}
+
+	.printer-test {
+		width: 90px;
+		height: 30px;
+		background: #fff;
+		border: 1px #d4dfe8 solid;
+		border-radius: 2px;
+		color: #666;
+		cursor: pointer;
+		font-size: 14px;
+		margin-right: 20px;
+		margin-top: 8px;
+	}
+	.printer-test:hover{
+		background-color:#2a5cff;
+		color:#fff;
+	}
+	.article .top{
+		margin-top:30px;
+	}
+	.section{width:100%;}
+</style>
+
+<div class="box">
+<div class="main">
+	<div class="aside">
+	<ul>
+		<li class="aside-set">
+			<a href="javascript:showTab(0)">
+			<em id="tt0" class="nav-icon">打印机管理</em>
+			</a>
+		</li>
+		<li class="aside-set">
+			<a href="javascript:showTab(1)">
+			<em id="tt1" class="nav-em">云打印管理</em>
+			</a>
+		</li>
+	</ul>
+
+	<div class="article" id="tab0">
+		<div class="printer-none" style="display:none">
+			<div class="input-info">
+				<p class="app-p">
+					<span style="color:red">未检测到可用的打印机设备!</span>
+				</p>
+			</div>
+			<hr class="hr-new">
+		</div>
+		<div class="section top printer-cont" style="display:none;">
+			<table class="printer-list">
+				<thead>
+					<tr>
+						<th width="30%">&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp<span style="color:#999;">（共<em id="devnum">0</em>台）</span></th>
+						<th width="25%">设备型号</th>
+						<th width="25%">设备状态</th>
+						<th width="20%">操作</th>
+					</tr>
+				</thead>
+				<tbody id="list">
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div class="article" id="tab1" style="display:none">
+		<div class="set-content">
+			<div class="input-info">
+				<label style="float:left; margin-top:22px; width:140px">开启</label>
+				<div id="on-off" class="switch open1" style="margin:17px 0 2px 36px">
+					<div class="slide open2"></div>
+				</div>
+				<span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+				<div class="clean"></div>
+			</div>
+
+			<div class="input-info">
+				<label style="width:140px">纳税人识别号</label>
+				<input class="wid140" type="text"  id="tax-num" value=""/>
+			</div>
+
+			<div class="input-info">
+				<label style="width:140px">51盒子编号</label>
+				<input class="wid140" type="text"  id="box-num" value=""/>
+			</div>
+
+			<hr id="hr2" class="hr-new">
+			<div class="operate-btn">
+				<input type="button" value="保 存" class="s off" id="save"/>
+				<img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+			</div>
+
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/xhr.js"></script>
+<script type="text/javascript">
+	var T_alert = new Toast();
+		T_alert._css.lineHeight = "40px";
+
+	var requestData = {};
+	var printerType = new Array("卷纸针式打印机", "卷纸热敏打印机", "平推针式打印机");
+	var printerStatus = {};
+
+	XHR.poll(300, '/cgi-bin/aisino/spooler/manage', {id: "list"},
+		function(x, lt) {
+			if (lt) {
+				$("#list").empty();
+				if (lt.PRINTERS.length == 0) {
+					$(".printer-none").css("display", "block");
+					$(".printer-cont").css("display", "none");
+				} else {
+					$('#devnum').html(lt.PRINTERS.length);
+					for (var i = 0; i < lt.PRINTERS.length; i++) {
+						if (!printerStatus[lt.PRINTERS[i].model]) {
+							printerStatus[lt.PRINTERS[i].model] = " ";
+						}
+						var revise = "";
+						if (lt.PRINTERS[i].type == 0)
+							revise = "<button class='printer-test' onclick=blackMarkRevise(" + lt.PRINTERS[i].type + "," + lt.PRINTERS[i].vid + "," + lt.PRINTERS[i].pid + ");>黑标校准</button>";
+
+						$("#list").append("<tr id='" + lt.PRINTERS[i].model + "'>" +
+											"<td><img src='<%=resource%>/images/apps/printer_" + lt.PRINTERS[i].type + ".png' alt='' /></td>" +
+											"<td>" + lt.PRINTERS[i].model + "<br/>" + printerType[lt.PRINTERS[i].type] +"</td>" +
+											"<td class='printer-status'>" + printerStatus[lt.PRINTERS[i].model] + "</td>" +
+											"<td> <button class='printer-test' onclick=printTest(" + lt.PRINTERS[i].type + "," + lt.PRINTERS[i].vid + "," + lt.PRINTERS[i].pid + ");>打印测试</button>"
+											 + revise +
+											"</td>" +
+										  "</tr>");
+
+						getPrinterStatus(lt.PRINTERS[i].model, lt.PRINTERS[i].type, lt.PRINTERS[i].vid, lt.PRINTERS[i].pid);
+					}
+
+					$(".printer-none").css("display", "none");
+					$(".printer-cont").css("display", "block");
+				}
+			}
+		}
+	);
+
+
+	function getPrinterStatus(model, t, v, p) {
+		$.getJSON('/cgi-bin/aisino/spooler/manage', {id: "status", type: t, vid: v, pid: p},
+			function(r) {
+				if (r) {
+					var htmlStr = r.STATUS + "   <img src='<%=resource%>/images/apps/" + ((r.CODE == 0) ? "normal" : "error") + ".png' alt=''/>";
+					$("tr#" + model + " .printer-status").html(htmlStr);
+					printerStatus[model] = htmlStr;
+				}
+			}
+		);
+	}
+
+	function blackMarkRevise(t, v, p) {
+		var c = new Confirm('此功能将恢复黑标走纸位置为默认值', function() {
+			XHR.get('/cgi-bin/aisino/spooler/manage', {id: "impact_revise", type: t, vid: v, pid: p}, 
+				function(x, r) {
+					if (r.CODE == 0) {
+						T_alert.show("设置成功, 请重启打印机", 2000);
+					} else {
+						T_alert.show("设置失败, 打印机不支持此功能", 2000);
+					}
+				}
+			)
+		});
+	}
+
+	function printTest(t, v, p) {
+		var c = new Confirm('为避免造成浪费, 请放置测试用纸.', function() {
+			XHR.get('/cgi-bin/aisino/spooler/manage', {id: "selftest", type: t, vid: v, pid: p}, 
+				function(x, r) {
+					if (r.CODE != 0) {
+						T_alert.show("打印失败, 请检查打印机状态", 2000);
+					}
+				}
+			)
+		});
+	}
+
+	function showTab(id) {
+		$(".article").css("display", "none");
+		$("#tab" + id).css("display", "block");
+		$("#tt" + id).removeClass("nav-em");
+		$("#tt" + id ).addClass("nav-icon");
+		$("#tt" + (id^1)).removeClass("nav-icon");
+		$("#tt" + (id^1)).addClass("nav-em");
+	}
+
+	function switchButton(action) {
+		if (action == "off") {
+			$("#on-off").removeClass('open1');
+			$("#on-off").addClass('close1');
+			$("#on-off").children().removeClass('open2');
+			$("#on-off").children().addClass('close2');
+
+			// 页面表单禁用
+			$(".set-content").find(":input").attr("disabled","disabled");
+			$("#save").css("display", "none")
+		} else {
+			$("#on-off").removeClass('close1');
+			$("#on-off").addClass('open1');
+			$("#on-off").children().removeClass('close2');
+			$("#on-off").children().addClass('open2');
+
+			// 页面表单激活
+			$(".set-content").find(":input").removeAttr("disabled");
+			$("#save").css("display", "inline-block")
+		}
+	}
+
+ 	// 检测数据并设置请求数据
+	function checkInputData() {
+		requestData.boxnum = $("#box-num").val();
+		requestData.taxnum = $("#tax-num").val();
+
+		if (requestData.boxnum.length < 1) {
+			T_alert.show("51盒子编号不能为空!",2000);
+			$("#box-num").focus();
+			return false;
+		}
+
+		if (requestData.taxnum.length < 1) {
+			T_alert.show("纳税人识别号不能为空!",2000);
+			$("#tax-num").focus();
+			return false;
+		}
+		return true;
+	}
+
+	function submit() {
+		$.ajax({
+			url: '<%=luci.dispatcher.build_url("admin", "application", "aisino", "setCloudPrinter")%>',
+			cache: false,
+			dataType: "json",
+			data: requestData,
+			timeout:30000,
+			type: "POST",
+			success: function(rsp) {
+				if (rsp.code == 0) {
+					T_alert.show("保存成功！",2000);
+				} else {
+					T_alert.show("保存失败！",2000);
+				}
+				loadSave("after", "save");
+				$(".loadImg").css("display","none");
+			},
+			error: function(x){
+				T_alert.show("保存成功！",2000);
+				loadSave("after", "save");
+				$(".loadImg").css("display","none");
+			},
+			ontimeout:function(){
+				T_alert.show("保存超时！",2000);
+				loadSave("after", "save");
+				$(".loadImg").css("display","none");
+			}
+		});	
+	}
+
+	function getConfig() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "aisino", "get51BoxConfig")%>", {}, function(data) {
+			if (data) {
+				var status = data.cloudprinter;
+				switchButton((status == "1") ? "on" : "off");
+				$("#box-num").val(data.boxnum);
+				$("#tax-num").val(data.taxnum);
+			}
+        });	
+	}
+
+	$(function() {
+		getConfig();
+
+		$("#on-off").click(function() {
+			if ($(this).hasClass('open1')) {
+				$(".loadImg").css("display","inline-block");
+				switchButton("off");
+				// 提交关闭
+				requestData.disabled = 1;
+				submit();
+			} else {
+				requestData.disabled = 0;
+				switchButton("on");
+			}
+		});
+
+		$("#save").click(function () {
+			if (!checkInputData()){
+				return false;
+			}
+
+			loadSave("before", "save");
+			submit();
+		});
+	});
+
+</script>
+<%include("bottom")%>

@@ -1,0 +1,191 @@
+<%
+	local _uci = require "luci.model.uci".cursor()	
+	
+	if luci.http.formvalue("mtu") == "1" then		
+		local mtu_val = 1500
+		
+		local wan_type = _uci:get("network", "wan", "proto")
+		local wan_ifname = _uci:get("network", "wan", "ifname")
+		
+		if wan_type == "pppoe" then
+			mtu_val = luci.util.trim(luci.util.exec("ifconfig pppoe-wan | grep MTU|sed 's/.*MTU://'|awk '{print $1}'"))
+		else
+			mtu_val = luci.util.trim(luci.util.exec("ifconfig "..wan_ifname.." | grep MTU|sed 's/.*MTU://'|awk '{print $1}'"))
+		end
+		
+		luci.http.prepare_content("application/json")
+		luci.http.write_json(mtu_val)
+    return
+	end
+	
+%>
+
+<%+header%>
+
+<script type="text/javascript">
+	var mtu_default = 1500;
+	
+	$(function () {
+		set_header_icon_lighted("pic_fun_gj");
+		get_wan_mtu();
+		
+		$("#mtudef").click(function () {
+			$("#mtu_num").val(mtu_default);
+		});
+		
+		$("#mtusave").click(function () {
+			mtu_value = document.getElementById("mtu_num").value;
+			if (!check_mtu()) {
+				return false;
+			}
+			$("#mtusave").prop("disabled" , true);
+			$(".mtusave").show();
+			mtu_set(mtu_value);
+		})
+	});
+
+	function get_wan_mtu() {
+		xhr = new XHR();
+		xhr.get('<%=REQUEST_URI%>', {mtu: 1}, function (x, data) {
+			if (data) {
+				$("#mtu_num").val(data);
+			}
+		})
+	}
+
+</script>
+	
+</script>	
+<div class="soft_con">
+	<div class="soft_con2">
+		<div class="banben gaoji_box">
+			<div class="gaoji_left">
+				<ul>
+					<% include("themes/" .. theme .. "/menuer") %>
+				</ul>
+			</div>
+			
+			<div id="mtu" class="function1 gaoji_right">
+				<div class="pwd_kuai">
+					<table class="pwdtable" border="0" cellpadding="0" cellspacing="0">
+						<tr>
+							<td class="pleft">MTU</td>
+							<td>
+								<input type="text" maxlength="5" class="pin" id="mtu_num" placeholder=""/>
+							</td>
+							<td><span id="mtudef" class="mtu_defa" style="cursor: pointer"><%:default%></span></td>
+						</tr>
+						<tr>
+							<td class="pleft"></td>
+							<td>
+								<input id="mtusave" class="pbtn" type="button" value="<%:Save%>"/>
+							</td>
+							<td><img class="mtusave" style="padding-top:24px;display: none;" src="<%=resource%>/icons/images/loading.gif"/></td>
+						</tr>
+					</table>
+				</div>
+				
+				<!--mtu设置-->
+				<script type="text/javascript">
+
+					function check_mtu() {
+						var mtu = $("#mtu_num").val();
+						var reg = /^[0-9]+$/;
+						if (mtu.length < 1) {
+							dialog({
+								title: '<%:Notify%>',okValue: '<%:OK%>',
+								content: '<%:Input value cannot be empty.%>',
+								ok: function () {
+									setTimeout(function () {
+										document.getElementById("mtu_num").focus();
+									}, 0);
+								},
+								cancel: false
+							}).showModal();
+							return false;
+						} else if (mtu.indexOf(" ") >= 0) {
+							dialog({
+								title: '<%:Notify%>',okValue: '<%:OK%>',
+								content: '<%:Input value cannot contain spaces.%>',
+								ok: function () {
+									setTimeout(function () {
+										document.getElementById("mtu_num").focus();
+									}, 0);
+								},
+								cancel: false
+							}).showModal();
+							return false;
+						}else if (!reg.exec(mtu) || mtu == 0) {
+							dialog({
+								title: '<%:Notify%>',
+								okValue: '<%:OK%>',
+								content: '<%:Character is not allowed in MTU.%>',
+								ok: function () {
+									setTimeout(function () {
+										$("#mtu_num").focus();
+									}, 0);
+								},
+								cancel: false
+							}).showModal();
+							return false;
+						}else if(parseInt(mtu)<512 ){
+							dialog({
+								title: '<%:Notify%>',
+								okValue: '<%:OK%>',
+								content: '<%:Invalid value. MTU size for 512 ~ 1500.%>',
+								ok: function () {
+									setTimeout(function () {
+										$("#mtu_num").focus();
+									}, 0);
+								},
+								cancel: false
+							}).showModal();
+							return false;
+						}else if(parseInt(mtu)>1500 ){
+							dialog({
+								title: '<%:Notify%>',
+								okValue: '<%:OK%>',
+								content: '<%:Invalid value. MTU size for 512 ~ 1500.%>',
+								ok: function () {
+									setTimeout(function () {
+										$("#mtu_num").focus();
+									}, 0);
+								},
+								cancel: false
+							}).showModal();
+							return false;
+						}
+						return true;
+					}
+					
+					function mtu_set(value){
+						$.ajax({
+							url: '<%=luci.dispatcher.build_url("admin", "network", "set_wan_mtu")%>',
+							cache: false,
+							dataType: "json",
+							data: {token: '<%=token%>', mtu_set : value},
+							timeout:2000,
+							type: "POST",
+							success: function(rsp){
+								if(rsp.result == true){
+									success_prop("mtusave");
+								}else{
+									failed_prop(rsp.result,"mtusave");
+								}
+							},
+							error: function(x){
+								error_prop(x.statusText,"mtusave");
+							},
+							ontimeout:function(){
+								timeout_prop();
+							}
+						});
+					}
+				</script>
+			</div>	
+
+		</div>
+	</div>
+</div>
+
+<%+footer%>

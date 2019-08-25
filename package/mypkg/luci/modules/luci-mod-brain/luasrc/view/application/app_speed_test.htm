@@ -1,0 +1,116 @@
+<%
+local uci  = require "luci.model.uci".cursor()
+
+local downSpeed = uci:get("apfreeqos", "bandwidth", "download") or 0
+local upSpeed = uci:get("apfreeqos", "bandwidth", "upload") or 0
+
+local serverPort = tonumber(luci.http.getenv("SERVER_PORT"))
+include("top")
+%>
+<div class="box">
+	<div class="main">
+		<%include("application/menuer")%>
+		
+		<div class="">
+			<!--<div class="title">-->
+				<!--<h3>网络测速</h3>-->
+			<!--</div>-->
+			<div class="article aside">
+				<ul class="wd-tab">
+                    <%if serverPort ~= 443 then%>
+					<li class="current tab1 aside-set">SpeedTest.cn 在线测速</li>
+                    <%end%>
+					<li class="tab2 aside-set">设备外网测速</li>
+				</ul>
+                
+                <%if serverPort ~= 443 then%>
+                <div class="wf_tab_cont" id="tab1" style="margin:30px auto;">
+                    <table id="Bq">
+                        <tr><td id="stWrap"></td></tr>
+                    </table>
+                    <script src="//www.speedtest.cn/assets/js/api/speedtest.light_nobg.min.js"></script>
+                    <p style="padding:40px;text-align: right;color:#999;">本插件版权归<a style="color:#0abcdf;" href="http://www.speedtest.cn/" target="_blank">SpeedTest.cn</a>测速网所有,并保留一切权利</p>
+                </div>
+                <%end%>
+                
+                <div class="wf_tab_cont" id="tab2" style="<%if serverPort ~= 443 then%>display:none;<%end%>height:584px;">
+                    <div class="btncont">
+                        <button class="testbtn" style="margin-top:100px;">点击测速</button>
+                    </div>
+                    <div class="clock-box">
+                        <span class="big-circle"></span>
+                        <span class="small-circle"></span>
+                        <span class="pointer"></span>
+                        <p class="citcletxt">正在测速...</p>
+                    </div>
+                    <div class="cont rescont">
+                        <div class="testresult">
+                            <div class="testlist bord">
+                                <span class="num" id="up-speed"><%=string.format("%0.2f", upSpeed / 100)%></span>
+                                <span class="tip">上行带宽<b>(Mbps)</b></span>
+                            </div>
+                            <div class="testlist">
+                                <span class="num" id="down-speed"><%=string.format("%0.2f", downSpeed / 100)%></span>
+                                <span class="tip">下行带宽<b>(Mbps)</b></span>
+                            </div>
+                        </div>
+
+                        <div class="cont">
+                            <button class="testbtn retest">重新测速</button>
+                        </div>
+                    </div>
+                </div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript">
+    function doSpeedTest() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "connect", "speedTest")%>", null, function(data) {
+            $("#down-speed").html((data.download / 100).toFixed(2));
+            $("#up-speed").html((data.upload / 100).toFixed(2));
+            $("#suggest").html((data.upload / 25).toFixed(0) + "KB/s" );
+            
+            $(".clock-box").hide();
+            $(".rescont").show();
+        });
+    }
+    
+    $(function(){
+        var height = $(document).height()-90>795?$(document).height()-90:795;
+        var width = window.innerWidth;
+        if(width>1350){
+            $('.nav').css('height','100%');
+        }else{
+            $('.nav').css('height',height);
+        }
+
+        $(".testbtn").click(function(){
+            $(".clock-box").show();
+            $(".btncont").hide();
+            $(".rescont").hide();
+            
+            doSpeedTest();
+        });
+        
+        <%if serverPort ~= 443 then%>
+        $(".wd-tab li").click(function(){
+            $(".wd-tab li").removeClass("current");
+            $(this).addClass("current");
+            var i = $(".wd-tab li").index($(this));
+            $(".wf_tab_cont").css("display","none");
+            if(i == 0){
+                $("#tab1").css("display","block");
+            }else if(i == 1){
+                $("#tab2").css("display","block");
+            }else if(i == 2){
+                $("#tab3").css("display","block");
+            }
+        });
+        <%end%>
+    })
+</script>
+
+
+<%include("bottom")%>

@@ -1,0 +1,845 @@
+<%
+local uci = require "luci.model.uci".cursor()
+local json = require "ktapi.ktJson"
+
+local ktWifi = require "ktapi.ktWifi"
+
+local PWR_MIN, PWR_MID, PWR_HIG, PWR_MAX
+
+local bd = luci.util.ubus("system", "board") or { }
+local tg = bd.release.target
+if tg:find("ramips") then
+    PWR_MIN, PWR_MID, PWR_HIG, PWR_MAX = 32, 50, 63, 100
+elseif tg:find("ipq") then
+    PWR_MIN, PWR_MID, PWR_HIG, PWR_MAX = 15, 17, 20, 29
+else
+    PWR_MIN, PWR_MID, PWR_HIG, PWR_MAX = 15, 17, 20, 21
+end
+
+local apclientset = uci:get("network", "wan", "apclient") or "0"
+
+local wifi2G = json.Encode(ktWifi.get_wifi_net("2.4G"))
+local wifi5G = json.Encode(ktWifi.get_wifi_net("5G"))
+--local guest = json.Encode(ktWifi.get_wifi_net("guest"))
+local guest = "[]"
+%>
+
+<%include("top")%>
+<script type="text/javascript" src="<%=resource%>/js/jquery.toggle-password.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+//  T_alert._css.top = "780px";
+    T_alert._css.position = "fixed";
+    T_alert._css.bottom = "150px";
+
+
+    var global_wifi0_data = <%=wifi2G%>;
+    var global_wifi1_data = <%=wifi5G%>;
+    var global_wifi0_guest = <%=guest%>;
+    var global_request_data = {};
+    var old_config_data = {};
+    var is_apclient_set = "<%=apclientset%>";
+
+    //console.log(global_wifi0_data);
+
+    //加密类型显示隐藏
+    function show_password_g(type, ele, pwd) {
+        if (type == "psk-mixed+tkip+ccmp") {
+            ele.css("display", "block");
+        } else if (type == "none" || type == "") {
+            //pwd.val("");
+            ele.css("display", "none");
+        }
+    }
+
+    function switch_btn(id, action) {
+        if (action == "off") {
+            $('#' + id).removeClass('open1');
+            $('#' + id).addClass('close1');
+            $('#' + id).children().removeClass('open2');
+            $('#' + id).children().addClass('close2');
+            $("." + id).css("display", "none");
+
+            <%if wifi5G ~= "[]" then%>
+            if ($("#merge_btn").hasClass('switch open1')) {
+                if (id == "wifi2g_onoff") {
+                    switch_btn("wifi5g_onoff", "off");
+                    $("#5g_btn").css("display", "none");
+                }
+            }
+            <%end%>
+
+            <%if guest ~= "[]" then%>
+            if (id == "wifi2g_onoff") 
+               $("#wifi_guest_box").css("display", "none");
+            <%end%>
+        } else {
+            $('#' + id).removeClass('close1');
+            $('#' + id).addClass('open1');
+            $('#' + id).children().removeClass('close2');
+            $('#' + id).children().addClass('open2');
+            $("." + id).css("display", "block");
+
+            <%if wifi5G ~= "[]" then%>
+            if ($("#merge_btn").hasClass('switch open1')) {
+                if (id == "wifi2g_onoff") {
+                    switch_btn("wifi5g_onoff", "on");
+                    $("#5g_btn").css("display", "block");
+                }
+            }
+            <%end%>
+
+            <%if guest ~= "[]" then%>
+            if (id == "wifi2g_onoff") 
+               $("#wifi_guest_box").css("display", "block");
+            <%end%>
+        }
+    }
+
+    function switch_merge(action) {
+        if (action == "off") {
+            switch_btn("merge_btn", "off");
+            $('#5g_btn').css("display", "block");
+            $('#5g_table').css("display", "block");
+            $('#wifi5g_onoff').css("display", "block");
+
+            $("#hr2").css('display',"block");
+            $("#24tit").css("display","none");
+            $("#wifiswitch").html("2.4G无线网络");
+
+        } else {
+            switch_btn("merge_btn", "on")
+            $('#5g_table').css("display", "none");
+            $('.wifi2g_onoff').css("display", "block");
+            $('.wifi5g_onoff').css("display", "block");
+            $('#wifi5g_onoff').css("display", "none");
+            $('#5g_dev_table').css("display", "block");
+
+            $("#hr2").css('display',"none");
+            $("#24tit").css("display","block");
+            $("#wifiswitch").html("无线开关");
+
+            //$(":input").removeAttr("disabled");
+        }
+    }
+
+    function default_load_wifi_info() {
+        <%if wifi5G ~= "[]" then%>
+        if (global_wifi0_data.ssid == global_wifi1_data.ssid &&
+                global_wifi0_data.key == global_wifi1_data.key &&
+                    global_wifi0_data.hidden == global_wifi1_data.hidden &&
+                        global_wifi0_data.is_up == global_wifi1_data.is_up)
+                            switch_merge("on");
+
+            set_config_data("wifi5g", global_wifi1_data);
+        <%end%>
+
+        <%if guest ~= "[]" then%>
+        if (global_wifi0_guest.ssid) {
+            set_config_data("guest", global_wifi0_guest);
+        }
+        <%end%>
+
+        //先设置5g数据, 判断合并时需要
+        set_config_data("wifi2g", global_wifi0_data);
+        $("#wifi-table").css("display", "block");
+
+        if (is_apclient_set == 1) {
+            $("#wifi2g_channel").attr("disabled","disabled");
+            $("#best_channel").css("display", "none");
+            $("#channel_msg").css("display", "inline");
+        }
+    }
+
+    function set_config_data(band, data) {
+        if (band != "guest") {
+            $('#' + band + '_channel').val(data.channel)
+
+            if (data.txpower) {
+                $('#' + band + '_txpower').val(data.txpower);
+            } else {
+                $('#' + band + '_txpower').val("<%=PWR_MAX%>");
+            }
+        }
+
+         $('#' + band + '_ssid').val(data.ssid)
+
+         if (data.hidden == 1) {
+            $('#' + band + '_hide').attr("checked","checked");
+         }
+
+         if (data.encry != "none") {
+            $('#' + band + '_encry').val(data.encry)
+            $('#' + band + '_key').val(data.key)
+            $('#' + band + '_password').css("display", "block");
+         }
+
+         if (data.is_up == 1) {
+            switch_btn(band + "_onoff", "off");
+         }
+    }
+
+    function check_ssid(id) {
+        $("#" + id).focus();
+
+        var str = $("#" + id).val();
+
+        if (str.indexOf(" ") >= 0) {
+            T_alert.show("<%:SSID 不能包含空格.%>",2000);
+            return false;
+        }
+
+        var myreg = new RegExp("[`~!@#$%^&*()=+|{}':;',\\[\\]<>/?~！￥……（）【】‘；：”“'。，、？§№☆★○●◎◇◆℃‰€°¤〓↓↑←→※▲△■＃＆＠＼︿♂♀]");
+        var realLength = 0;
+        var len = str.length;
+        var charCode = -1;
+
+        for (var i = 0; i < len; i++) {
+            charCode = str.charCodeAt(i);
+
+            if (charCode >= 0 && charCode <= 128) {
+                realLength += 1;
+            } else {
+                realLength += 3;
+            }
+        }
+
+        if (realLength < 1) {
+            T_alert.show("<%:SSID 不能为空.%>",2000);
+            return false;
+        } else if (myreg.test(str)) {
+            T_alert.show("<%:SSID 格式不正确.%>",2000);
+            return false;
+        } else if (realLength > 30) {
+            T_alert.show("<%:SSID 长度不合法.%>",2000);
+            return false;
+        }
+
+        return true;
+    }
+
+    function check_Password(id) {
+        var str = $("#" + id).val();
+        var reg = /^[0-9a-zA-Z]*$/g;
+
+        $("#" + id).focus();
+
+        if (reg.test(str) != true) {
+            T_alert.show("<%:无线密码格式不正确.%>",2000);
+            return false;
+        }
+
+        if (str.indexOf(" ") >= 0) {
+            T_alert.show("<%:无线密码不能包含空格.%>",2000);
+            return false;
+        }
+
+        if (str.length == 0) {
+            T_alert.show("<%:无线密码不能为空.%>",2000);
+            return false;
+        } else if (str.length < 8) {
+            T_alert.show("<%:无线密码必须大于8位.%>",2000);
+            return false;
+        } else if (str.length > 63) {
+            T_alert.show("<%:无线密码长度受限.%>",2000);
+            return false;
+        }
+
+        return true;
+    }
+
+    function generated_config_data() {
+        var data = {};
+
+        data.wifi0_hidden     = 0;
+        data.wifi0_disabled   = 0;
+        data.wifi0_channel    = $("#wifi2g_channel").val();
+        data.wifi0_txpower    = $("#wifi2g_txpower").val();
+        data.wifi0_ssid       = $("#wifi2g_ssid").val();
+        data.wifi0_password   = $("#wifi2g_key").val();
+        data.wifi0_encryption = $("#wifi2g_encry").val();
+
+        if ($("#wifi2g_hide").prop("checked")) {
+            data.wifi0_hidden = 1;
+        }
+
+        if ($("#wifi2g_onoff").hasClass('switch close1')) {
+            data.wifi0_disabled = 1;
+        }
+
+        if ($("#wifi2g_txpower option:selected").text() == "穿墙") {
+            data.wifi0_txpower = "";
+        }
+        <%if wifi5G ~= "[]" then%>        
+        data.wifi1_hidden       = 0;
+        data.wifi1_disabled     = 0;        
+        data.wifi1_channel      = $("#wifi5g_channel").val();
+        data.wifi1_txpower      = $("#wifi5g_txpower").val();
+        data.wifi1_ssid         = $("#wifi5g_ssid").val();
+        data.wifi1_encryption   = $("#wifi5g_encry").val();
+        data.wifi1_password     = $("#wifi5g_key").val();
+
+        data.merge = 0;
+
+        if ($("#wifi5g_hide").prop("checked")) {
+            data.wifi1_hidden = 1;
+        }
+
+        if ($("#wifi5g_onoff").hasClass('switch close1')) {
+            data.wifi1_disabled = 1;
+        }
+
+        if ($("#merge_btn").hasClass('switch open1')) {
+            data.merge = 1;
+            data.wifi1_disabled = data.wifi0_disabled;
+        }
+
+        if ($("#wifi5g_txpower option:selected").text() == "穿墙") {
+            data.wifi1_txpower = "";
+        }
+        <%end%>
+
+        <%if guest ~= "[]" then%>
+        data.wifi0_guest_ssid         = $("#guest_ssid").val();
+        data.wifi0_guest_encryption   = $("#guest_encry").val();
+        data.wifi0_guest_password     = $("#guest_key").val();
+
+        data.wifi0_guest_hidden   = 0;
+        data.wifi0_guest_disabled = 0;
+
+        if ($("#guest_hide").prop("checked")) {
+            data.wifi0_guest_hidden = 1;
+        }
+
+        if ($("#guest_onoff").hasClass('switch close1')) {
+            data.wifi0_guest_disabled = 1;
+        }
+        <%end%>
+
+        return data;
+    }
+
+    function check_input_data() {
+        if ($("#wifi2g_onoff").hasClass('switch open1')) {
+            if (!check_ssid("wifi2g_ssid")) return false;
+
+            if ($("#wifi2g_encry").val() != "none") {
+                if (!check_Password("wifi2g_key")) return false;
+            }
+        }
+
+        <%if wifi5G ~= "[]" then%>
+        if ($("#merge_btn").hasClass('switch close1') && $("#wifi5g_onoff").hasClass('switch open1')) {
+            if (!check_ssid("wifi5g_ssid")) return false;
+
+            if ($("#wifi5g_encry").val() != "none") {
+                if (!check_Password("wifi5g_key")) return false;
+            }
+        }
+        <%end%>
+
+        <%if guest ~= "[]" then%>
+        if ($("#wifi2g_onoff").hasClass('switch open1') && $("#guest_onoff").hasClass('switch open1')) {
+            if (!check_ssid("guest_ssid")) return false;
+
+            if ($("#guest_encry").val() != "none") {
+                if (!check_Password("guest_key")) return false;
+            }
+        }
+        <%end%>
+
+        global_request_data = generated_config_data();
+
+        $("#save").focus();
+
+        if (validators.equal(global_request_data, old_config_data)) {
+            T_alert.show("配置未改变",2000);
+            return false;
+        }
+
+        return true;
+    }
+</script>
+
+<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+
+    <div class="">
+        <div class="article">
+            <div class="set-content">
+                <div id="wifi-table" style="display:none">
+                    <%if wifi5G ~= "[]" then%>
+                    <div class="input-info">
+                        <label style="float: left;margin-top:22px;">Wifi合并</label>
+
+                        <div id="merge_btn" class="switch close1" style="margin:17px 0 2px 36px">
+                            <div class="slide close2"></div>
+                        </div>
+                        <!--<div style="float: left;">-->
+                            <!--<input class="magic-checkbox" type="radio" name="merge-switch" id="merge-yes" value="yes">-->
+                            <!--<label for="merge-yes" class="checkbox-txt" style="margin-left: 40px;line-height:22px;width:50px;">是</label>-->
+                        <!--</div>-->
+                        <!--<div style="float: left;">-->
+                            <!--<input class="magic-checkbox" type="radio" name="merge-switch" id="merge-no" value="no">-->
+                            <!--<label for="merge-no" class="checkbox-txt" style="line-height:22px;width:50px;">否</label>-->
+                        <!--</div>-->
+
+                        <span class="wifi-span" style="margin-top:22px;">开启后，2.4G和5G会使用同一个名称</span>
+
+                        <div class="clean"></div>
+
+                        <hr class="hr-new">
+                    </div>
+                    <%end%>
+
+                    <!-- 2.4G无线设置 -->
+                    <div class="input-info">
+                        <label id="wifiswitch" style="float: left;margin-top: 22px;">2.4G网络</label>
+
+                        <div id="wifi2g_onoff" class="switch open1" style="margin:17px 0 2px 36px">
+                            <div class="slide open2"></div>
+                        </div>
+
+                        <div class="clean"></div>
+                    </div>
+
+                    <div class="wifi2g_onoff">
+                        <div class="input-info">
+                            <label>无线名称</label>
+                            <input class="wid140" type="text"  id="wifi2g_ssid" placeholder="请输入无线名称"/>
+                            <input class="inp-checkbox" type="checkbox" id="wifi2g_hide" value="1" style="display: none"/>
+                            <label for="wifi2g_hide" class="checkbox-txt hidewifi" style="display: none">隐藏网络</label>
+                        </div>
+
+                        <div class="input-info">
+                            <label>加密方式</label>
+
+                            <div class="select-div">
+                                <select class="opt" id="wifi2g_encry">
+                                    <option value="none">无密码</option>
+                                    <option value="psk-mixed+tkip+ccmp">WPA2-PSK强加密</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="wifi2g_password" style="display: none" class="input-info">
+                            <label>无线密码</label>
+
+                            <input class="wid140" type="password" style="ime-mode:disabled;"
+                                   id="wifi2g_key" onpaste="return false"
+                                   onselectstart="return false" maxlength="68"
+                                   onkeyup="this.value=this.value.replace(/[\u4e00-\u9fa5]/g,'')"/>
+                            <!--<input class="inp-checkbox" type="checkbox" id="togglePassword_2g"/>-->
+                            <!--<label for="togglePassword_2g" class="checkbox-txt hidewifi">显示密码</label>-->
+                            <div style="display: inline-block;">
+                                <input class="magic-checkbox" type="checkbox" name="layout" id="togglePassword_2g">
+                                <label for="togglePassword_2g" class="checkbox-txt" style="line-height:22px;">显示密码</label>
+                            </div>
+                        </div>
+
+                        <div id="24tit" class="input-info" style="display:none;">
+                            <label style="float: left;margin-top: 22px;">2.4G网络</label>
+
+                            <div class="clean"></div>
+                        </div>
+
+                        <div class="input-info">
+                            <label>无线信道</label>
+
+                            <div class="select-div">
+                                <select class="opt" id="wifi2g_channel">
+                                    <option value="0"><%:自动%></option>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                    <option value="7">7</option>
+                                    <option value="8">8</option>
+                                    <option value="9">9</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                </select>
+                            </div>
+                            <a href="javascript:;" class="showDnsList" id="best_channel" style="color:#999;">最优信道推荐</a>
+                            <img style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                            <span id="channel_msg" style="display:none;color:red">中继模式下无法设置信道</span>
+                        </div>
+
+                        <div class="input-info">
+                            <label>信号强度</label>
+
+                            <div class="select-div">
+                                <select class="opt" id="wifi2g_txpower">
+                                    <option value="<%=PWR_MIN%>"><%:低%></option>
+                                    <option value="<%=PWR_MID%>"><%:中%></option>
+                                    <option value="<%=PWR_HIG%>"><%:高%></option>
+                                    <option value="<%=PWR_MAX%>"><%:穿墙%></option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr id="hr2" class="hr-new">
+
+                    <!-- 5G无线设置 -->
+                    <%if wifi5G ~= "[]" then%>
+                    <div class="input-info" id="5g_btn">
+                        <label style="float: left;margin-top: 22px;">5G网络</label>
+
+                        <div id="wifi5g_onoff" class="switch open1" style="margin:17px 0 2px 36px">
+                            <div class="slide open2"></div>
+                        </div>
+
+                        <div class="clean"></div>
+                    </div>
+
+                    <div class="wifi5g_onoff">
+                        <div class="wifi-box" id="5g_table">
+                            <div class="input-info">
+                                <label>无线名称</label>
+
+                                <input class="wid140" type="text"  id="wifi5g_ssid" placeholder="请输入无线名称"/>
+                                <input class="inp-checkbox" type="checkbox" id="wifi5g_hide" style="display: none"/>
+                                <label for="wifi5g_hide" class="checkbox-txt hidewifi" style="display: none">隐藏网络</label>
+                            </div>
+
+                            <div class="input-info">
+                                <label>加密方式</label>
+
+                                <div class="select-div">
+                                    <select class="opt" id="wifi5g_encry">
+                                        <option value="none">无密码</option>
+                                        <option value="psk-mixed+tkip+ccmp">WPA2-PSK强加密</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="wifi5g_password" style="display: none" class="input-info">
+                                <label>无线密码</label>
+
+                                <input class="wid140" type="password" style="ime-mode:disabled;"
+                                       id="wifi5g_key" onpaste="return false"
+                                       onselectstart="return false" maxlength="68"
+                                       onkeyup="this.value=this.value.replace(/[\u4e00-\u9fa5]/g,'')"/>
+                                <!--<input class="inp-checkbox" type="checkbox" id="togglePassword_5g"/>-->
+                                <!--<label for="togglePassword_5g" class="checkbox-txt hidewifi">显示密码</label>-->
+                                <div style="display: inline-block;">
+                                    <input class="magic-checkbox" type="checkbox" name="layout" id="togglePassword_5g">
+                                    <label for="togglePassword_5g" class="checkbox-txt" style="line-height:22px;">显示密码</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="5g_dev_table">
+                            <div class="input-info">
+                                <label>无线信道</label>
+
+                                <div class="select-div">
+                                    <select class="opt" id="wifi5g_channel">
+                                        <option value="149">149</option>
+                                        <option value="153">153</option>
+                                        <option value="157">157</option>
+                                        <option value="161">161</option>
+                                        <option value="165">165</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="input-info">
+                                <label>信号强度</label>
+
+                                <div class="select-div">
+                                    <select class="opt" id="wifi5g_txpower">
+                                        <option value="<%=PWR_MIN%>"><%:低%></option>
+                                        <option value="<%=PWR_MID%>"><%:中%></option>
+                                        <option value="<%=PWR_HIG%>"><%:高%></option>
+                                        <option value="<%=PWR_MAX%>"><%:穿墙%></option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <%end%>
+
+                    <!-- 访客网络 -->
+                    <%if guest ~= "[]" then%>
+                    <div id="wifi_guest_box">
+                        <hr class="hr">
+
+                        <div class="input-info">
+                            <label style="float: left;margin-top: 22px;">访客无线网络</label>
+
+                            <div id="guest_onoff" class="switch open1" style="margin:17px 0 2px 36px">
+                                <div class="slide open2"></div>
+                            </div>
+
+                            <div class="clean"></div>
+                        </div>
+
+                        <div class="guest_onoff">
+                            <div class="wifi-box" id="guest_table">
+                                <div class="input-info">
+                                    <label>无线名称</label>
+
+                                    <input class="wid140" type="text"  id="guest_ssid" placeholder="请输入无线名称"/>
+                                    <input class="inp-checkbox" type="checkbox" id="guest_hide"/>
+                                    <label for="guest_hide" class="checkbox-txt hidewifi">隐藏网络</label>
+                                </div>
+
+                                <div class="input-info">
+                                    <label>加密方式</label>
+
+                                    <div class="select-div">
+                                        <select class="opt" id="guest_encry">
+                                            <option value="none">无密码</option>
+                                            <option value="psk-mixed+tkip+ccmp">WPA2-PSK强加密</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div id="guest_password" style="display: none" class="input-info">
+                                    <label>无线密码</label>
+
+                                    <input class="wid140" type="password" style="ime-mode:disabled;"
+                                           id="guest_key" onpaste="return false"
+                                           onselectstart="return false" maxlength="68"
+                                           onkeyup="this.value=this.value.replace(/[\u4e00-\u9fa5]/g,'')"/>
+                                    <input class="inp-checkbox" type="checkbox" id="togglePassword_guest"/>
+                                    <label for="togglePassword_guest" class="checkbox-txt hidewifi">显示密码</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <%end%>
+
+                    <div class="operate-btn ml190">
+                        <input type="button" value="保 存" class="s off" id="save"/>
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script type="text/javascript">
+
+    $(function () {
+        var height = $(document).height()-90>1382+60?$(document).height()-90:1382+60;
+        var width = window.innerWidth;
+        if(width>1350){
+            $('.nav').css('height','100%');
+        }else{
+            $('.nav').css('height',height);
+        }
+
+        default_load_wifi_info();
+        old_config_data = generated_config_data();
+    });
+
+    $("#wifi2g_encry").change(function () {
+        var type2g = $("#wifi2g_encry").val();
+        var elem2g = $("#wifi2g_password");
+        var pwd2g = $("#wifi2g_key");
+
+        show_password_g(type2g, elem2g, pwd2g);
+    });
+
+    $("#wifi5g_encry").change(function () {
+        var type5g = $("#wifi5g_encry").val();
+        var elem5g = $("#wifi5g_password");
+        var pwd5g = $("#wifi5g_key");
+
+        show_password_g(type5g, elem5g, pwd5g);
+    });
+
+    $("#guest_encry").change(function () {
+        var type_guest = $("#guest_encry").val();
+        var elem_guest = $("#guest_password");
+        var pwd_guest = $("#guest_key");
+
+        show_password_g(type_guest, elem_guest, pwd_guest);
+    });
+
+    $('#wifi2g_key').togglePassword({
+        el: '#togglePassword_2g'
+    });
+
+    $('#wifi5g_key').togglePassword({
+        el: '#togglePassword_5g'
+    });
+
+    $('#wifi5g_key').togglePassword({
+        el: '#togglePassword_guest'
+    });
+
+    // 合并开关
+    $("#merge_btn").click(function() {
+        if ($(this).hasClass('open1')) {
+            switch_merge("off");
+        } else {
+            switch_merge("on");
+        }
+    });
+    $('input[type=radio][name=merge-switch]').change(function(){
+        if(this.value == 'yes'){
+        }
+
+    })
+
+
+    // 2.4开关
+    $("#wifi2g_onoff").click(function() {
+        if ($(this).hasClass('open1')) {
+            if (is_apclient_set == "1") {
+                T_alert.show("当前为中继模式,不允许关闭wifi.", 2000);
+                return false;
+            }
+
+            if (swicth_wifi("off", "2G") == 0) {
+                old_config_data.wifi0_disabled = 1;
+                switch_btn("wifi2g_onoff", "off");
+            }
+        } else {
+            if (swicth_wifi("on", "2G") == 0) {
+                old_config_data.wifi0_disabled = 0;
+                switch_btn("wifi2g_onoff", "on");
+            }
+        }
+    });
+
+    // 5g开关
+    $("#wifi5g_onoff").click(function() {
+        if ($(this).hasClass('open1')) {
+            if (swicth_wifi("off", "5G") == 0) {
+                switch_btn("wifi5g_onoff", "off");
+                old_config_data.wifi1_disabled = 1;
+            }
+        } else {
+            if (swicth_wifi("on", "5G") == 0) {
+                switch_btn("wifi5g_onoff", "on");
+                old_config_data.wifi1_disabled = 0;
+            }
+        }
+    });
+
+    // 访客网络开关
+    $("#guest_onoff").click(function() {
+        if ($(this).hasClass('open1')) {
+            if (swicth_wifi("off", "guest") == 0) {
+                switch_btn("guest_onoff", "off");
+                old_config_data.wifi0_guest_disabled = 1;
+            }
+        } else {
+            if (swicth_wifi("on", "guest") == 0) {
+                switch_btn("guest_onoff", "on");
+                old_config_data.wifi0_guest_disabled = 0;
+            }
+        }
+    });
+
+    $("#best_channel").click(function() {
+        //$("#dnsLayer").css("display","block");
+        var loadimg = $(this).siblings('img');
+        loadimg.css('display','inline-block');
+        $(this).css('display','none');
+
+        $.ajax({
+            url:"<%=luci.dispatcher.build_url("admin", "application", "wifimon", "scanWirelessEnv")%>",
+            success:function(rsp){
+                loadimg.css('display','none');
+                if(rsp.length == 0){
+                    T_alert.show("获取失败,当前网络不可用！",2000);
+                }else{
+                    for (var i = 0; i < 3; i++) {
+                        if (rsp.chEnv[i].channel <= 11) {
+                            $("#wifi2g_channel").val(rsp.chEnv[i].channel);
+                            break;
+                        }
+                    }
+                }
+
+                $("#best_channel").css('display','inline-block');
+            },
+            error:function(){
+                loadimg.css('display','none');
+                $("#best_channel").css('display','inline-block');
+                T_alert.show("获取失败,当前网络不可用！",2000);
+            }
+        })
+
+    });
+
+    //开关动作
+    function swicth_wifi(action, device){
+        var r = 0;
+
+        <%if wifi5G ~= "[]" then%>
+        if (device != "guest") { 
+            if ($("#merge_btn").hasClass('switch open1')) {
+                device = "all";
+            }
+        }
+        <%end%>
+
+        if(action == "on"){
+            $.getJSON("<%=luci.dispatcher.build_url("admin", "wireless", "reconnect")%>",{device: device},function(rsp) {
+                T_alert.show("无线功能已开启",2000);
+            })
+         } else {
+            var c = confirm("是否确定关闭wifi?");
+
+            if (c == true) {
+                $.getJSON("<%=luci.dispatcher.build_url("admin", "wireless", "shutdown")%>",{device: device},function(rsp) {
+                    T_alert.show("无线功能已关闭",2000);
+                })
+            } else {
+                r = 1;
+            }
+        }
+
+        return r;
+    }
+
+    // 保存
+    $("#save").click(function() {
+        if (!check_input_data()) return false;
+
+        var request_data = JSON.stringify(global_request_data);
+
+        loadSave("before", "save");
+
+        $.ajax({
+          url: "<%=luci.dispatcher.build_url("admin", "wireless", "wifi_setup")%>",
+          dataType: 'json',
+          timeout: 3000, //3 second timeout
+          data: {token: '<%=token%>', reqdata: request_data},
+          success: function(rsp) {
+                if(rsp.code == 0){
+                    T_alert.show("保存成功！",2000);
+                    old_config_data = objCopy(global_request_data);
+                } else {
+                    T_alert.show("保存失败！",2000);
+                }
+
+                loadSave("after", "save");
+            },
+            error: function(x, t, m) {
+                loadSave("after", "save");
+                T_alert.show("保存失败",2000);
+            }
+        });
+    });
+</script>
+
+<%include("bottom")%>

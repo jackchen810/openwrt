@@ -1,0 +1,629 @@
+<%
+	local ktUtil = require "ktapi.ktUtil"
+	local ktNetwork = require "ktapi.ktNetwork"
+	local lanInfo = ktNetwork.getLanInfo()
+
+	local routerMac = ktUtil.officalMac(lanInfo.macaddr) or "unknow"
+
+	local qrcodeSRC = luci.util.exec("curl http://wechat.kunteng.org.cn/route?mac=" .. routerMac) or ""
+	include("top")
+%>
+<style>
+	.operate-btn .off{
+		width:106px;
+		height:38px;
+		line-height:38px;
+		border-radius: 2px;
+	}
+	.tiptable table .td1{
+		width:30%;
+	}
+	.white_content{
+		top:150px;
+	}
+	.cont_inner{
+		padding-bottom:0;
+	}
+	.set-content{
+		padding-bottom:30px;
+	}
+</style>
+<div id="manage-layer" class="layer" style="display: none;">
+	<div class="bglayer"></div>
+
+	<div class="white_content">
+		<div class="findclose">
+			<span class="findclose" id="manage-close"><img src="<%=resource%>/images/i_close.png" alt=""/></span>
+		</div>
+
+		<div class="cont_inner">
+			<div class="set-content">
+				<div class="input-info">
+					<div class="selcont">
+						<label class="settit2">网络设置</label>
+						<div id="choseLink">
+							<div id="ulcblabel"><span id="ulcbabeltxt"></span><span class="yy-icon yy-soi"></span></div>
+							<div id="ulcbcontent" class="">
+								<ul>
+									<li data-value="dhcp"><a href="javascript:;">自动获取(DHCP)</a></li>
+									<li data-value="static"><a href="javascript:;">手动设置(静态IP)</a></li>
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- 静态ip设置 -->
+				<div id="static" style="display:none;" class="chosebox">
+					<div class="input-info">
+						<label>IP  地址</label>
+						<input type="text" id="static-ipaddr"/>
+					</div>
+
+					<div class="input-info">
+						<label>子网掩码</label>
+						<input type="text" id="static-netmask"/>
+					</div>
+
+					<div class="input-info">
+						<label>默认网关</label>
+						<input type="text" id="static-gateway"/>
+					</div>
+				</div>
+
+				<!-- DHCP设置 -->
+				<div id="dhcp" style="display:none;" class="chosebox">
+					<div class="input-info" style="margin-top:30px;height:30px;overflow: hidden;">
+						<label style="float: left;height:10px;"></label>
+						<div style="float: left;">
+							<input class="magic-checkbox" type="checkbox" name="layout" id="dhcpdns-switch">
+							<label for="dhcpdns-switch" class="checkbox-txt" style="margin-left: 40px;line-height:22px;">自定义DNS</label>
+						</div>
+
+					</div>
+
+				</div>
+
+				<div id="dns_table" style="display:none;">
+					<div class="input-info">
+						<label>首选DNS</label>
+						<input type="text" id="dhcp-dns1"/>
+						<img style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+					</div>
+
+					<div class="input-info">
+						<label>备用DNS</label>
+						<input type="text" id="dhcp-dns2"/>
+						<span style="color:#999;">(选填)</span>
+					</div>
+				</div>
+
+				<!-- 提交按钮 -->
+				<div class="operate-btn ml190" id="save-btn" style="margin:30px 0 0 190px;">
+					<input type="submit" id="save" value="保 存" class="on" style="margin-left:0;"/>
+					<img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="box">
+	<div class="main">
+		<div class="title">
+			<h3>51盒子管理</h3>
+		</div>
+		<style>
+			.box-left{
+				float:left;
+			}
+			.box-right{
+				float:right;
+				margin:17px 40px 0 0;
+			}
+			.alarm-ma{
+				text-align: center;
+			}
+			.alarm-ma span{
+				display: block;
+				color:#666;
+			}
+			.alarm-ma i{
+				display: block;
+				width:120px;
+				height:120px;
+				padding:2px;
+				border:1px solid #dedede;
+				border-radius: 8px;
+				margin:10px auto;
+			}
+			.alarm-ma i img{
+				width:100%;
+				height:100%;
+			}
+			.errmsg{color:red;}
+			.box-cont-new{
+				overflow: hidden;
+			}
+		</style>
+		<div class="article">
+			<div class="box-cont-new">
+				<div class="box-left" style="margin:50px 0;">
+					<div class="input-info">
+						<label class="settit">连接状态</label>
+						<span class="msgspan" id="status-msg">获取中...</span>
+					</div>
+					<div class="input-info">
+						<label>设备编号</label>
+						<em id="box_id">获取中...</em>
+					</div>
+				</div>
+				<div class="box-right">
+				<div class="qrcode alarm-ma">
+					<i><img src="" alt=""></i>
+					<span>扫一扫，及时获得设备异常通知</span>
+				</div>
+			</div>
+			</div>
+			<hr class="hr-new"/>
+			<div class="box-cont-new">
+				<div class="input-info">
+					<label>纳税人识别号</label>
+					<input type="text" id="box_taxnum"/>
+				</div>
+				<div class="input-info">
+				<label>51盒子IP地址</label>
+				<input type="text" id="box_ipaddr"/>
+			</div>
+			</div>
+			<div class="operate-btn">
+				<input type="button" value="网络管理" class="s off box-mange"/>
+				<input type="button" value="设备自检" onclick="box_stat_check();" class="s off box-check" style="margin-left:20px;"/>
+				<img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+			</div>
+
+			<div class="tiptable" style="display:none;">
+				<table class="result-table" border="0" cellspacing="1" cellpadding="0">
+					<caption style="padding-left: 20px;">运行状态</caption>
+					<tbody>
+					<tr>
+						<td class="td1">50KB/s</td>
+						<td>手机端微信、浏览网页较流畅，图片需缓冲3-5秒；PC浏览网页较缓慢。</td>
+					</tr>
+					<tr>
+						<td colspan="2" style="color:#999;">Ps：以上数据值仅供参考。具体设置可根据自身环境调整。</td>
+					</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/xhr.js"></script>
+<script type="text/javascript">
+	var BOX_STATE = 0;
+	var BOX_IPADDR = "";
+
+	var T_alert = new Toast();
+		T_alert._css.lineHeight = "40px";
+	var requestData = {};
+	var oldConfigData = {}; 
+	var netProto = "";
+
+	var BoxNormalState = {
+		"51盒子与金税盘绑定状态" : "绑定",
+		"专票抄报清卡状态" : "已清卡",
+		"普票抄报清卡状态" : "已清卡",
+		"卷票抄报清卡状态" : "已清卡",
+		"电子票抄报清卡状态" : "已清卡",
+		"金税盘授权状态" : "已授权",
+		"未上传的发票" : "没有",
+		"51平台登录状态" : "已登录",
+	}
+
+	XHR.poll(60, '/cgi-bin/aisino/spooler/manage', {id: "boxlist"}, function (x, data) {
+		if (data.BOXES.length == 0) {
+			BOX_STATE = 0;
+
+			// 未连接
+			$("#status-msg").css("color", "red");
+			$("#status-msg").html("<%:设备未连接%>");
+			$("#box_id").html("未找到设备");
+		} else {
+			BOX_STATE = 1;
+			BOX_IPADDR = data.BOXES[0].IPADDR;
+
+			// 已连接
+			$("#status-msg").css("color", "#2573bf");
+			$("#status-msg").html("<%:已连接%>");
+			$("#box_ipaddr").val(data.BOXES[0].IPADDR);
+			$("#box_id").html(data.BOXES[0].SBBH);
+			if (data.BOXES[0].NSRSBH) {
+				$("#box_taxnum").val(data.BOXES[0].NSRSBH);
+				requestData.boxnum = data.BOXES[0].NSRSBH;
+			}
+		}
+	})
+
+	function switchBox(type) {
+		$(".chosebox").css("display","none");
+
+		if (type == "static") {
+			$("#static").css("display","block");
+			$("#dns_table").css("display", "block");
+		} else {
+			$("#dhcp").css("display","block");
+			$("#dns_table").css("display", "none");
+		}
+	}
+
+	function get51BoxConfig() {
+		XHR.get('<%=luci.dispatcher.build_url("admin", "application", "aisino", "get51BoxConfig")%>', null, function (x, data) {
+			$("#box_taxnum").val(data.taxnum);
+			netProto = data.network.proto;
+
+			$("#static-ipaddr").val(data.network.ipaddr);
+			$("#static-netmask").val(data.network.netmask);
+			$("#static-gateway").val(data.network.gateway);
+
+			// 主DNS
+			if (data.network.dns1) {
+			   $("#dhcp-dns1").val(data.network.dns1);
+
+			   // 勾选自定义DNS
+			   if (netProto == "dhcp") {
+					$("#dhcpdns-switch").prop("checked", "checked");
+					$("#dns_table").css("display", "block");
+			   }
+			}
+
+			// 次DNS
+			$("#dhcp-dns2").val(data.network.dns2);
+
+			$("#choseLink").css("display", "inline-block");
+			var $protoLi = $("#ulcbcontent li[data-value='"+ netProto +"']");
+			$("#ulcbabeltxt").html($protoLi.find('a').html());
+			$("#loading-tip").css("display", "none");
+			switchBox(data.network.proto);
+		});
+	}
+
+	function checkDnsSettings(type) {
+		if ($("#" + type + "dns-switch").length > 0 && !$("#" + type + "dns-switch").prop("checked")) return true;
+
+		requestData.primayDns = $("#" + type + "-dns1").val();
+		requestData.secondDns = $("#" + type + "-dns2").val();
+
+
+		if (requestData.primayDns == "") {
+			T_alert.show("首选DNS格式不能为空",2000);
+			$("#" + type + "-dns1").focus();
+			return false;
+		}
+
+		if (!validators.ipaddr(requestData.primayDns)) {
+			T_alert.show("首选DNS格式不正确",2000);
+			$("#" + type + "-dns1").focus();
+			return false;
+		}
+
+		if (requestData.secondDns != "") {
+			if (!validators.ipaddr(requestData.secondDns)) {
+				T_alert.show("备用DNS格式不正确",2000);
+				$("#" + type + "-dns2").focus();
+				return false;
+			}
+		}
+		return true;
+	}
+
+	function checkStaticSettings() {
+		requestData.ipaddr = $("#static-ipaddr").val();
+		requestData.netmask = $("#static-netmask").val();
+		requestData.gateway = $("#static-gateway").val();
+		requestData.primayDns = $("#dhcp-dns1").val();
+		requestData.secondDns = $("#dhcp-dns2").val();
+
+		if (requestData.ipaddr.length < 1) {
+			T_alert.show("IP地址不能为空",2000);
+			$("#static-ipaddr").focus();
+			return false;
+		}
+
+		if (!validators.ipaddr(requestData.ipaddr)) {
+			T_alert.show("IP地址格式不正确",2000);
+			$("#static-ipaddr").focus();
+			return false;
+		}
+
+		if (requestData.netmask.length < 1) {
+			T_alert.show("子网掩码不能为空",2000);
+			$("#static-netmask").focus();
+			return false;
+		}
+
+		if (!validators.netmask(requestData.netmask)) {
+			T_alert.show("子网掩码格式不正确",2000);
+			$("#static-netmask").focus();
+			return false;
+		}
+
+		if (requestData.gateway.length < 1) {
+			T_alert.show("网关地址不能为空",2000);
+			$("#static-gateway").focus();
+			return false;
+		}
+
+		if (!validators.ipaddr(requestData.gateway)) {
+			T_alert.show("网关地址格式不正确",2000);
+			$("#static-gateway").focus();
+			return false;
+		}
+
+		if (requestData.gateway == requestData.ipaddr) {
+			T_alert.show("IP地址格式与网关地址相同",2000);
+			$("#static-ipaddr").focus();
+			return false;
+		}
+
+		if (!checkDnsSettings("dhcp")) return false;
+
+		return true;
+	}
+
+	// 检测数据并设置请求数据
+	function checkInputData() {
+		requestData.boxip = $("#box_ipaddr").val();
+		requestData.boxnum = $("#box_taxnum").val();
+
+		if (requestData.boxip.length < 1) {
+			T_alert.show("51盒子IP地址不能为空!",2000);
+			$("#box_ipaddr").focus();
+			return false;
+		}
+
+		if (requestData.boxnum.length < 1) {
+			T_alert.show("纳税人识别号不能为空!",2000);
+			$("#box_taxnum").focus();
+			return false;
+		}
+
+		if (requestData.boxip == BOX_IPADDR && BOX_STATE == 0) {
+			T_alert.show("51盒子不在线, 请稍后重试",2000);
+			return false;
+		}
+
+		switch (netProto) {
+			case "static":
+					if (!checkStaticSettings()) return false;
+				break;
+			case "dhcp":
+					if (!checkDnsSettings("dhcp")) return false;
+				break;
+			default:
+				break;
+		}
+
+		if (validators.equal(requestData, oldConfigData)) {
+			T_alert.show("配置未改变",2000);
+			return false;
+		}
+
+		oldConfigData = objCopy(requestData);
+		//console.log(requestData);
+		return true;
+	}
+
+    function compareJson(a,b){
+        var aProps = Object.getOwnPropertyNames(a);
+        var bProps = Object.getOwnPropertyNames(b);
+		// console.log(aProps,bProps);
+        for (var i = 0; i < bProps.length; i++) {
+            var propName = bProps[i];
+			// console.log(propName);
+            if (a[propName] && a[propName] !== b[propName]) {
+                b[propName] = b[propName]+'/no';
+            }
+        }
+		// console.log(b);
+        return b;
+    }
+
+	function box_stat_check() {
+		check_request = {};
+		check_request.id = "boxcheck";
+		check_request.boxip = $("#box_ipaddr").val();
+		check_request.boxnum = $("#box_taxnum").val();
+
+		if (check_request.boxip.length < 1) {
+			T_alert.show("51盒子IP地址不能为空!",2000);
+			$("#box_ipaddr").focus();
+			return false;
+		}
+
+		if (check_request.boxnum.length < 1) {
+			T_alert.show("纳税人识别号不能为空",2000);
+			$("#box_taxnum").focus();
+			return false;
+		}
+
+		$('.save-loading').css('display','inline-block');
+		$('.tiptable').css('display','none');
+		$.ajax({
+			url: "/cgi-bin/aisino/spooler/manage",
+			data: check_request,
+			timeout: 20000,
+			success: function(rsp) {
+				$('.save-loading').css('display','none');
+
+				if (rsp.CODE == 0) {
+					msg = rsp.DATA;
+					$('.tiptable').css('display','block');
+					var resultarr = msg.split('~');
+					var obj = {};
+					for (var j in resultarr) {
+						obj[resultarr[j].split(':')[0]] = resultarr[j].split(':')[1];
+					}
+
+                    var newobj = compareJson(BoxNormalState, obj);
+
+					$('.result-table tbody').empty();
+                    for (var i in newobj) {
+                        var tdstr = '';
+                        if (newobj[i].indexOf('/no') != -1) {
+                            tdstr = '<td class="errmsg">'+ newobj[i].split("/")[0] +'</td>'
+                        } else {
+                            tdstr = '<td>'+ newobj[i] +'</td>'
+                        }
+
+                        var tr = '<tr>' + '<td class="td1">'+ i +'</td>' + tdstr + '</tr>';
+                        $('.result-table tbody').append(tr);
+                    }
+
+					var height = ($(document).height() - 90) > ($('.main').outerHeight() + 210) ? ($(document).height() - 90) : ($('.main').outerHeight() + 210);
+					var width = window.innerWidth;
+					if (width > 1350) {
+						$('.nav').css('height','100%');
+					} else {
+						$('.nav').css('height',height);
+					}
+
+				} else {
+					T_alert.show("自检失败, 请检查设备状态或税号后重试", 5000);
+					loadSave("after", "save");				
+				}
+			},
+			error: function(x) {
+				$('.save-loading').css('display','none');
+				T_alert.show("自检失败, 请检查设备状态或税号后重试", 5000);
+				loadSave("after", "save");
+			},
+			ontimeout:function() {
+				$('.save-loading').css('display','none');
+				T_alert.show("自检失败, 请检查设备状态或税号后重试", 5000);
+				loadSave("after", "save");
+			}
+		});
+	}
+
+	$(function(){
+
+        if ("<%=qrcodeSRC%>" != "") {
+            $('.qrcode img').attr("src", "<%=qrcodeSRC%>");
+        }
+
+		get51BoxConfig();
+		$(".box-mange").click(function(){
+			var height = $(document).height()-90>$('.main').outerHeight()+60?$(document).height()-90:$('.main').outerHeight()+60;
+			var height2 = $('.main').outerHeight()+210;
+			var width = window.innerWidth;
+			if(width>1350){
+				$('.nav').css('height','100%');
+			}else{
+				$('.nav').css('height',height);
+			}
+			$('.layer').css('height',height2);
+			$("#manage-layer").css("display","block");
+		});
+
+		$("#manage-close").click(function(){
+			$("#manage-layer").css("display","none");
+		})
+
+		$("#choseLink").change(function(){
+			var str = $(this).val();
+			netProto = str;
+			switchBox(str);
+		});
+
+
+		$("#choseLink").bind('mouseover',function(){
+			$("#ulcbcontent").show();
+			$('.yy-soi').css({
+				'transform': 'rotate(180deg)',
+				'-webkit-transform': 'rotate(180deg)'
+			})
+		})
+		$("#choseLink").bind('mouseout',function(){
+			$("#ulcbcontent").hide();
+			$('.yy-soi').css({
+				'transform': 'rotate(0deg)',
+				'-webkit-transform': 'rotate(0deg)'
+			})
+		})
+
+		$('#ulcbcontent ul li').click(function(){
+			//console.log($(this).attr('data-value'));
+			var str = $(this).attr('data-value');
+			netProto = str;
+			switchBox(str);
+			var protomsg = $("li[data-value='"+ str +"']").find('a').html();
+			$("#ulcbabeltxt").html(protomsg);
+			$("#ulcbcontent").hide();
+			$('.yy-soi').css({
+				'transform': 'rotate(0deg)',
+				'-webkit-transform': 'rotate(0deg)'
+			})
+			$("#save-btn").css("display","block");
+		});
+
+		$("#dhcpdns-switch").click(function(){
+			$("#save-btn").css("display","block");
+
+			if (this.checked) {
+				$("#dns_table").css("display", "block");
+			} else {
+				$("#dns_table").css("display", "none");
+			}
+		});
+
+		$("#save").click(function () {
+			requestData = {};
+			requestData.id = "boxnetconf";
+			
+			requestData.proto = (netProto == "dhcp") ? '1' : '0';
+
+			if (!checkInputData()) return false;
+
+			//console.log(requestData);
+			loadSave("before", "save");
+			$.ajax({
+				url: "/cgi-bin/aisino/spooler/manage",
+				data: requestData,
+				timeout: 20000,
+				success: function(data) {
+					if (data.CODE == 0) {
+						$.getJSON('<%=luci.dispatcher.build_url("admin", "application", "aisino", "set51BoxNetwork")%>', requestData, function(data) {
+							if (data.code == 0) {
+								T_alert.show("保存成功", 5000);
+							} else {
+								oldConfigData = {};
+								T_alert.show("保存失败, 请检查设备状态或税号", 3000);
+							}
+
+							loadSave("after", "save");
+						});
+					} else {
+						oldConfigData = {};
+						T_alert.show("保存失败, 请检查设备状态或税号后重试", 5000);
+						loadSave("after", "save");
+					}
+				},
+				error: function(x) {
+					oldConfigData = {};
+					T_alert.show("保存失败, 请检查设备状态或税号后重试", 5000);
+					loadSave("after", "save");
+				},
+				ontimeout:function() {
+					oldConfigData = {};
+					T_alert.show("保存失败, 请检查设备状态或税号后重试", 5000);
+					loadSave("after", "save");
+				}
+			});
+		});
+	})
+</script>
+
+<%include("bottom")%>

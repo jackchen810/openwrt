@@ -1,0 +1,30 @@
+<%
+	local disp = require "luci.dispatcher"                                
+	local system_node = disp.get("admin", "advanced")
+	local childs = disp.node_childs(system_node)
+	
+	local request  = disp.context.path
+	local c = system_node
+	local i, r
+
+	-- tag all nodes leading to this page
+	for i, r in ipairs(request) do
+		if c.nodes and c.nodes[r] then
+			c = c.nodes[r]
+			c._menu_selected = true
+		end
+	end
+	
+	if #childs > 0 then
+		for i, v in ipairs(childs) do
+			local nnode = system_node.nodes[v]
+			if nnode.index then 
+%>
+				<li class="<%- if nnode._menu_selected then%>current<%end%> gjleft">
+					<a style="display: block" href="<%=luci.dispatcher.build_url("admin", "advanced", v)%>"><%=striptags(translate(nnode.title))%></a>
+					</li>
+<%
+			end
+		end
+	end	
+%>

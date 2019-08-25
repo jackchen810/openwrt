@@ -1,0 +1,1606 @@
+
+<%#
+ Copyright 2008 Steven Barth <steven@midlink.org>
+ Copyright 2008-2011 Jo-Philipp Wich <jow@openwrt.org>
+ Licensed to the public under the Apache License 2.0.
+-%>
+
+<%
+	local fs 	 = require "nixio.fs"
+	local util = require "luci.util"
+	local stat = require "luci.tools.status"
+	local ver  = require "luci.version"
+	local uci  = require("luci.model.uci")
+	local kt_wifi = require "luci.kt_uci_api"
+	local _uci     = uci.cursor()
+	local has_wifi = ((fs.stat("/etc/config/wireless", "size") or 0) > 0)
+	local cfg2g    = kt_wifi.get_wifi_iface_cfg_id("2G")
+	local has_dsl = fs.access("/etc/init.d/dsl_control")	
+
+	local arch = util.exec("opkg info kernel|grep Architecture")
+	
+	if luci.http.formvalue("status") == "1" then
+
+		local rv = {}        
+		rv.wan = {
+			proto    = _uci:get("network", "wan", "proto"),
+			password = _uci:get("network", "wan", "password"),
+			username = _uci:get("network", "wan", "username"),
+			ipaddr   = _uci:get("network", "wan", "ipaddr"),
+			gwaddr   = _uci:get("network", "wan", "gateway"),
+			netmask  = _uci:get("network", "wan", "netmask"),
+			dns      = _uci:get("network", "wan", "dns"),
+			ssid     = _uci:get("wireless",cfg2g,"ssid"),
+			lan_gwaddr = _uci:get("network", "lan", "ipaddr"),
+			--中继状态
+			apclientset = _uci:get("network", "wan", "apclient")
+		}
+		
+		luci.http.prepare_content("application/json")
+		luci.http.write_json(rv)
+		return
+	end
+-%>
+
+
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+	<meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+	<!--[if lt IE 9]
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+    <![endif]>-->
+
+    <title><%:Router Management Page%></title>
+    <link rel="shortcut icon" href="<%=media%>/favicon.ico">
+	
+    <link rel="stylesheet" href="<%=resource%>/ktcss/wizard.css"/>    
+	<link rel="stylesheet" href="<%=resource%>/ktcss/ui-dialog.css"/>
+	
+	<script type="text/javascript" src="<%=resource%>/js/jquery-1.9.0.min.js"></script>
+	<script type="text/javascript" src="<%=resource%>/js/dialog-plus-min.js"></script>
+    <script type="text/javascript" src="<%=resource%>/js/json2.js"></script>
+    <script type="text/javascript" src="<%=resource%>/js/jquery.toggle-password.js"></script>
+    <script type="text/javascript" src="<%=resource%>/xhr.js"></script>
+    <script type="text/javascript" src="<%=resource%>/cbi.js"></script>
+		<style>
+		.bac {
+		    background-color: #f7f7f7;
+		}
+		
+		.xbk {
+		    color: #2573bf;
+		    border-bottom: 1px solid #2573bf;
+		    background-color: #efefef;
+		}
+			.btn1{
+				height: 38px;
+				color: #aaa;
+				line-height: 38px;
+				text-align: center;
+				cursor: pointer;
+				font-size:18px;
+			}
+			.btn1:hover{
+				color: #666;
+			}
+		</style>
+    <script type="text/javascript">
+    		var internet_set = 
+    		{
+					"proto"					:"",
+					"username"      :"",
+					"password"      :"",
+					"ipaddr"        :"",
+					"netmask"       :"",
+					"gateway"       :"",
+					"backup_dns"    :"",
+					"main_dns"      :"",
+    			"ssid"          :"",
+    			"lan_gwaddr"    :"",
+    		}
+			var wan_setting_prestate = "dhcp";	
+			
+			function layerIn(){
+                  $layer = '<div id="loading" style="width: 100%; height: 400%; position: absolute; opacity: 0.9; top: 0px; left: 0px; margin: 0px; padding: 0px;      background-color: rgb(255, 255, 255); z-index:9999;"><img style="margin-left:50%; margin-top:25%;" src="<%=resource%>/icons/images/loading.gif"></div>';
+                  $("body").append($layer);
+ 	         }
+			 
+   	        function layerOut(){
+                  $("#loading").remove();
+   	        }
+
+    		function init()
+    		{
+    				init_wan_set();
+    		}
+			
+			function init_wan_set()
+			{
+					xhr = new XHR();
+					
+				  xhr.post('<%=REQUEST_URI%>', { status: 1 }, function(x) {
+					if(x.responseText)
+						{
+							var data = eval('(' + x.responseText + ')');
+							if(data)
+							{
+								internet_set.proto      = data.wan.proto   ? data.wan.proto:"";
+								internet_set.ipaddr     = data.wan.ipaddr  ? data.wan.ipaddr:"";
+								internet_set.netmask    = data.wan.netmask ? data.wan.netmask:"";
+								internet_set.gateway    = data.wan.gwaddr  ? data.wan.gwaddr:"";
+								internet_set.ssid       = data.wan.ssid    ? data.wan.ssid:"";
+								internet_set.username       = data.wan.username    ? data.wan.username:"";
+								internet_set.password  = data.wan.password    ? data.wan.password:"";
+								
+								//获取中继状态
+								internet_set.apclientset = data.wan.apclientset;
+								
+								//设置dns
+								switch(typeof data.wan.dns)
+								{
+									case "object":
+										internet_set.backup_dns =  data.wan.dns[1];
+										internet_set.main_dns = data.wan.dns[0];
+									  break;
+									case "string":
+									  internet_set.main_dns = data.wan.dns;
+									  break;
+									default:
+									 ;
+								}		
+								internet_set.lan_gwaddr = data.wan.lan_gwaddr    ? data.wan.lan_gwaddr:"";
+								wan_set_load_default();
+							}
+						}
+				})
+				setTimeout("layerOut()",250);
+			}
+			
+			function wan_set_load_default()
+			{
+				var type;
+				switch(internet_set.proto)
+				{
+					case "pppoe":
+						type = "pppoe";
+					break;
+					case "dhcp":
+						type = "dhcp";
+					break;
+					case "static":
+						type = "ip";
+					break;	
+					default:
+						type = "dhcp";
+					break;
+				}
+				
+				//外网设置自动选择到中继
+				if(internet_set.apclientset == '1') {
+					type = "wire";
+				}	
+				
+				$("input[name='internetWay']").each(function(index) {
+				if ($("input[name='internetWay']").get(index).value == type) {
+				$("input[name='internetWay']").get(index).checked = true;
+				}
+				});
+
+				if(type == "pppoe"){
+					var pppoe_element;
+					if (pppoe_element = document.getElementById('username')) {
+						if (internet_set.username) {
+							pppoe_element.value = internet_set.username;
+						}
+
+					}
+					if (pppoe_element = document.getElementById('password')) {
+						if (internet_set.password) {
+							pppoe_element.value = internet_set.password;
+						}
+					}
+					if (pppoe_element = document.getElementById('backup_dns_pppoe')) {
+						if (internet_set.backup_dns) {
+							pppoe_element.value = internet_set.backup_dns;
+						}
+					}
+					if (pppoe_element = document.getElementById('main_dns_pppoe')) {
+						if (internet_set.main_dns) {
+							pppoe_element.value = internet_set.main_dns;
+							document.getElementById('dns_switch_pppoe').checked = true;
+							show_dns_pppoe();
+						}
+					}
+				}
+				if(type == "ip"){
+					var static_element;
+					if (static_element = document.getElementById('static_ip')) {
+						if (internet_set.ipaddr) {
+							static_element.value = internet_set.ipaddr;
+						}
+					}
+					if (static_element = document.getElementById('static_netmask')) {
+						if (internet_set.netmask) {
+							static_element.value = internet_set.netmask;
+						}
+					}
+					if (static_element = document.getElementById('static_gateway')) {
+						if (internet_set.gateway) {
+							static_element.value = internet_set.gateway;
+						}
+					}
+					if (static_element = document.getElementById('backup_dns_static')) {
+						if (internet_set.backup_dns) {
+							static_element.value = internet_set.backup_dns;
+						}
+					}
+					if (static_element = document.getElementById('main_dns_static')) {
+						if (internet_set.main_dns) {
+							static_element.value = internet_set.main_dns;
+						}
+					}
+				}
+				if(type == "dhcp"){
+					var dhcp_element;
+					if (dhcp_element = document.getElementById('backup_dns_dhcp')) {
+						if (internet_set.backup_dns) {
+							dhcp_element.value = internet_set.backup_dns;
+						}
+					}
+					if (dhcp_element = document.getElementById('main_dns_dhcp')) {
+						if (internet_set.main_dns) {
+							dhcp_element.value = internet_set.main_dns;
+							document.getElementById('dns_switch_dhcp').checked = true;
+							show_dns_dhcp();
+						}
+					}
+				}
+
+				if(static_element = document.getElementById('ssid'))
+				{
+					static_element.value = internet_set.ssid;
+				}
+			}
+				
+				
+			function wan_set_cache(type)
+			{
+				if (type == "ssid") {
+					internet_set.ssid = document.getElementById('ssid').value;
+					return;
+				}
+
+				internet_set.backup_dns = "";
+				internet_set.main_dns = "";
+				
+				switch(type)
+				{
+					case 	"pppoe":
+						internet_set.proto = "pppoe";
+						internet_set.username = document.getElementById('username').value;
+						internet_set.password = document.getElementById('password').value;					
+						
+						if (document.getElementById('dns_switch_pppoe').checked == true)
+						{
+							internet_set.backup_dns = document.getElementById('backup_dns_pppoe').value;
+							internet_set.main_dns = document.getElementById('main_dns_pppoe').value;
+						}
+						break;
+					case  "dhcp":
+						internet_set.proto = "dhcp";
+						
+						if (document.getElementById('dns_switch_dhcp').checked == true)
+						{
+							internet_set.backup_dns = document.getElementById('backup_dns_dhcp').value;
+							internet_set.main_dns = document.getElementById('main_dns_dhcp').value;					
+						}						
+						break;
+
+					case  "static":		
+						internet_set.proto = "static";
+						internet_set.ipaddr = document.getElementById('static_ip').value;
+					
+						internet_set.netmask = document.getElementById('static_netmask').value;		
+						internet_set.gateway = document.getElementById('static_gateway').value;
+						internet_set.main_dns = document.getElementById('main_dns_static').value;		
+						internet_set.backup_dns = document.getElementById('backup_dns_static').value;
+
+						break;
+					default:
+						break;
+				}
+			}
+			function guide_save()
+			{
+//           		swal("保存成功！");
+				dialog({
+					title: '<%:Notify%>',
+					content: '<%:Successfully saved. Go to homepage%>'
+				}).showModal();
+				wan_save();
+				
+
+
+       		}
+			function wan_save()
+			{
+				var set =JSON.stringify(internet_set);
+				(new XHR()).post('<%=controller%>/admin/system/set_wizard', { token: '<%=token%>',wizard_set:set}, function check(){
+					window.location.href="<%=controller%>admin/home";
+				});
+			}
+
+        //        上一步下一步选择性跳转
+        function Networksettingsjump()
+		{
+            var radios = document.getElementsByName("internetWay");
+            for (var i = 0; i < radios.length; i++) {
+                if (radios[i].checked == true) {
+                    console.log(radios[i].value);
+                }
+                if (radios[i].checked == true && radios[i].value == "pppoe") {
+                    document.getElementById("wwsz-nr2").style.display = "block";
+                    document.getElementById("wwsz-nr1").style.display = "none";
+
+					var ppoeval = document.getElementById("username").value;
+					document.getElementById("username").focus();
+					document.getElementById("username").value = "";
+					document.getElementById("username").value = ppoeval;
+//                    setTimeout(function () { $("#username").focus(); }, 0);
+                    document.getElementById("wwsz-sznr").className = "xbk";
+                    document.getElementById("wwsz-swfs").className = "bac";
+					document.getElementById("wwsz-ssid").className = "bac";
+                }
+                if (radios[i].checked == true && radios[i].value == "dhcp") {
+                    document.getElementById("wwsz-nr2-1").style.display = "block";
+                    document.getElementById("wwsz-nr1").style.display = "none";
+                    document.getElementById("wwsz-sznr").className = "xbk";
+                    document.getElementById("wwsz-swfs").className = "bac";
+					document.getElementById("wwsz-ssid").className = "bac";
+                }
+                if (radios[i].checked == true && radios[i].value == "ip") {
+                    document.getElementById("wwsz-nr2-2").style.display = "block";
+                    document.getElementById("wwsz-nr1").style.display = "none";
+
+					var ipval = document.getElementById("static_ip").value;
+					document.getElementById("static_ip").focus();
+					document.getElementById("static_ip").value = "";
+					document.getElementById("static_ip").value = ipval;
+//                    setTimeout(function () { $("#static_ip").focus(); }, 0);
+                    document.getElementById("wwsz-sznr").className = "xbk";
+                    document.getElementById("wwsz-swfs").className = "bac";
+					document.getElementById("wwsz-ssid").className = "bac";
+                }
+				if(radios[i].checked == true && radios[i].value == "wire"){
+					document.getElementById("wwsz-nr2-3").style.display = "block";
+					apclient_default();
+					document.getElementById("wwsz-nr1").style.display = "none";
+					document.getElementById("wwsz-sznr").className = "xbk";
+					document.getElementById("wwsz-swfs").className = "bac";
+				}
+            }
+        }
+        function pppoenext() {
+        	  if(checkUserName()==true&&checkPassword()==true){
+				  if(document.getElementById('dns_switch_pppoe').checked == true
+						  &&(check_main_dns("main_dns_pppoe")==false || check_backup_dns("backup_dns_pppoe") == false)){
+				  	  return
+				  }
+                  document.getElementById("wwsz-nr2").style.display = "none";
+			      document.getElementById("wwsz-nr3").style.display = "block";
+			      document.getElementById("wwsz-ssid").className = "xbk";
+			      document.getElementById("wwsz-sznr").className = "bac";
+			      wan_set_cache("pppoe");
+			      wan_setting_prestate = "pppoe";
+
+			  }
+        }
+        function pppoeprov() {
+            document.getElementById("wwsz-nr1").style.display = "block";
+            document.getElementById("wwsz-nr2").style.display = "none";
+            document.getElementById("wwsz-swfs").className = "xbk";
+            document.getElementById("wwsz-sznr").className = "bac";
+			document.getElementById("wwsz-ssid").className = "bac";
+        }
+        function dhcpnext() {
+			if(document.getElementById('dns_switch_dhcp').checked == true &&
+					(check_main_dns("main_dns_dhcp")==false || check_backup_dns("backup_dns_dhcp") == false)){
+					return;
+			}
+			document.getElementById("wwsz-nr2-1").style.display = "none";
+			document.getElementById("wwsz-nr3").style.display = "block";
+			document.getElementById("wwsz-ssid").className = "xbk";
+			document.getElementById("wwsz-sznr").className = "bac";
+			wan_set_cache("dhcp");
+			wan_setting_prestate = "dhcp";
+        }
+        function dhcpprov() {
+            document.getElementById("wwsz-nr1").style.display = "block";
+            document.getElementById("wwsz-nr2-1").style.display = "none";
+            document.getElementById("wwsz-swfs").className = "xbk";
+            document.getElementById("wwsz-sznr").className = "bac";
+			document.getElementById("wwsz-ssid").className = "bac";
+        }
+        function ipnext() {
+            if(check_ip()==true&&check_netmask()==true) {
+					if (check_static_gateway() == true && check_main_dns("main_dns_static") == true
+							&& check_backup_dns("backup_dns_static") == true){
+						wan_setting_prestate = "static";
+						document.getElementById("wwsz-nr2-2").style.display = "none";
+						document.getElementById("wwsz-nr3").style.display = "block";
+						setTimeout(function () {
+							$("#ssid").focus();
+						}, 0);
+						document.getElementById("wwsz-ssid").className = "xbk";
+						document.getElementById("wwsz-sznr").className = "bac";
+						wan_set_cache("static");
+					}
+        		}
+
+        }
+        function ipprov() {
+            document.getElementById("wwsz-nr1").style.display = "block";
+            document.getElementById("wwsz-nr2-2").style.display = "none";
+            document.getElementById("wwsz-swfs").className = "xbk";
+            document.getElementById("wwsz-sznr").className = "bac";
+			document.getElementById("wwsz-ssid").className = "bac";
+        }
+
+		function wireprov() {
+			document.getElementById("wwsz-nr1").style.display = "block";
+			document.getElementById("wwsz-nr2-3").style.display = "none";
+			document.getElementById("wwsz-swfs").className = "xbk";
+			document.getElementById("wwsz-sznr").className = "bac";
+		}
+		
+        function ssidnext() {
+        		if(check_ssid()==true){
+						document.getElementById("wwsz-nr3").style.display = "none";
+						document.getElementById("wwsz-nr4").style.display = "block";
+						document.getElementById("wwsz-ssid").className = "bac";
+						document.getElementById("wwsz-wancheng").className = "xbk";
+						wan_set_cache("ssid");
+        			}
+        }
+        function ssidprov() {
+	    switch(wan_setting_prestate)
+	    {
+	    case "dhcp":
+                    document.getElementById("wwsz-nr2-1").style.display = "block";                                                                                                                
+                    document.getElementById("wwsz-nr3").style.display = "none";                                                                                                                 
+                    setTimeout(function () { $("#username").focus(); }, 0);                                                                                                                     
+                    document.getElementById("wwsz-sznr").className = "xbk";                                                                                                                     
+                    document.getElementById("wwsz-swfs").className = "bac"; 		   	
+			document.getElementById("wwsz-ssid").className = "bac";
+	    break;
+	    case "pppoe":
+                    document.getElementById("wwsz-nr2").style.display = "block";                                                                                                                
+                    document.getElementById("wwsz-nr3").style.display = "none";                                                                                                                 
+                    setTimeout(function () { $("#username").focus(); }, 0);                                                                                                
+                    document.getElementById("wwsz-sznr").className = "xbk";                                                                 
+                    document.getElementById("wwsz-swfs").className = "bac";   
+			document.getElementById("wwsz-ssid").className = "bac";
+	    break;
+	    case "static":
+	            document.getElementById("wwsz-nr2-2").style.display = "block";                                                                                                              
+                    document.getElementById("wwsz-nr3").style.display = "none";                                                                                                                 
+                    setTimeout(function () { $("#static_ip").focus(); }, 0);                                                                                                            
+                    document.getElementById("wwsz-sznr").className = "xbk";                                                                                                             
+                    document.getElementById("wwsz-swfs").className = "bac";  
+			document.getElementById("wwsz-ssid").className = "bac";
+	    break;
+	    default:
+                   document.getElementById("wwsz-nr3").style.display = "none";                                          
+            	   document.getElementById("wwsz-nr1").style.display = "block";                   
+           	   document.getElementById("wwsz-swfs").className = "xbk";                        
+           	   document.getElementById("wwsz-ssid").className = "bac"; 
+	    break;
+	    }
+        }
+        function setfinishprov() {
+            document.getElementById("wwsz-nr4").style.display = "none";
+            document.getElementById("wwsz-nr3").style.display = "block";
+            document.getElementById("wwsz-ssid").className = "xbk";
+            document.getElementById("wwsz-wancheng").className = "bac";
+        }
+    </script>
+    <script type="text/javascript">
+        function checkUserName(){
+            var username=document.getElementById("username").value;
+            if(username.length<1){
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:User name cannot be empty!%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#username").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+                  return false;
+            }else{
+            	return true;
+            }
+        }
+    </script>
+    <!--判断密码是否为空-->
+    <script type="text/javascript">
+        function checkPassword(){
+            var pwd=document.getElementById("password").value;
+            if(pwd.length<1){
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:Password cannot be empty!%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#password").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+                 return false;
+            }else{
+            	return true;
+            }
+        }
+    </script>
+    <!--显示密码-->
+     <script type="text/javascript">
+        $(function(){
+            $('#password').togglePassword({
+                el: '#togglePassword'
+            });
+        });
+    </script>
+     <!--判断IP地址是否合法-->
+    <script type="text/javascript">
+        function  check_ip(){
+            var str =document.getElementById("static_ip") .value;
+            var strlength= str.length;
+            if(strlength<1){
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:IP address cannot be empty.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#static_ip").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+                return false;
+            }
+            else{
+                if(strlength>15||strlength<7)          //IP的字段长度的限制
+                {
+//                    swal("您输入要查找的IP长度不正确，必须是7到15位");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid IP address.%>',
+						ok: function () {
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                var patrn =/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+                if(!patrn.exec(str)){
+//                    swal("您输入要查找的IP格式不正确，必须是000.000.000.000格式");
+//                    setTimeout(function () { $("#static_ip").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid IP address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_ip").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                var laststr;
+                laststr= str.split(".");     //用.把字符串str分开
+                var last_patrn=/^\d{1,3}$/;
+                if(parseInt(laststr[0]) <= 0 || parseInt(laststr[0])>255||parseInt(laststr[1])>255||parseInt(laststr[2])>255||parseInt(laststr[3])>255) //判断IP每位的大小
+                {
+//                    swal("您输入要查找的IP范围不正确，必须是0~255之间");
+//                    setTimeout(function () { $("#static_ip").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid IP address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_ip").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                if(!last_patrn.exec(laststr[3]))
+                {
+//                    swal("您输入要查找的IP格式不正确，必须是000.000.000.000格式");
+//                    setTimeout(function () { $("#static_ip").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid IP address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_ip").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+				if(parseInt(laststr[0]) == 223 && parseInt(laststr[1]) == 255 && parseInt(laststr[2]) == 255 && parseInt(laststr[3]) == 255){
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid IP address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_ip").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				if(parseInt(laststr[0]) > 223){
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid IP address.Plase try again.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_ip").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                var ipadr = internet_set.lan_gwaddr;
+                var pos_of_lan_gateway = parseInt(ipadr.lastIndexOf("."))
+                var pos_of_wan_static_ipaddr = parseInt(str.lastIndexOf("."));
+                
+                if(ipadr.substring(0,pos_of_lan_gateway) == str.substring(0,pos_of_wan_static_ipaddr))
+                {
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:IP addresses with WAN on the same IP subnet.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_ip").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                return true;
+            }
+        }
+    </script>
+    <!--判断子网掩码-->
+    <script type="text/javascript">
+        function check_netmask(){
+            var str =document.getElementById("static_netmask") .value;
+            var strlength= str.length;
+            if(strlength<1){
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid netmask address.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#static_netmask").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+                return false;
+            }
+            else{
+                if(strlength>15||strlength<7)          //IP的字段长度的限制
+                {
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid netmask address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_netmask").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                var patrn =/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+                if(!patrn.exec(str)){
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid netmask address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_netmask").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                var laststr;
+                laststr= str.split(".");     //用.把字符串str分开
+                var last_patrn=/^\d{1,3}$/;
+                if(parseInt(laststr[0]) <= 0 || parseInt(laststr[0])>255||parseInt(laststr[1])>255||parseInt(laststr[2])>255||parseInt(laststr[3])>255) //判断IP每位的大小
+                {
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid netmask address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_netmask").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                if(!last_patrn.exec(laststr[3]))
+                {
+//                    swal("您输入的子网掩码格式不正确，必须是000.000.000.000格式");
+//                    setTimeout(function () { $("#static_netmask").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid netmask address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_netmask").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                return true;
+            }
+        }
+    </script>
+    <!--判断网关地址-->
+    <script type="text/javascript">
+        function check_static_gateway(){
+            var str =document.getElementById("static_gateway") .value;
+            var strlength= str.length;
+            if(strlength<1){
+//                swal("输入的内容不能为空");
+//                 setTimeout(function () { $("#static_gateway").focus(); }, 0);
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid gateway address.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#static_gateway").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+                return false;
+            }
+            else{
+                if(strlength>15||strlength<7)          //IP的字段长度的限制
+                {
+//                    swal("您输入的网关地址长度不正确，必须是7到15位");
+//                     setTimeout(function () { $("#static_gateway").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid gateway address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_gateway").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                var patrn =/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+                if(!patrn.exec(str)){
+//                    swal("您输入的网关地址格式不正确，必须是000.000.000.000格式");
+//                     setTimeout(function () { $("#static_gateway").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid gateway address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_gateway").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                var laststr;
+                laststr= str.split(".");     //用.把字符串str分开
+                if (parseInt(laststr[0]) <= 0 || parseInt(laststr[0]) > 255 || parseInt(laststr[1]) > 255 || parseInt(laststr[2]) > 255 || parseInt(laststr[3]) > 255) //判断IP每位的大小
+                {
+//                    swal("您输入的网关地址范围不正确，必须是0~255之间");
+//                     setTimeout(function () { $("#static_gateway").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid gateway address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_gateway").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+				
+				var last_patrn=/^\d{1,3}$/;
+                if(!last_patrn.exec(laststr[3]))
+                {
+//                    swal("您输入的网关地址格式不正确，必须是000.000.000.000格式");
+//                     setTimeout(function () { $("#static_gateway").focus(); }, 0);
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid gateway address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#static_gateway").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+                    return false;
+                }
+                return true;
+            }
+        }
+    </script>
+
+	<!--判断DNS-->
+	<script type="text/javascript">
+		function check_backup_dns(id) {
+			var str = document.getElementById(id).value;
+			var strlength = str.length;
+			if (strlength < 1) {
+				return true;
+			}
+			else {
+				if (strlength > 15 || strlength < 7)          //IP的字段长度的限制
+				{
+//                    swal("您输入的DNS地址长度不正确，必须是7到15位");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				var patrn = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+				if (!patrn.exec(str)) {
+//                    swal("您输入DNS地址格式不正确，必须是000.000.000.000格式");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				var laststr;
+				laststr = str.split(".");     //用.把字符串str分开
+				var last_patrn = /^\d{1,3}$/;
+				if (parseInt(laststr[0]) <= 0 || parseInt(laststr[0]) > 255 || parseInt(laststr[1]) > 255 || parseInt(laststr[2]) > 255 || parseInt(laststr[3]) > 255) //判断IP每位的大小
+				{
+//                    swal("您输入的DNS范围不正确，必须是0~255之间");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				if (!last_patrn.exec(laststr[3])) {
+//                    swal("您输入的DNS格式不正确，必须是000.000.000.000格式");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				return true;
+			}
+		}
+	</script>
+	<script type="text/javascript">
+		function check_main_dns(id) {
+			var str = document.getElementById(id).value;
+			var strlength = str.length;
+			if (strlength < 1) {
+//                swal("输入的内容不能为空");
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:Invalid DNS address.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#"+id+"").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+				return false;
+			}
+			else {
+				if (strlength > 15 || strlength < 7)          //IP的字段长度的限制
+				{
+//                    swal("您输入的DNS地址长度不正确，必须是7到15位");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',
+						content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				var patrn = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+				if (!patrn.exec(str)) {
+//                    swal("您输入DNS地址格式不正确，必须是000.000.000.000格式");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',
+						content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				var laststr;
+				laststr = str.split(".");     //用.把字符串str分开
+				var last_patrn = /^\d{1,3}$/;
+				if (parseInt(laststr[0]) <= 0 || parseInt(laststr[0]) > 255 || parseInt(laststr[1]) > 255 || parseInt(laststr[2]) > 255 || parseInt(laststr[3]) > 255) //判断IP每位的大小
+				{
+//                    swal("您输入的DNS范围不正确，必须是0~255之间");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',
+						content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				if (!last_patrn.exec(laststr[3])) {
+//                    swal("您输入的DNS格式不正确，必须是000.000.000.000格式");
+					dialog({
+						title: '<%:Notify%>',okValue: '<%:OK%>',content: '<%:Invalid DNS address.%>',
+						ok: function () {
+							setTimeout(function () {
+								$("#"+id+"").focus();
+							}, 0);
+						},
+						cancel: false
+					}).showModal();
+					return false;
+				}
+				return true;
+			}
+		}
+	</script>
+    <!--判断SSID不能为空-->
+    <script type="text/javascript">
+        function check_ssid(str) {
+			var obj = document.getElementById("ssid");
+			var str = obj.value;
+			if (str.indexOf(" ") >= 0){
+//                    swal("输入有空格！");
+				obj.value = str.replace(/\s/g, ""); // 这句话可以强制删除所有空格
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:SSID cannot contain spaces.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#ssid").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+				return false;
+			}
+			var myreg = new RegExp("[`~!@#$^%&*()=+|{}':;',\\[\\]<>/?~！￥……（）【】‘；：”“'。，、？§№☆★○●◎◇◆℃‰€°¤〓↓↑←→※▲△■＃＆＠＼︿♂♀]");
+            var realLength = 0;
+            var len = str.length;
+            var charCode = -1;
+            for (var i = 0; i < len; i++) {
+                charCode = str.charCodeAt(i);
+                if (charCode >= 0 && charCode <= 128) {
+                    realLength += 1;
+                } else {
+                    // 如果是中文则长度加3
+                    realLength += 3;
+                }
+            }
+            if (realLength < 1) {
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:SSID cannot be empty.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#ssid").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+                return false;
+            } else if(myreg.test(str)){
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:Character is not allowed in SSID.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#lan_ssid").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+				return false;
+			} else if (realLength > 30) {
+				dialog({
+					title: '<%:Notify%>',okValue: '<%:OK%>',
+					content: '<%:Length is not allowed in SSID.%>',
+					ok: function () {
+						setTimeout(function () {
+							$("#ssid").focus();
+						}, 0);
+					},
+					cancel: false
+				}).showModal();
+                return false;
+            }
+            return true;
+        }
+    </script>
+</head>
+<!--<body onload="init()">-->
+<body onload=" layerIn(); init()">
+<div style="background: #2573BF;width:100%">
+<div class="header">
+    <!--<img style=" margin: 46px 418px 24px 418px;width: 74px;height: 74px;" src="<%=resource%>/icons/images/xiangdao/xiangdao.png">-->
+	<img style="height: 74px;" src="<%=resource%>/icons/images/xiangdao/xiangdao.png">
+    <span><%:Setup Wizard%></span>
+</div>
+</div>
+<div id="wwsz" class="soft_con2">
+    <div class="function1" style="border: none;">
+        <div id="nr2" class="nav2 syl">
+            <ul>
+                <li id="wwsz-swfs" class="xbk bac">1、<%:Choose WAN Type%></li>
+                <li id="wwsz-sznr" class="bac">2、<%:Internet Setup%></li>
+                <li id="wwsz-ssid" class="bac">3、<%:Wireless Setup%></li>
+                <li id="wwsz-wancheng" class="bac">4、<%:Finish%></li>
+            </ul>
+            <!--外网设置&#45;&#45;设置内容-->
+            <div id="wwsz-nr1" style="clear: both">
+                <table class="bohao">
+                    <tr>
+                        <td><input type="radio" id="wwsz_01" name="internetWay" value="pppoe"/></td>
+                        <td><label for="wwsz_01"><%:Broadband (PPPoE)%></label></td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" id="wwsz_02" name="internetWay" value="dhcp"/></td>
+                        <td><label for="wwsz_02"><%:Automatic (DHCP)%></label></td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" id="wwsz_03" name="internetWay" value="ip"/></td>
+                        <td><label for="wwsz_03"><%:Static IP Address%></label></td>
+                    </tr>
+
+					<% if arch:find("ramips") and has_wifi then %>
+					<tr>
+						<td><input type="radio" id="inter_4" name="internetWay" value="wire"/></td>
+						<td><label for="inter_4"><%:Client Mode Wireless%></label></td>
+					</tr>
+					<%end%>
+
+				</table>
+                <div id="wwsz-next1" onclick="Networksettingsjump()" class="btn center" style="margin: 20px auto"><%:Next%>
+                </div>
+            </div>
+            <div id="wwsz-nr2" style="display: none; clear: both">
+                <table class="tr tableMAR">
+                    <tr>
+                        <td style="width:83px;text-align:right;"><%:Username%>：</td>
+                        <td>
+							<input type="text" class="inputwidth" id="username"/>
+						</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td style="width:83px;text-align:right;"><%:Password%>：</td>
+                        <td>
+							<input type="password" class="inputwidth"  id="password"/>
+						</td>
+                        <td style="font-size: 12px;">
+							<input type="checkbox" id="togglePassword" style="margin-right:5px;display:inline-block;width:15px;height:15px;position:relative;top:2px;"/>
+							<label for="togglePassword"><%:Reveal%></label>
+						</td>
+                    </tr>
+                </table>
+				<table class="tr tableMAR" width=405>
+					<tr>
+						<td style="width:83px;"></td>
+						<td id="dns_onoff" style="text-align:left;">
+							<input type="checkbox" autocomplete="off" id="dns_switch_pppoe" style="margin-right:5px;display:inline-block;width:15px;height:15px;position:relative;top:2px;"/>
+							<label for="dns_switch_pppoe"><%:Use These DNS Servers%></label>
+						</td>
+						<td></td>
+					</tr>
+					<tr class="dns_kuai" style="display: none;">
+						<td style="width:83px;text-align:right;"><%:Primary DNS%>：</td>
+						<td><input type="text" id="main_dns_pppoe"/></td>
+						<td></td>
+					</tr>
+					<tr class="dns_kuai" style="display: none;">
+						<td style="width:83px;text-align:right;"><%:Secondary DNS%>：</td>
+						<td><input type="text" id="backup_dns_pppoe"/></td>
+						<td></td>
+						<!--自定义DNS设置-->
+						<script>
+							function show_dns_pppoe(){
+								var dns_switch = document.getElementById("dns_switch_pppoe");
+								if(dns_switch.checked == true){
+									$(".dns_kuai").css("display","table-row");
+								}else{
+									$(".dns_kuai").css("display","none");
+								}
+							}
+							$(function(){
+								$("#dns_onoff").click(function(){
+									show_dns_pppoe();
+								})
+							})
+						</script>
+				</table>
+                <div class="next" >
+                    <p id="wwsz-prov2z-nr2").style.display = "block";                                                                                                                
+                    document.getElementById("wwsz-nr1").style.display = "none";                                                                                                                 
+                    setTimeout(function () { $("#username").focus(); }, 0);                                                                                                
+                    document.getElementById("wwsz-sznr").className = "xbk";                                                                 
+                    document.getElementById("wwsz-swfs").className = "bac";    onclick="pppoeprov()"><%:Back%></p>
+
+                    <p id="wwsz-next2" onclick="pppoenext()"><%:Next%></p>
+                </div>
+            </div>
+            <div id="wwsz-nr2-1" style="display: none;clear: both;">
+                <p style="text-align: center;padding-top: 40px;"><%:Get Automatically from Server%></p>
+				<table class="tr tableMAR" width=320>
+					<tr>
+						<td colspan=2 id="dns_onoff2" style="text-align:left;padding-left:30px">
+							<input type="checkbox" autocomplete="off" id="dns_switch_dhcp" style="margin-right:5px;display:inline-block;width:15px;height:15px;position:relative;top:2px;"/>
+							<label for="dns_switch_dhcp" ><%:Use These DNS Servers%></label>
+						</td>
+					</tr>
+					
+					<tr class="dns_kuai2" style="display: none;">
+						<td style="width:83px;text-align:right;"><%:Primary DNS%>：</td>
+						<td><input type="text" id="main_dns_dhcp"/></td>
+					</tr>
+					<tr class="dns_kuai2" style="display: none;">
+						<td style="width:83px;text-align:right;"><%:Secondary DNS%>：</td>
+						<td><input type="text" id="backup_dns_dhcp"/></td>
+					</tr>
+					<!--自定义DNS设置-->
+					<script>
+						function show_dns_dhcp(){
+							var dns_switch_pppoe = document.getElementById("dns_switch_dhcp");
+							if(dns_switch_dhcp.checked == true){
+								$(".dns_kuai2").css("display","table-row");
+							}else{
+								$(".dns_kuai2").css("display","none");
+							}
+						}
+						$(function(){
+							$("#dns_onoff2").click(function(){
+								show_dns_dhcp();
+							})
+						})
+					</script>
+				</table>
+                <div class="next">
+                    <p id="wwsz-prov2-1" onclick="dhcpprov()"><%:Back%></p>
+
+                    <p id="wwsz-next2-1" onclick="dhcpnext()"><%:Next%></p>
+                </div>
+            </div>
+            <div id="wwsz-nr2-2" style="clear: both;display: none">
+                <table class="bohao">
+                    <tr>
+                        <td><%:IP Address%></td>
+                        <td>：</td>
+                        <td><input type="text" id="static_ip"/></td>
+                    </tr>
+                    <tr>
+                        <td><%:Subnet Mask%></td>
+                        <td>：</td>
+                        <td><input type="text" id="static_netmask"/></td>
+                    </tr>
+                    <tr>
+                        <td><%:Gateway IP%></td>
+                        <td>：</td>
+                        <td><input type="text" id="static_gateway"/></td>
+                    </tr>
+                    <tr>
+                        <td><%:Primary DNS%></td>
+                        <td>：</td>
+                        <td><input type="text" id="main_dns_static"/></td>
+                    </tr>
+                    <tr>
+                        <td><%:Secondary DNS%></td>
+                        <td>：</td>
+                        <td><input type="text" id="backup_dns_static" /></td>
+                    </tr>
+                </table>
+                <div class="next">
+                    <p onclick="ipprov()" id="wwsz-prov2-2"><%:Back%></p>
+
+                    <p onclick="ipnext()" id="wwsz-next2-2"><%:Next%></p>
+                </div>
+            </div>
+			<script type="text/javascript">
+			function check_nowip() {
+				var str = document.getElementById("static_ip").value;
+				var strlength = str.length;
+				if (strlength < 1) {
+					return false;
+				}
+				else {
+					if (strlength > 15 || strlength < 7)          //IP的字段长度的限制
+					{
+						return false;
+					}
+					var patrn = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+					if (!patrn.exec(str)) {
+						return false;
+					}
+					var laststr;
+					laststr = str.split(".");     //用.把字符串str分开
+					var last_patrn = /^\d{1,3}$/;
+					if (parseInt(laststr[0]) <= 0 || parseInt(laststr[0]) > 255 || parseInt(laststr[1]) > 255 || parseInt(laststr[2]) > 255 || parseInt(laststr[3]) > 255) //判断IP每位的大小
+					{
+						return false;
+					}
+					if (!last_patrn.exec(laststr[3])) {
+						return false;
+					}
+					var lasttype = /([1-9]|[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5])(\\.(\\d|[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5])){3}/;
+					return true;
+				}
+			}
+			
+			 $(function(){
+				//        静态IP设置
+				$("#static_netmask").focus(function(){
+					if($(this).val() == ""){
+						$(this).val("255.255.255.0");
+					}
+				});
+				$("#static_gateway").focus(function(){
+					if(check_nowip() == true){						
+						var str = $("#static_ip").val();
+						var arr = str.split(".");
+						var arr2 = "";
+						for (var i = 0; i < arr.length - 1; i++) {
+							arr[i] = arr[i] + ".";
+							arr2 += arr[i];
+						}
+						arr2 += "1";
+						$(this).val(arr2);
+					} else {
+						$("#static_ip").focus();
+						dialog({
+							title: '<%:Notify%>',
+							okValue: '<%:OK%>',
+							content: '<%:Invalid IP address.%>',
+							ok: function () {
+								setTimeout(function () {
+									$("#static_ip").focus();
+								}, 0);
+							},
+							cancel: false
+						}).showModal();
+					}
+					
+				})
+			})
+			</script>
+
+			<div id="wwsz-nr2-3" style="clear: both;display: none;">
+
+				<!--无线中继设置-->
+				<table class="bohao">
+					<tbody>
+					<tr>
+						<td class="function1_left"><%:Name (SSID)%></td>
+						<td>：</td>
+						<td id="wire_middle" width="">
+							<div class="loading">
+								<img src="<%=resource%>/icons/images/loading.gif" alt=""/><%:Scanning...%>
+							</div>
+							<div class="wname">
+								<div class="wire-name">
+									<input readonly="readonly" id="wire_name" class="wn" type="text" placeholder="<%:Choose a wireless network%>"/>
+									<p id="wire_data" style="display: none;"></p>
+									<button id="chosew" class="choose_wire"><%:Select%></button>
+								</div>
+								<div id="wn_list" class="wn_list">
+
+								</div>
+							</div>
+						</td>
+						<td><a id="rescan" onclick="scan_ap_list();" href="#" style="color:#2573bf;font-size: 14px;"><%:Rescan%></a></td>
+					</tr>
+					<tr class="showpwd" id="showlock" style="display:none;">
+						<td class="function1_left"><%:Network Key%></td>
+						<td>：</td>
+						<td><input type="text" id="apclient_pwd"/></td>
+						<td></td>
+					</tr>
+					<tr>
+						<td class="function1_left"><%:Status%></td>
+						<td>：</td>
+						<td><span style="font-size:14px;color:#2573bf;" id="apclient_status"></span></td>
+						<td></td>
+					</tr>
+					</tbody>
+				</table>
+				<script>
+					function scan_ap_list(x){
+						$(".wname").css("display","none");
+						$(".loading").css("display","block");
+						$("#rescan").hide();
+						$.ajax({
+							url: '<%=luci.dispatcher.build_url("admin", "wireless","scan_ap_list")%>',
+							cache: false,
+							dataType: "json",
+							timeout: 20000,
+							success: function(rsp){
+								if(rsp.code == 0) {
+									set_ap_list_info(rsp.aplist);
+								}
+								$(".loading").css("display","none");
+								$(".wname").css("display","block");
+								$("#rescan").show();
+							},
+							error: function(x){
+								$(".loading").css("display","none");
+								$(".wname").css("display","block");
+								$("#rescan").show();
+							},
+							ontimeout:function(){
+								$(".loading").css("display","none");
+								$(".wname").css("display","block");
+								$("#rescan").show();
+							}
+						});
+					}
+
+					function get_apclient_status(x) {
+
+						var request_data = {};
+							
+						$.getJSON("<%=luci.dispatcher.build_url("admin", "wireless","get_apclient_status")%>",request_data,function(rsp)
+						{
+							if(rsp.result == false) {
+								$("#apclient_status").html("<%:Not connected%>");
+							} else {
+								if(rsp.wanConn == '1') {
+									$("#apclient_status").html("<%:Connected%>");
+								} else {
+									$("#apclient_status").html("<%:Not connected%>");
+									x += 1;
+									if (x < 5){
+										setTimeout("get_apclient_status("+x+");",4000);
+										$("#apclient_status").html("<%:Connecting...%>");
+									} 									
+								}
+								
+								apclient_request_data.ssid = rsp.apcliSsid;
+								$("#wire_name").val(rsp.apcliSsid);
+								apclient_request_data.bssid = rsp.apcliBssid;
+								apclient_request_data.authmode = rsp.apcliAuthmode;
+								if (rsp.apcliAuthmode == "NONE" || rsp.apcliAuthmode == "none") {
+									$("#showlock").css("display","none");
+								} else {
+									apclient_request_data.key = rsp.apcliWpapsk;
+									$("#apclient_pwd").val(rsp.apcliWpapsk);
+									$("#showlock").css("display","table-row");
+								}
+							}
+						})
+					}
+
+					function apclient_default(){
+						$("#apclient_status").html("<%:Loading%>");
+						scan_ap_list("init");
+						//get_apclient_status();
+						setTimeout("get_apclient_status(0);",5000);
+					}
+
+					function set_ap_list_info(list) {
+
+						$("#wn_list").empty();
+
+						for(var i = 0; i<list.length; i++) {
+							var $a = $('<a></a>');
+							var img;
+							var span;
+							var p;
+							if(list[i].security.toLowerCase() == "none") {
+								img = '<i><img src="<%=resource%>/icons/images/signal_png/signal'+ list[i].signal + '.png"/></i>'
+							} else {
+								img = '<i><img src="<%=resource%>/icons/images/signal_png/signal'+ list[i].signal + 'lock.png"/></i>'
+							}
+
+							span = '<span>'+ list[i].ssid +'</span>';
+							p = '<p style="display:none">'+ list[i].ssid + '?' + list[i].channel + '?' + list[i].bssid + '?'+ list[i].security +'</p>';
+							$a.append(span).append(p).append(img);
+							$("#wn_list").append($a);
+						}
+					}
+
+					function stopPropagation(e) {
+						if (e.stopPropagation)
+							e.stopPropagation();
+						else
+							e.cancelBubble = true;
+					}
+
+					var apclient_request_data = {};
+
+					$(function () {
+						$("#chosew").click(function (e) {
+							$("#wn_list").css({"display": "block"});
+							stopPropagation(e);
+							$("#wn_list").find("a").bind("click",function(){
+								var value = $(this).find("span").html();
+								var lock = $(this).find("img").attr("src");
+
+								//设置中继数据
+								$("#wire_data").html($(this).find("p").html());
+								var str = $("#wire_data").html();
+								var str2 = str.split("?");
+								apclient_request_data.ssid = str2[0];
+								apclient_request_data.channel = str2[1];
+								apclient_request_data.bssid = str2[2];
+								apclient_request_data.authmode = str2[3];
+
+								if(lock.indexOf("lock") > 0){
+									$("#showlock").css("display","table-row");
+								}else{
+									$("#showlock").css("display","none");
+								}
+								$("#wire_name").val(value);
+								$("#wn_list").css("display","none");
+							});
+						});
+						$(document).bind('click',function(){
+							$('#wn_list').css('display','none');
+						});
+					})
+
+					function wiresave(){
+						//$("#wwsz-next2-3").prop("disabled", true);
+						//$(".wiresave").show();
+						if ($("#wire_name").val() == "" ) {
+							dialog({
+								title: '<%:Notify%>',
+								content: '<%:Choose a wireless network%>'
+							}).showModal();
+							$("#apclient_status").html("<%:Not connected%>");
+							return;
+						}
+						$("#wiresave").removeAttr("onclick");
+						$.getJSON("<%=luci.dispatcher.build_url("admin", "system","skip_wizard")%>",{},function(rsp)
+						{
+							apclient_request_data.key = document.getElementById('apclient_pwd').value;
+							$.ajax({
+								url: "<%=luci.dispatcher.build_url("admin", "wireless", "set_apclient")%>",
+								cache: false,
+								dataType: "json",
+								data: apclient_request_data,
+								success: function(rsp){
+									if(rsp.result == true){
+										dialog({
+											title: '<%:Notify%>',
+											content: '<%:Successfully saved. Go to homepage%>'
+										}).showModal();
+										window.location.href = '<%=luci.dispatcher.build_url("admin","home")%>';
+									}else{
+										dialog({
+											title: '<%:Notify%> ',
+											content: '<%:Save failed. Plase try again%>'
+										}).showModal();
+										$("#apclient_status").html("<%:Not connected%>");
+										$("#wiresave").attr("onclick","wiresave();");
+									}
+								},
+								error: function(x){
+									$("#apclient_status").html("<%:Not connected%>");
+									$("#wiresave").attr("onclick","wiresave();");
+								}
+							});
+						});
+					}
+
+				</script>
+				<div class="next">
+					<p onclick="wireprov()" style="cursor: pointer;"><%:Back%></p>
+					<p id="wiresave" onclick="wiresave()" style="cursor: pointer;"><%:Save%></p>
+					<img class="wiresave" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+				</div>
+			</div>
+
+            <div id="wwsz-nr3" style="display: none">
+			
+                <div class="ssid_div">
+				<%if has_wifi then%>
+                    SSID: <input type="text" class="ssid" id="ssid"/>
+				<%else%>
+                    <input type="text" class="ssid" id="ssid" style="display: none" value="default"/>
+					<%:No configuration required.%>
+				<%end%>	
+				</div>
+				
+                <div class="next">
+                    <p onclick="ssidprov()" id="wwsz-prov2-3"><%:Back%></p>
+                    <p onclick="ssidnext()" id="wwsz-next2-3"><%:Next%></p>
+                </div>
+            </div>
+            <div id="wwsz-nr4" style="display: none;clear: both">
+                <p style="text-align: center;padding-top: 40px;"><%:Finish%></p>
+                <div class="next">
+                    <p onclick="setfinishprov()" id="wwsz-prov4"><%:Back%></p>
+
+                    <p id="wwsz-next3">
+						<a style="display:block;text-decoration: none;width:115px;height:38px;line-height:38px;" onclick=" guide_save()" ><%:Save%></a>
+						<!--<a style="display:block;text-decoration: none;width:115px;height:38px;line-height:38px;" onclick=" wan_save()" >保存</a>-->
+					</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+	<div class="backbtn"><a class="btn1" onclick="skip()"><%:Back Home Page%></a></div>
+	<script type="text/javascript">	
+		$(function(){
+		<%if fs.access("/usr/lib/lua/luci/firstlogin") then%>
+			$(".btn1").html("<%:Skip%>")
+		<%end%>
+		})
+		
+		function skip(){
+			$.getJSON("<%=luci.dispatcher.build_url("admin", "system","skip_wizard")%>",{},function(rsp) 
+				{
+				window.location.href = '<%=luci.dispatcher.build_url("admin","home")%>';
+				});			
+		}
+	</script>
+</div>
+</body>
+</html>

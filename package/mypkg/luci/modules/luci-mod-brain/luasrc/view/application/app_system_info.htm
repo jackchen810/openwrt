@@ -1,0 +1,753 @@
+<%
+    local ktWifi = require "ktapi.ktWifi"
+    local ktUtil = require "ktapi.ktUtil"
+    local ktNetwork = require "ktapi.ktNetwork"
+
+    local uci = require "luci.model.uci".cursor()
+
+    local hasNetdata = tonumber((luci.sys.exec(" ps |grep [n]etdata|wc -l") or ""):match("%d+")) or 0
+    local serverPort = tonumber(luci.http.getenv("SERVER_PORT"))
+
+    local firmwareInfo = ktUtil.getFirmwareInfo()
+    local lanInfo = ktNetwork.getLanInfo()
+
+    local trafficInterface = uci:get("network", "wan", "ifname") or "br-lan"
+    local isWifiRepter = uci:get("network", "wan", "apclient") or 0
+    local isFitAPMode = (uci:get("network", "lan", "proto") == "dhcp")
+
+    -- 中继模式使用br-lan获取流量
+    if isWifiRepter == "1" then trafficInterface = "br-lan" end
+
+    local romVersion = firmwareInfo.version or "0.0.0"
+    local cpuName = luci.util.ubus("system", "board").system or "unknow"
+    local routerMac = ktUtil.officalMac(lanInfo.macaddr) or "unknow"
+    local boardName = (firmwareInfo.board_name):gsub("\n", "") or "unknow"
+
+    local lanAddr = lanInfo.ipaddr or "wifi.kunteng.org.cn"
+
+    local wifi0 = ktWifi.get_wifi_net("2.4G") or ""
+    local wifi1 = ktWifi.get_wifi_net("5G") or ""
+    local channel = ktWifi.getCurrentChannel()
+%>
+
+<%include("top")%>
+<div class="main">
+	<div class="aside">
+		<ul>
+			<%include("settings/menuer")%>
+		</ul>
+	</div>
+	<style>
+		.info-cont{
+			width:100%;
+			background-color: #fff;
+			padding-bottom:40px;
+			margin-bottom:80px;
+			border-radius: 6px;
+		}
+		table.info-table{
+			width: 90%;
+			margin:60px auto;
+			color:#333;
+		}
+		.info-table caption{
+			background-color:#efefef;
+			height:60px;
+			line-height:60px;
+			font-size:16px;
+			color:#333;
+			text-align: left;
+			padding-left:37px;
+			font-weight:bold;
+			border-top-left-radius: 6px;
+			border-top-right-radius: 6px;
+		}
+		table.info-table td{
+			height:60px;
+			line-height:60px;
+			border-color:#ececec;
+			padding-left:37px;
+			color: #333;
+		}
+		.info-charts-cont{
+			width:90%;
+			margin:0 auto;
+			overflow: hidden;
+		}
+		.info-chart-cpu{
+			float:left;
+			width:60%;
+			height:450px;
+		}
+		.info-chart-storage{
+			float:right;
+			width:35%;
+			height:450px;
+		}
+		.info-chart-cpu .index_title h3,.info-chart-storage .index_title h3{
+			padding-left:10px;
+		}
+	</style>
+	<div class="info-cont">
+		<div class="info-table-cont">
+			<div class="">
+				<div class="">
+					<table class="gridtable info-table">
+						<caption>系统基本信息</caption>
+						<tr>
+							<td>产品类型</td>
+							<td><%=boardName%></td>
+						</tr>
+						<tr>
+							<td>系统版本</td>
+							<td><%=romVersion%></td>
+						</tr>
+						<tr>
+							<td>设备MAC</td>
+							<td><%=routerMac%></td>
+						</tr>
+						<tr>
+							<td>CPU类型</td>
+							<td><%=cpuName%></td>
+						</tr>
+						<tr>
+							<td>内存</td>
+							<td id="storge-td"></td>
+						</tr>
+						<tr>
+							<td>运行时间</td>
+							<td id="run-time">0d 0h 0m 0s<%=%></td>
+						</tr>
+						<!--<tr <%if isFitAPMode then%>style="display:none"<%end%>>
+							<td style="width: 28%;">上网方式</td>
+							<td style="" id="internetAccessType">获取中...</td>
+						</tr>
+
+						<tr <%if isFitAPMode then%>style="display:none"<%end%>>
+							<td>互联网IPV4地址</td>
+							<td id="internet">0.0.0.0</td>
+						</tr>
+
+						<tr>
+							<td>局域网IPV4地址</td>
+							<td id="LANIP"><%=lanInfo.ipaddr%>/<%=lanInfo.netmask%></td>
+						</tr>
+					<%if wifi0.channel then%>
+						<tr>
+							<td>2.4G 无线信道</td>
+							<td id="Channel2">
+							<%if wifi0.is_up == "1" then %>Wifi 已关闭<% else if wifi0.channel == "0" then%>自动 (当前信道 <%=channel%>)<%else%> <%=wifi0.channel%> <%end end%>
+							</td>
+						</tr>
+
+						<%if wifi1.channel then%>
+						<tr>
+							<td>5G 无线信道</td>
+							<td id="Channel5">
+							<%if wifi1.is_up == "1" then %>Wifi 已关闭 <%else%><%=wifi1.channel%><%end%>
+							</td>
+						</tr>
+						<%end%>
+					<%end%>-->
+					</table>
+				</div>
+			</div>
+		</div>
+		<div class="info-charts-cont">
+			<div style="float: right;display: none;" class="index_cont chart2">
+				<div class="index_title">
+					<h3>实时网络状态</h3>
+					<p class="chart-speed"><em class="up">上行：<span id="txByte">0 KB/s</span></em><em class="down">下行：<span id="rxByte">0 KB/s</span></em></p>
+				</div>
+				<div class="chart-info">
+					<p class="speedunit"><em >KB</em></p>
+					<div id="net"></div>
+					<div class="bottom">
+						<p class="speed-info"><em class="average">上行峰值：<span id="maxtxByte">0 KB/s</span></em><em class="down-speed">下行峰值：<span id="maxrxByte">0 KB/s</span></em></p>
+					</div>
+				</div>
+			</div>
+			<div class="info-chart-cpu chart3">
+				<div class="index_title">
+					<h3>CPU状态</h3>
+					<!--<p id="cpu-load" class="chart-speed">当前CPU负载：0%</p>-->
+				</div>
+				<div class="chart-info chart-cpu">
+					<div id="cpuinfo" style=""></div>
+					<div class="bottom bottom-cpu">
+						<!--<p id="cpu-type" class="pinfo"> CPU类型: <%=cpuName%></p>-->
+						<p id="cpu-load" class="chart-speed">当前CPU负载：<span>0%</span></p>
+					</div>
+				</div>
+			</div>
+			<div class="info-chart-storage chart4">
+				<div class="index_title">
+					<h3>内存状态</h3>
+				</div>
+				<div class="chart-info">
+					<!-- <p class="chart-speed">当前内存占用：400.00%</p> -->
+					<div id="storage" style="display: none;"></div>
+					<div id="storage2" style="width:100%;height:270px;"></div>
+					<div class="bottom">
+						<p class="speed-info">
+							<!--<em class="infoem"><i style="background-color:#2bc449;"></i>内存： <span id="totle"></span><span>M</span></em>-->
+							<em class="infoem"><i style="background-color:#6657ff;"></i>已用： <span id="use"></span><span>M</span></em>
+							<em class="infoem"><i style="background-color:#2bc449;"></i>缓冲： <span id="buff"></span><span>M</span></em>
+							<em class="infoem"><i style="background-color:#eeeeee;"></i>空闲： <span id="avl"></span><span>M</span></em>
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!--<script type="text/javascript" src="<%=resource%>/js/echarts.simple.min.js"></script>-->
+<script src="<%=resource%>/js/echarts.min.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/xhr.js"></script>
+<script>
+    var TxRateArry = new Array();//上传数组
+    var RxRateArry  = new Array();//下载数组
+    var cpuArry = new Array();
+
+    var RxByte = 0;
+    var TxByte = 0;
+    var MaxRxByte = 0;
+    var MaxTxByte = 0;
+    var Time = 60;
+
+    var netChart, cpuChart, memChart;
+
+    var TrafficInterface = "<%=trafficInterface%>";
+
+    var lanAddr = "<%=lanAddr%>";
+
+    var REQUEST_NETDATA_URI = "http://" + lanAddr + ":19999/api/v1/data";
+
+    $(function () {
+        initArry();
+        //getExternalIp(0);
+        //getNetStatus();
+
+        getDeviceInfo();
+
+        //        图表1请求数据
+        netChart = echarts.init(document.getElementById("net"));
+        netChart.setOption({
+            color:['#d19d05','#019a30', '#61a0a8'] ,
+            grid: {
+                x: '10%',
+                y: '3%',
+                x2: '8%',
+                height: '60%'
+            },
+            xAxis: {
+                data: ['','','','','','','','','','','','','','','','','','','',''],
+                axisLine: {
+                    show: true,
+                    lineStyle: {
+                        color: '#999',
+                        type: 'dashed'
+                    }
+                }
+            },
+            yAxis: {
+                axisLabel : {
+                },
+                axisLine: {
+                    lineStyle: {
+                        color: '#999'
+                    }
+                },
+                min : 0
+            },
+            tooltip : {
+                trigger: 'axis',
+                axisPointer: {
+                    animation: false,
+                    lineStyle:{
+                        color:"#999"
+                    }
+                }
+            },
+            series: [{
+                name:"上行",
+                type: 'line',
+                symbol:'none',
+                animation: false,
+                areaStyle: {
+                    normal: {
+                    color: '#d19d05',
+                    }
+                },
+                lineStyle: {
+                    normal: {
+                        color: '#d19d05',
+                        width: 1
+                    }
+                },
+                markArea: {
+                    silent: true
+                },
+                data: TxRateArry
+            },{
+                name:"下行",
+                type: 'line',
+                symbol:'none',
+                animation: false,
+                areaStyle: {
+                    normal: {
+                        color: '#019a30'
+                    }
+                },
+                lineStyle: {
+                    normal: {
+                        color: '#019a30',
+                        width: 1
+                    }
+                },
+                markArea: {
+                    silent: true
+                },
+                data: RxRateArry
+            }]
+        });
+
+//        图表2请求数据
+        cpuChart = echarts.init(document.getElementById("cpuinfo"));
+        cpuChart.setOption({
+            grid: {
+                x: '10%',
+                y: '6%',
+                x2: '8%',
+                height: '70%'
+            },
+            xAxis: {
+                data: ['','','','','','','','','','','','','','','','','','','',''],
+                axisLine: {
+                    show: true,
+                    lineStyle: {
+                        color: '#999',
+                        // type: 'dashed'
+                    }
+                }
+            },
+            yAxis: {
+                axisLine: {show: false},
+                axisLabel : {
+                    formatter: '{value} %'
+                },
+                splitLine: {
+                    lineStyle: {
+                        color: '#f3f3f3'
+                    }
+                },
+                type : 'value',
+                min : 0,
+                max : 100
+            },
+            tooltip: {},
+            series: [{
+                type: 'line',
+                symbol:'none',
+                animation: false,
+                areaStyle: {
+                    normal: {
+                        color: '#1d5bfc'
+                    }
+                },
+                lineStyle: {
+                    normal: {
+                        // color: '#1d5bfc',
+                        // width: 0.5
+						color:new echarts.graphic.LinearGradient(0,0,0,1,[{
+							offset:0,
+							color:'#1d5bfc'
+                    	},{
+							offset:1,
+							color:'rgba(116,155,255,0.1)'
+                    	}])
+                    }
+                },
+                markArea: {
+                    silent: true
+                },
+                data: cpuArry
+            }]
+        });
+
+//        图表3请求数据
+        memChart = echarts.init(document.getElementById("storage"));
+        memChart.setOption({
+            color:['#c23531','#91c7ae', '#61a0a8'] ,
+            tooltip : {
+//                show :true,
+                trigger: 'item',
+                formatter: "{a} <br/>{b} : {c} ({d}%)"
+            },
+            series: [
+                {
+                    name:"内存状态",
+                    type:'pie',
+                    selectedMode: 'single',
+                    radius: [0, '30%'],
+
+                    label: {
+                        normal: {
+                            position: 'inner'
+                        }
+                    },
+                    labelLine: {
+                        normal: {
+                            show: false
+                        }
+                    },
+                    data:[
+                        //{value:335, name:'直达', selected:true},
+                        {value:0, name:'可用'},
+                        //{value:0, name:'已用'}
+                    ]
+                },
+                {
+                    name:"内存状态",
+                    type:'pie',
+                    radius: ['40%', '55%'],
+                    data:[
+                        //{value:0, name:'已用'},
+                        {value:0, name:'空闲'},
+                        //{value:0, name:'缓冲'}
+                    ]
+                }
+            ]
+        });
+
+        memChart2 = echarts.init(document.getElementById("storage2"));
+        memChart2.setOption({
+            color:['#6657ff','#2bc449', '#eeeeee'] ,
+            tooltip : {
+//                show :true,
+                trigger: 'item',
+                formatter: "{a} <br/>{b} : {c} ({d}%)"
+            },
+            // legend: {
+            //     orient: 'vertical',
+            //     x: 'left',
+            //     data:['已用','缓冲','空闲']
+            // },
+            title:{
+            	text:'0M',
+				x:'center',
+				y:'center',
+				textStyle:{
+            		color:'#666',
+					fontSize:16,
+					backgroundColor:'#fff'
+            	}
+        	},
+            series: [
+                {
+                    name:"",
+                    type:'pie',
+                    selectedMode: 'single',
+					radius: ['30%', '50%'],
+                    avoidLabelOverlap: false,
+                    label: {
+                        normal: {
+                            show: false,
+                            position: 'center'
+                        },
+                        emphasis: {
+                            show: true,
+                            textStyle: {
+                                fontSize: '30',
+                                fontWeight: 'bold'
+                            }
+                        }
+                    },
+                    labelLine: {
+                        normal: {
+                            show: false
+                        }
+                    },
+                    data:[
+                        {value:335, name:'已用', selected:true},
+                        {value:0, name:'缓冲'},
+                        {value:0, name:'空闲'}
+                    ]
+                }
+            ]
+        });
+
+        //cpuChart.timeTicket = setInterval("getCpuUsage()", 2000);
+        //memChart.timeTicket = setInterval("getMemUsage()", 5000);
+        //netChart.timeTicket = setInterval("getWanTraffic()", 2000);
+        getWanTraffic();
+        getCpuUsage();
+        //getMemUsage();
+    })
+
+    function getDeviceInfo() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "system", "getDeviceInfo")%>", null, function(data) {
+            var sessionNum = data.sessionNum;
+            var runTime = data.runTime;
+            var day = Math.floor(runTime / (60 * 60 * 24));
+            var hours = Math.floor(runTime % (60 * 60 * 24) / (60 * 60));
+            var minutes = Math.floor(runTime % (60 * 60) / 60);
+            var seconds = Math.floor(runTime % 60);
+
+            $("#session").html(sessionNum + "台" );
+            $("#run-time").html(day + "天 " + hours + "小时 " + minutes + "分钟 " + seconds + "秒");
+
+            var wanProto = "";
+            switch (data.wanInfo.proto){
+                case "dhcp":
+                    wanProto = "自动获取(DHCP)";
+                    break;
+                case "pppoe" :
+                    wanProto = "宽带拨号(PPPOE)";
+                    break;
+                case "static" :
+                    wanProto = "手动设置(静态IP)";
+                    break;
+                case "relay" :
+                    wanProto = "无线中继模式";
+                    break;
+            }
+
+            $("#internetAccessType").html(wanProto);
+            if (!data.wanInfo.ipaddr) {
+                $("#internet").html("未连接");
+            } else {
+                $("#internet").html(data.wanInfo.ipaddr + "/" + data.wanInfo.netmask);
+            }
+
+            getMemUsage(data.meminfo);
+
+            if (data.wanState) setNetStatus(data.wanState);
+        });
+
+        setTimeout("getDeviceInfo()", 10000);
+    }
+
+    function getWanTraffic() {
+        <%if hasNetdata == 1 and serverPort ~= 443 then%>
+        var timer = 2000;
+        $.getJSON(REQUEST_NETDATA_URI, {chart:"net." + TrafficInterface, format: "array", points:"2", options:"jsonwrap", _:Math.random()}, function(data) {
+            //console.log(data);
+            addTrafficData(data.latest_values);
+        <%else%>
+        var timer = 6000;
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "network", "getWanTraffic")%>", {iface: TrafficInterface}, function(data) {
+            addTrafficData(data);
+        <%end%>
+
+            $("#maxrxByte").html(bandwidthLabel(MaxRxByte));
+            $("#maxtxByte").html(bandwidthLabel(MaxTxByte));
+            $("#rxByte").html(bandwidthLabel(RxByte));
+            $("#txByte").html(bandwidthLabel(TxByte));
+
+            //console.log(MaxRxByte, MaxTxByte, RxByte, TxByte);
+
+            netChart.setOption({
+                series: [{data: TxRateArry},{data: RxRateArry},]
+            });
+        });
+
+        setTimeout("getWanTraffic()", timer);
+    };
+
+    function getCpuUsage() {
+        <%if hasNetdata == 1 and serverPort ~= 443 then%>
+        $.getJSON(REQUEST_NETDATA_URI, {chart:"system.cpu", format: "array", points:"120", after:"-120", _:Math.random()}, function(data) {
+
+            $("#cpu-load span").html(data[0].toFixed(2) +"%")
+
+            cpuChart.setOption({
+                series: [{data: data.reverse()}]
+            });
+        });
+
+        setTimeout("getCpuUsage()", 2000)
+        <%else%>
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "system", "getCpuUsage")%>", null, function(data) {
+
+            cpuArry.push(data);
+
+            if (cpuArry.length > Time) {
+                cpuArry.shift();
+            }
+
+            $("#cpu-load").html("当前CPU负载："+ data +"%")
+
+            cpuChart.setOption({
+                series: [{data: cpuArry}]
+            });
+        });
+
+        setTimeout("getCpuUsage()", 5000);
+        <%end%>
+    };
+
+    function getMemUsage(data) {
+        //$.getJSON("<%=luci.dispatcher.build_url("admin", "system", "getMemUsage")%>", null, function(data) {
+
+            //console.log(data)
+            var total = data.total / 1024;
+            var avl = (data.free + data.buffered) /1024;
+            var free = data.free / 1024;
+            var buff = data.buffered / 1024;
+            var use = total - avl;
+
+            var ftotal = Math.round(total / 1024 / 16) * 16;
+            var use1 = (use/1024).toFixed(2);
+            var buff1 = (buff/1024).toFixed(2);
+            var free1 = (free/1024).toFixed(2);
+            $("#totle").html(ftotal);
+            $("#use").html((use/1024).toFixed(2));
+            $("#buff").html((buff/1024).toFixed(2));
+            $("#avl").html((avl/1024).toFixed(2));
+            $("#storge-td").html(ftotal+'M');
+
+            memChart2.setOption({
+                title:{
+                	text:ftotal+'M'
+                },
+				series: [
+                    {
+                        data:[
+                                {value:use1, name:'已用', selected:true},
+                                {value:buff1, name:'缓冲'},
+                                {value:free1, name:'空闲'}
+                        ]
+                    }
+                ]
+            });
+        //});
+
+        //setTimeout("getMemUsage()", 8000);
+    }
+
+    function addTrafficData(arry) {
+        <%if hasNetdata == 1 and serverPort ~= 443 then%>
+        RxByte = (arry[0]/8).toFixed(2);
+        TxByte = (Math.abs(arry[1])/8).toFixed(2);
+        <%else%>
+        var arrLen = arry.length;
+        var privLine = arry[arrLen-2];
+        var lastLine = arry[arrLen-1];
+
+        var splitPrivLine= new Array();
+        var splitLastLine = new Array();
+
+        splitPrivLine = privLine.split(",");
+        splitLastLine = lastLine.split(",");
+
+        var time0 = splitPrivLine[0].replace("[ ", "");
+        var time1 = splitLastLine[0].replace("[ ", "");
+        // console.log( time0, time1);
+        // 首次打开会有时差
+        if ((time1 - time0) != 1) return false;
+
+        // 当前速率
+        RxByte = ((splitLastLine[1] - splitPrivLine[1])/1024).toFixed(2);
+        TxByte = ((splitLastLine[3] - splitPrivLine[3])/1024).toFixed(2);
+        <%end%>
+
+        if (TrafficInterface == "br-lan") {
+            var tmp = RxByte;
+            RxByte = TxByte;
+            TxByte = tmp;
+        }
+
+        // 计算峰值
+        MaxRxByte = Math.max(MaxRxByte, RxByte);
+        MaxTxByte = Math.max(MaxTxByte, TxByte);
+
+        // 存储速率
+        RxRateArry.push(RxByte);
+        TxRateArry.push(TxByte);
+
+        if (TxRateArry.length > Time) {
+            TxRateArry.shift();
+            RxRateArry.shift();
+        }
+    };
+
+    function initArry() {
+        for (var i = 0; i < Time; i++) {
+            RxRateArry.push(0);
+            TxRateArry.push(0);
+            cpuArry.push(0);
+        }
+    }
+
+    function bandwidthLabel(kby) {
+        var uby = '<%:KB/s%>';
+
+        if (kby >= 1024)
+        {
+            uby = '<%:MB/s%>';
+            kby = (kby / 1024).toFixed(2);
+        }
+
+        // return String.format("%f %s",kby.toFixed(2), uby);
+        return kby + " " + uby;
+    }
+
+    // jsonip.com, ipinfo.io, freegeoip.net, api.ipify.org
+    var UriArry = [
+        "http://chaxun.1616.net/s.php?type=ip&output=json",
+        "https://ipinfo.io",
+        "https://jsonip.com/?callback=?",
+        "https://freegeoip.net/json/",
+        "https://api.ipify.org?format=jsonp",
+//        "https://www.trackip.net/ip?json",
+        ];
+
+    // 页面打开时随机访问某一个url
+    var I = Math.floor(Math.random() * UriArry.length);
+    var ExternalIP = "未知";
+
+    function getExternalIp(n) {
+        if (ExternalIP != "未知") {
+            var img = "<%=resource%>/images/bn_inet_link.png";
+
+        } else if (ExternalIP == "未知" && n >= UriArry.length) {
+            var img = "<%=resource%>/images/bn_inet_error.png";
+
+        } else {
+            $.ajax({
+                url: UriArry[I],
+                dataType: 'jsonp',
+                success: function (response) {
+                    ExternalIP = response.ip ? response.ip : response.Ip;
+                }
+            });
+
+            if (++I >= UriArry.length) I = 0;
+
+            setTimeout("getExternalIp(" + (++n) + ")",3000);
+            return false;
+        }
+
+        $("#inet_status").attr("src", img);
+        $("#inet_ipaddr").html("<span>" + ExternalIP + "</span>");
+
+        ExternalIP = "未知";
+        setTimeout("getExternalIp(0)",30000);
+    }
+
+    function setNetStatus(data) {
+        if (data.code == "0") {
+            ExternalIP = data.msg;
+            $("#inet_status").attr("src", "<%=resource%>/images/bn_inet_link.png");
+
+        } else {
+            ExternalIP = "未知"
+            $("#inet_status").attr("src", "<%=resource%>/images/bn_inet_error.png");
+        }
+
+        $("#inet_ipaddr").html("<span>" + ExternalIP + "</span>");
+    }
+
+</script>

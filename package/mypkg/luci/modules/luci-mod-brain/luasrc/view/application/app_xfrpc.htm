@@ -1,0 +1,413 @@
+<%
+    local uci = require("luci.model.uci").cursor()
+    local run_id = luci.util.exec("/usr/bin/xfrpc_op -r"):gsub("\n", "")
+    local server = uci:get_all("xfrpc", "common")
+    local config = {}
+
+    uci:foreach("xfrpc", "proxy",
+        function(s)
+            local t = {}
+            t.sname = s[".name"]
+            t.name = s.name
+            t.type = s.type
+            t.local_ip = s.local_ip
+            t.local_port = s.local_port
+            t.custom_domains = s.custom_domains
+
+            table.insert(config, t)
+        end
+    )
+
+    include("top")
+%>
+
+<div class="box">
+<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+
+    <div class="">
+        <!--<div class="title">-->
+            <!--<h3>内网映射</h3>-->
+        <!--</div>-->
+        <div class="article">
+            <div class="input-info">
+                <p class="app-p">
+                    本功能可为内网IP地址提供动态域名解析服务，设置只需指定内网主机的IP及服务端口, 互联网用户输入指定域名即可访问内网主机<br/>
+                    <span style="color:red">! 提示：域名需要增加CNAME记录, 记录值请填写: <b id="server_addr" style="font-weight: normal;"><%=server.server_addr%></b></span>
+                </p>
+            </div>
+            <!--<hr class="app-hr">-->
+            <ul class="wd-tab xfrp-tab">
+                <li class="current tab1">映射规则设置</li>
+                <li class="tab2">服务器设置</li>
+            </ul>
+            <div class="section top">
+                <div class="tab-list xfrp-cont" id="tab1">
+                    <table class="" style="width:100%;">
+                        <thead>
+                        <tr>
+                            <th width="120px" class="portname-css">协议</th>
+                            <th width="120px">主机</th>
+                            <th width="70px">端口</th>
+                            <th width="*">域名/代理端口</th>
+                            <th width="150px">操作</th>
+                        </tr>
+                        </thead>
+                        <style>
+                            #frp_type{height:35px;line-height:35px;border:none;padding:4px 0 4px 5px;}
+                            #local_port,#custom_domains{height:35px;line-height:35px;border:1px solid #ddd;padding-left: 5px;outline: none;}
+                            #local_port{width:80px;}
+                            #custom_domains{width:180px;padding-left: 5px;}
+                            div.select-div{
+                                width:150px;
+                                height:36px;
+                                padding:0;
+                                margin:0;
+                                border:1px solid #ddd;
+                            }
+                            div.select-div-2{
+                                width:100px;
+                            }
+                            div.select-div:after{
+                                right:0;
+                            }
+                            div.select-div select{
+                                height:35px;
+                                padding:0;
+                            }
+                            .sel_span1{
+                                /*height:36px;*/
+                            }
+                            .sel_span2{
+                                border:none;
+                            }
+                        </style>
+                        <tbody id="list_proxy">
+                        <%for _, z in ipairs(config) do%>
+                            <tr class="addedtr" name="proxy_<%=z.name%>">
+                                <td class="portname-css"><%=z.type%></td><td><%=z.local_ip%></td><td><%=z.local_port%></td>
+                                <%if z.type:match("http") then%>
+                                <td><a href="<%=z.type%>://<%=z.custom_domains%>" target="_blank"><%=z.custom_domains%></a></td>
+                                <%else%>
+                                <td id="<%=z.type%>_proxy"> <img class="save-loading" src="<%=resource%>/images/loading.gif" alt=""/></td>
+                                <%end%>
+                                <td><a class="fw_rule" href="javascript:;" data-sname="<%=z.name%>">删除</a></td>
+                            </tr>
+                        <%end%>
+                            <tr class="tr">
+                                <td>
+                                    <div class="select-div select-div-2">
+                                        <select id="frp_type">
+                                            <option value="http">http</option>
+                                            <option value="https">https</option>
+                                            <option value="tcp">tcp</option>
+                                            <!-- <option value="ftp">ftp</option> -->
+                                        </select>
+                                    </div>
+                                </td>
+                                <td style="position:relative;width:160px;height:50px;padding-right:15px;">
+                                    <span class="sel_span1 selwid110">
+                                        <input id="local_ip" class="sel_inp mac" type="text" name="mac" value="">
+                                    </span>
+                                    <span class="sel_span2 selwid110 clip110">
+                                        <div class="select-div">
+                                            <select id="sel-hide" class="sel_select aabb sel_sel_wid130" name="aabb" onclick="simOptionClick4IE()">
+                                            <option value="" onclick="showOptionValue( this )">自定义</option>
+                                            <%luci.sys.net.ipv4_hints(function(ip, name)%>
+                                                <option value="<%=ip%>" onclick="showOptionValue( this )"><%=ip%></option>
+                                            <%end)%>
+                                            </select>
+                                        </div>
+                                    </span>
+                                </td>
+                                <td>
+                                    <input id="local_port"/>
+                                </td>
+                                <td style="padding-left:15px;">
+                                    <input id="custom_domains"/>
+                                </td>
+                                <td style="padding-left:30px;">
+                                    <a href="javascript:;" class="addTr">添加</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="tab-list" id="tab2" style="display: none;">
+                        <div class="input-info">
+                            <label>服务器地址</label>
+                            <input class="wid140" type="text"  id="xfrp_server" placeholder="xfrp.kunteng.org.cn"/ value="<%=server.server_addr%>">
+                        </div>
+
+                        <div class="input-info">
+                            <label>服务器端口</label>
+                            <input class="wid140" type="text"  id="server_port" placeholder="7001" value="<%=server.server_port%>"/>
+                        </div>
+<!--
+                        <div class="input-info">
+                            <label>服务器秘钥</label>
+                            <input class="wid140" type="text"  id="auth_key" placeholder="8135446887"/>
+                        </div>
+ -->
+                    <hr id="hr2" class="hr-new">
+                    <div class="operate-btn">
+                        <input type="button" value="保 存" class="s off" id="save"/>
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var oHeight;
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    var serverAddr = "<%=server.server_addr%>";
+    var serverPort = "<%=server.server_port%>";
+    var serverDashboardPort = parseInt(serverPort) + 1;
+
+    // 删除行
+    function delone(name) {
+//        var a=otr.parentNode.parentNode;
+//        a.parentNode.removeChild(a);
+
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "application", "xfrpc", "delWebProxy")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', name:name},
+            timeout:2000,
+            type: "POST",
+            success: function(rsp) {
+                if (rsp.code == 0) {
+                    $('tr[name=proxy_'+ name +']').remove();
+                    T_alert.show("删除成功",2000);
+                } else {
+                    T_alert.show("删除失败",2000);
+                }
+            },
+            error: function(x) {
+                T_alert.show("删除失败, 请重试",2000);
+            },
+            ontimeout:function() {
+                T_alert.show("删除失败, 请重试",2000);
+            }
+        });
+    }
+
+    function simOptionClick4IE() {
+        var evt=window.event;
+        var selectObj=evt?evt.srcElement:null;
+        // IE Only
+        if (evt && selectObj &&  evt.offsetY && evt.button!=2 && (evt.offsetY > selectObj.offsetHeight || evt.offsetY<0 )) {
+            // 记录原先的选中项
+            var oldIdx = selectObj.selectedIndex;
+            setTimeout(function() {
+                var option=selectObj.options[selectObj.selectedIndex];
+                // 此时可以通过判断 oldIdx 是否等于 selectObj.selectedIndex
+                // 来判断用户是不是点击了同一个选项,进而做不同的处理.
+                $("#local_ip").val($(option).val());
+            }, 60);
+        }
+    }
+
+    function showOptionValue(opt) {
+        $("#local_ip").val($(opt).val());
+    }
+
+    function getRemotePort(proxy) {
+        if (!proxy || proxy == "tcp") {
+            if ($("#tcp_proxy").length > 0) {
+                $.getJSON('<%=luci.dispatcher.build_url("admin", "application", "xfrpc", "getRemotePort")%>', {run_id:"<%=run_id%>", proto:"tcp"}, function(data) {
+                    if (data.code == 0) {
+                        $("#tcp_proxy").text(serverAddr + ":" + data.port);
+                        if (proxy) return;
+                    }
+                });
+            }
+        }
+
+        if (!proxy || proxy == "ftp") {
+            if ($("#ftp_proxy").length > 0) {
+                $.getJSON('<%=luci.dispatcher.build_url("admin", "application", "xfrpc", "getRemotePort")%>', {run_id:"<%=run_id%>", proto:"ftp"}, function(data) {
+                    if (data.code == 0) {
+                        $("#ftp_proxy").text(serverAddr + ":" + data.port);
+                        return;
+                    }
+                });
+            }
+        }
+
+        setTimeout("getRemotePort('" + proxy + "')", 10000);
+    }
+
+    function targetLabel(t, d) {
+        if (t.indexOf("http") >= 0 ) {
+            return '<td> <a href="' + t + '://'+ d +'" target="_blank">' + d +'</td>';
+        } else {
+            setTimeout("getRemotePort('" + t + "')", 3000);
+            return '<td id="' + t+ '_proxy"> <img class="save-loading" src="<%=resource%>/images/loading.gif" alt=""/></td>';
+        }
+    }
+
+    $(function () {
+        getRemotePort();
+
+        $(".wd-tab li").click(function() {
+            $(".wd-tab li").removeClass("current");
+            $(this).addClass("current");
+            var i = $(".wd-tab li").index($(this));
+            $(".tab-list").css("display","none");
+            if ( i == 0) {
+                $("#tab1").css("display","block");
+            } else if (i == 1) {
+                $("#tab2").css("display","block");
+            } else if (i == 2) {
+                $("#tab3").css("display","block");
+            }
+        });
+
+        $("#list_proxy").on("click", ".fw_rule", function() {
+            var d = $(this).data('sname');
+            delone(d);
+        });
+
+        $("#frp_type").bind("change",function() {
+            var type = $(this).val();
+            if (type == "tcp" || type == "ftp") {
+                $("#custom_domains").css("display","none");
+            } else {
+                $("#custom_domains").css("display","block");
+                $("#f_src_port").css("display","block");
+            }
+        });
+
+        $(".addTr").click(function() {
+            var type = $("#frp_type").val();
+            //var sname = type + ($("#list_proxy tr").length + 1);
+
+            var ip = $("#local_ip").val();
+            if (!validators.ipaddr(ip)) {
+                T_alert.show("内网ip格式不正确！",2000);
+                setTimeout(function () {$("#local_ip").focus();}, 0);
+                return false;
+            }
+
+            var port = $("#local_port").val();
+            if (!validators.port(port)) {
+                T_alert.show("端口格式不正确！",2000);
+                setTimeout(function () {$("#local_port").focus();}, 0);
+                return false;
+            }
+
+            var domain = $("#custom_domains").val();
+            if ((type.indexOf("http") >= 0) && domain == "") {
+                T_alert.show("域名不能为空！",2000);
+                setTimeout(function () {$("#custom_domains").focus();}, 0);
+                return false;
+            }
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "xfrpc", "addWebProxy")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', ip:ip, type:type, port:port, domain:domain},
+                timeout:10000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.code == 0) {
+                            var strTr = '<tr class="addedtr" name="proxy_'+ rsp.sname +'">'+
+                                '<td class="portname-css">'+ type +'</td>'+
+                                '<td>'+ ip +'</td>'+
+                                '<td>'+ port +'</td>' + targetLabel(type, domain) +
+                                '<td>'+
+                                '<a class="fw_rule" href="javascript:;" data-sname="'+ rsp.sname +'">删除</a>'+
+                                '</td>'+
+                                '</tr>';
+                            $(".tr").before(strTr);
+                            $("#local_port").val("");
+                            $("#custom_domains").val("");
+                            $("#local_ip").val("");
+
+                           //$("#sel-hide option[value='']").attr("selected", true);
+                        T_alert.show("添加成功",2000);
+                    } else if (rsp.code == 2) {
+                        if (type.indexOf("http") >= 0) {
+                            T_alert.show("域名已存在, 请更换域名或协议 ",2000);
+                        } else {
+                            T_alert.show("每客户端当前仅允许添加一条" + type + "映射规则",5000);
+                        }
+                        setTimeout(function () {$("#custom_domains").focus();}, 0);
+                    }
+                },
+                error: function(x) {
+                    T_alert.show("添加失败, 请重试")
+                },
+                ontimeout:function() {
+                    T_alert.show("添加失败, 请重试")
+                }
+            });
+            //$("#sel-hide").find("option[value='']").attr("selected",true);
+        })
+
+        $("#save").click(function () {
+            var serverAddrTmp = $("#xfrp_server").val();
+            var serverPortTmp = $("#server_port").val();
+            if (serverAddrTmp.length < 1) {
+                T_alert.show("服务器地址不能为空",2000);
+                $("#xfrp_server").focus();
+                return false;
+            }
+
+            if (serverPortTmp.length < 1 || !validators.port(serverPortTmp)) {
+                T_alert.show("服务器端口不正确",2000);
+                $("#server_port").focus();
+                return false;
+            }
+
+            serverAddr = serverAddrTmp;
+            serverPort = serverPortTmp;
+            loadSave("before", "save");
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "xfrpc", "setServer")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', addr:serverAddr, port:serverPort},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.code == 0) {
+                        T_alert.show("保存成功！",2000);
+                        $("#server_addr").text(serverAddr);
+                    } else {
+                        T_alert.show("保存失败！",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    T_alert.show("保存错误！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("保存超时！",2000);
+                    loadSave("after", "save");
+                }
+            });
+
+        });
+    });
+
+</script>
+
+
+<%include("bottom")%>

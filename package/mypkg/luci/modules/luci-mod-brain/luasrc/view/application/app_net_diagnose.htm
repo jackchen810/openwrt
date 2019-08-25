@@ -1,0 +1,106 @@
+<%include("top")%>
+<div class="box">
+	<div class="main">
+
+		<%include("application/menuer")%>
+		
+		<div class="">
+			<!--<div class="title">-->
+				<!--<h3>网络诊断</h3>-->
+			<!--</div>-->
+			<div class="article">
+				<div class="diag-new">
+					<div class="diag-new-img"><img src="<%=resource%>/images/newimg/diag-normal.png" alt=""></div>
+					<div class="diag-new-cont">
+						<p class="diag-new-cont-tit"><span>网络诊断</span><i class="diag-loading"><img src="<%=resource%>/images/loading2.gif" alt=""/></i></p>
+						<p class="diag-new-cont-msg">轻松诊断，查看您的网络连接状况</p>
+						<p class="diag-new-cont-btn"><button id="diagbtn">开始诊断</button></p>
+					</div>
+				</div>
+				<!--<div class="diag_img">
+					<p>
+						<span><img src="<%=resource%>/images/diagnose-pic.png" alt=""/></span>
+					</p>
+					<ul style="width:100%;">
+						<li style="width:200px;" class="diag-li1"></li>
+						<li style="width:88px;">&nbsp;</li>
+						<li style="width:196px;" class="diag-li2"></li>
+					</ul>
+				</div>-->
+				<div class="diag" id="diaging">
+					<i><img src="<%=resource%>/images/loading2.gif" alt=""/></i>
+					<p>正在进行网络诊断，请稍后...</p>
+				</div>
+				<div class="diag diaged" id="diaged">
+					<i><img src="<%=resource%>/images/i_success.png" alt=""/></i>
+					<p class="diag_message">恭喜！网络连接正常</p>
+				</div>
+				<div class="btn-cont">
+					<!--<button class="btn btn-center" id="diagbtn">开始诊断</button>-->
+				</div>
+
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	function show_message(code, title,text) {
+		// $("#diaging").css("display","none");
+		// $(".btn-cont").css("display","block");
+		$('.diag-loading').css('display','none');
+		$("#diagbtn").html("重新诊断");	
+		// $(".diag_message").html(text);
+		$(".diag-new-cont-tit span").html(title);
+		$(".diag-new-cont-msg").html(text);
+
+		if (code != 0) {
+			// $(".diag_message").addClass("diag_error");
+			// $("#diaged img").attr("src","<%=resource%>/images/i_error.png");
+			$(".diag-new-img img").attr("src","<%=resource%>/images/newimg/diag-error.png");
+		}else{
+            $(".diag-new-img img").attr("src","<%=resource%>/images/newimg/diag-success.png");
+		}
+		
+		// $("#diaged").css("display","block");
+	}
+	
+	$(function(){
+		$("#diagbtn").click(function(){
+		    $('.diag-new-cont-tit span').html('网络诊断');
+            $(".diag-new-img img").attr("src","<%=resource%>/images/newimg/diag-normal.png");
+			$('.diag-loading').css('display','inline-block');
+
+
+			// $("#diaging").css("display","block");
+			// $(".btn-cont").css("display","none");
+			// $("#diaged").css("display","none");
+			// $(".diag_message").removeClass("diag_error");
+			// $("#diaged img").attr("src","<%=resource%>/images/i_success.png");
+			
+			$.ajax({
+				url: '<%=luci.dispatcher.build_url("guest", "netStatus")%>',
+				cache: false,
+				dataType: "json",			
+				timeout:20000,
+				type: "POST",
+				success: function(rsp){					
+					if (rsp.code == 0) {					
+						show_message(0, "恭喜！网络连接正常","您的网络连接正常，继续加油哦")
+					} else {
+                        show_message(rsp.code, "啊哦，网络异常",rsp.msg);
+                        $('#diaged img').attr('src','<%=resource%>/images/newimg/diag-error.png');
+					}					
+				},
+				error: function(x){
+					show_message(-1,"啊哦，网络异常", "诊断失败, 请重试")
+				},
+				ontimeout:function(){
+					show_message(-1, "啊哦，网络异常","诊断超时, 请重试")
+				}
+			});
+
+		})
+	})
+</script>
+
+<%include("bottom")%>

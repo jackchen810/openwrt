@@ -1,0 +1,262 @@
+<%
+local _uci = require "luci.model.uci".cursor()
+local apmode = _uci:get("network", "lan", "proto")
+local lg = _uci:get("luci", "main", "lang")
+local nfs = require "nixio.fs" 
+
+local exts = nfs.dir("etc/config")
+if exts then                 
+	local ext             
+	for ext in exts do     
+		print(ext)
+	end                     
+end
+
+%>
+<!DOCTYPE html>
+<html lang="<%=luci.i18n.context.lang%>">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+    <meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+    <!--[if lt IE 9]
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+    <![endif]>-->
+
+    <title><%:Router Management Page%></title>
+    <link rel="shortcut icon" href="<%=media%>/favicon.ico">
+	
+    <link type="text/css" rel="stylesheet" href="<%=resource%>/ktcss/style.css"/>
+    <link type="text/css" rel="stylesheet" href="<%=resource%>/ktcss/ui-dialog.css"/>
+	<%
+		local n = nfs.dir("/www" .. resource .. "/extcss/")
+		if n then 
+			local file
+			for file in n do
+	%>
+    <link type="text/css" rel="stylesheet" href="<%=resource%>/extcss/<%=file%>" />
+	<%
+			end 
+		end
+	%>	
+    <script type="text/javascript" src="<%=resource%>/js/jquery-1.9.0.min.js"></script>
+    <script type="text/javascript" src="<%=resource%>/js/dialog-plus-min.js"></script>
+	<script type="text/javascript" src="<%=resource%>/laydate/laydate.js"></script>
+
+    <script type="text/javascript" src="<%=resource%>/js/json2.js"></script>
+    <script type="text/javascript" src="<%=resource%>/js/jquery.toggle-password.js"></script>
+    <script type="text/javascript" src="<%=resource%>/cbi.js"></script>
+    <script type="text/javascript" src="<%=resource%>/xhr.js"></script>
+	
+</head>
+
+<body>
+<div class="soft_function">
+    <div class="soft_con_icon">
+        <div class="icon_width" style="margin: 0 auto;">
+            <p class="header-p" style="float:left"><span><%:Router Management Page%></span></p>
+			
+		<div class="header-p" id="select_language" align=right>
+			<select id="language" size=1 style="margin-right:10px;color:#fff" onChange="change_select();">
+				<option style="background:rgb(37, 115, 191)" value="auto"><%:auto%></option>
+				<option style="background:rgb(37, 115, 191)" value="en">English</option>
+				<option style="background:rgb(37, 115, 191)" value="zh-cn">简体中文</option>
+			</select>
+			
+			<a id="pic_fun_k" style="margin-right:35px;font-size:14px" href="<%=luci.dispatcher.build_url("admin", "logout")%>"><%:Logout%></a>
+		</div>
+			
+            <ul class="navlist">
+                <li>
+                    <a id="pic_fun_adm" href="<%=luci.dispatcher.build_url("admin", "home")%>">
+                        <span><img class="icon1" src="<%=resource%>/icons/images/pic_fun_adm.png"/></span>
+                        <p ><%:Overview%></p>
+                    </a>
+                </li>
+                <li <%if apmode == "dhcp" then%> style="display:none;" <%end%>>
+                    <a id="pic_fun_crm" href="<%=luci.dispatcher.build_url("admin", "network")%>">
+                        <span><img class="icon2" src="<%=resource%>/icons/images/pic_fun_crm.png"/></span>
+                        <p><%:Internet%></p>
+                    </a>
+                </li>
+                <li>
+                    <a id="pic_fun_project" href="<%=luci.dispatcher.build_url("admin", "wireless")%>">
+                        <span><img class="icon3" src="<%=resource%>/icons/images/pic_fun_project.png"/></span>
+                        <p><%:Wireless%></p>
+                    </a>
+                </li>
+                <li  <%if apmode == "dhcp" then%> style="display:none;" <%end%>>
+                    <a id="pic_fun_gj" href="<%=luci.dispatcher.build_url("admin", "advanced")%>">
+                        <span><img class="icon4" src="<%=resource%>/icons/images/pic_fun_gj.png"/></span>
+                        <p><%:Advanced%></p>
+                    </a>
+                </li>
+				
+                <li>
+                    <a id="pic_fun_k" href="http://cloud.kunteng.org.cn/">
+                        <span><img class="icon4" src="<%=resource%>/icons/images/pic_fun_k.png"/></span>
+                        <p><%:Cloud%></p>
+                    </a>
+                </li>
+				
+				<%if apmode == "dhcp" then%> <script>$(".navlist li").css("width","33%");</script>	<%end%>
+				
+            </ul>
+        </div>
+    </div>
+	<script type="text/javascript">
+		var Globe_lg = '<%=lg%>';
+		if (Globe_lg) {
+			$("#language").val(Globe_lg);
+		}
+
+		$(function () {
+			$(".soft_con_icon ul li a").each(function(){
+				$(this).bind("mouseenter",function(){
+					$(this).unbind("mouseleave").bind("mouseleave",function(){
+						var id3 = $(this).attr("id");
+						$(this).children("p").css({"color": "#5a9ad7"});
+						var src3 = id3 + ".png";
+						$(this).find("img").attr("src", "<%=resource%>/icons/images/" + src3);
+					});
+					var id2 = $(this).attr("id");
+					$(this).children("p").css({"color": "#fff"});
+					var src2 = id2 + "_hover.png";
+					$(this).find("img").attr("src", "<%=resource%>/icons/images/" + src2);
+				});
+			});
+		});
+		
+		function set_header_icon_lighted(tags_id) {			
+			var current_id;
+			if (current_id = document.getElementById(tags_id)) {
+				$(current_id).unbind("mouseleave").unbind("mouseenter");
+				$(current_id).children("p").css({"color": "#fff"});
+				var src2 = tags_id + "_hover.png";
+				$(current_id).find("img").attr("src", "<%=resource%>/icons/images/" + src2);
+			}
+		}		
+			
+		// 弹出隐藏层
+		function ShowDiv(show_div, bg_div) {	
+			document.getElementById(show_div).style.display = 'block';
+			document.getElementById(bg_div).style.display = 'block';
+			var bgdiv = document.getElementById(bg_div);
+			bgdiv.style.width = document.body.scrollWidth;
+			
+			$("#" + bg_div).height($(document).height());
+		}
+		
+		// 关闭弹出层
+		function CloseDiv(show_div, bg_div) {	
+			document.getElementById(show_div).style.display = 'none';
+			document.getElementById(bg_div).style.display = 'none';
+		}
+		
+		//提示
+		function success_prop(id){
+			setTimeout(function(){
+				var d = dialog({title: '<%:Notify%> ', content: '<%:Successfully saved%>！', cancel: false, height: 40,}).showModal();			
+				setTimeout(function(){d.close().remove();$("#"+id).prop("disabled", false);}, 2000);				
+			},100);
+
+			$("."+id).hide();
+		}
+		
+		function failed_prop(code, id){
+			setTimeout(function(){
+				var d = dialog({title: '<%:Notify%> ', content: '<%:Save failed. Plase try again%>！', cancel: false, height: 40,}).showModal();			
+				setTimeout(function(){d.close().remove();$("#"+id).prop("disabled", false);}, 2000);				
+			},100);
+
+			$("."+id).hide();
+		}		
+		
+		function error_prop(statusText, id){
+			setTimeout(function(){
+				var d = dialog({title: '<%:Notify%> ', content: '<%:Save failed. check your network connection and retry%>！', cancel: false, height: 40,}).showModal();			
+				setTimeout(function(){d.close().remove();$("#"+id).prop("disabled", false);}, 2000);				
+			},100);
+
+			$("."+id).hide();
+		}	
+		
+		function timeout_prop(statusText, id){
+			setTimeout(function(){
+				var d = dialog({title: '<%:Notify%> ', content: '<%:Timeout%>！', cancel: false, height: 40,}).showModal();			
+				setTimeout(function(){d.close().remove();$("#"+id).prop("disabled", false);}, 2000);				
+			},100);
+
+			$("."+id).hide();
+		}
+		
+		function tip_dialog(data) {
+			dialog({
+				title: '<%:Notify%>',
+				okValue: '<%:OK%>',
+				content: data.msg,
+				ok: function () {
+					setTimeout(function () {
+					document.getElementById(data.id).focus();
+					}, 0);
+				},
+				cancel: false
+			}).showModal();
+		}
+
+		function check_ip_by_tag_id(id) {
+			var str = document.getElementById(id).value;
+			var strlength = str.length;
+			
+			if (strlength < 1) {
+				return false;
+			}
+			else {
+				if (strlength > 15 || strlength < 7)          //IP的字段长度的限制
+				{
+					return false;
+				}
+				
+				var patrn = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+				if (!patrn.exec(str)) {
+					return false;
+				}
+				
+				var laststr = str.split(".");     //用.把字符串str分开
+				if (parseInt(laststr[0]) <= 0) return false;
+				
+				if (parseInt(laststr[0]) > 255 || parseInt(laststr[1]) > 255 || parseInt(laststr[2]) > 255 || parseInt(laststr[3]) > 255) //判断IP每位的大小
+				{
+					return false;
+				}
+				
+				var last_patrn = /^\d{1,3}$/;
+				if (!last_patrn.exec(laststr[3])) {
+					return false;
+				}
+				return true;
+			}
+		}
+		
+		function change_select() {
+
+			var lang = $("#language").val();
+			$.ajax({
+				url: "<%=luci.dispatcher.build_url("admin", "system", "language")%>",
+				cache: false,
+				dataType: "json",
+				data: {token: '<%=token%>' , lang:lang},
+				timeout:5000,
+				type: "POST",
+				success: function(rsp){
+					if(rsp.result == true){
+						setTimeout('window.location.reload();', 300);
+					}
+				}
+			});
+			 
+		}
+	</script>
+	  

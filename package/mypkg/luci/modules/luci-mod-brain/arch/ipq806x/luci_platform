@@ -1,0 +1,13 @@
+#platform qcawifi
+config info    wireless
+    option    device_option_2G    'band'
+    option    device_option_value_2G    '2.4G'
+    option    iface_option_2G    'device'
+    option    iface_option_value_2G    'wifi1'    
+    option    device_option_5G    'band'
+    option    device_option_value_5G    '5G'
+    option    iface_option_5G    'device'
+    option    iface_option_value_5G    'wifi0'
+config	info    dhcp
+    option    dnsmasq    'domain'
+		

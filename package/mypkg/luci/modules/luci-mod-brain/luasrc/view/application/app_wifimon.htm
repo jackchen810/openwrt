@@ -1,0 +1,407 @@
+<%
+include("top")
+%>
+<style>
+    .wireless-env{width: 800px;height:380px;margin:50px auto 20px;}
+    .wireless-ch{width: 800px;height:380px;margin:0 auto;}
+    .chart-cont{display:none;width:100%;}
+    .btn-cont{padding-bottom:50px;}
+    .btn-cont .btn-scan{outline:none;margin-left:0;}
+    .loadingscan-img{display:none;}
+    @media screen and (max-width: 599px) and (min-width: 450px) {
+        .wireless-env{width:450px;}
+        .wireless-ch{width:450px;}
+    }
+    @media screen and (max-width:449px){
+        .wireless-env{width:350px;}
+        .wireless-ch{width:350px;}
+    }
+</style>
+<div class="box">
+    <div class="main">
+        <%include("application/menuer")%>
+
+        <div class="">
+            <!--<div class="title">-->
+                <!--<h3>无线环境扫描</h3>-->
+            <!--</div>-->
+            <div class="article">
+                <div class="diag-new wifimon-normal">
+                    <div class="diag-new-img"><img src="<%=resource%>/images/newimg/wifimon-normal.png" alt=""></div>
+                    <div class="diag-new-cont">
+                        <p class="diag-new-cont-tit"><span>WIFI环境扫描</span><i class="diag-loading"><img src="<%=resource%>/images/loading2.gif" alt=""/></i></p>
+                        <p class="diag-new-cont-msg">快捷搜索，为您推荐更快更便捷的wifi环境</p>
+                        <p class="diag-new-cont-btn"><button class="btn-scan">开始扫描</button></p>
+                    </div>
+                </div>
+
+
+                <div class="wifimon-result-cont wifimon-result-tit">
+                    <div class="wifimon-img"><img src="<%=resource%>/images/newimg/fast-test-ing-new.png" alt=""></div>
+                    <div class="wifimon-txt">
+                        <p class="wifimon-txt-tit">正在检测，请耐心等待</p>
+                        <!--<p class="wifimon-txt-msg">一键检测给你提供网络、51盒子和打印机设备的智能检测<span></span></p>-->
+                        <p class="wifimon-txt-msg" style="display: none;">根据扫描结果，<span>最优信道为10</span>，建议您去修改设置 <a href="<%=luci.dispatcher.build_url("admin", "network", "wifi_settings")%>">立即修改</a></p>
+                    </div>
+                    <div class="wifimon-btn"><button class="btn-agin">正在检测</button></div>
+                </div>
+                <style>
+                    .progressbar {
+                        width: 100%;
+                        /*margin-bottom: 35px;*/
+                        position: relative;
+                        background-color: #EEEEEE;
+                        /*box-shadow: inset 0px 1px 1px rgba(0,0,0,.1);*/
+                    }
+                    .proggress{
+                        height: 8px;
+                        width: 10px;
+                        background-color: #3498db;
+                    }
+                    #progressbar1{
+                        display: none;
+                        width:100%;
+                        height:2px;
+                    }
+                </style>
+                <div id="progressbar1"></div>
+
+                <!--<div class="wifimon-result-cont">-->
+                    <!--<div class="wifimon-img"><img src="<%=resource%>/images/newimg/wifimon-success.png" alt=""></div>-->
+                    <!--<div class="wifimon-txt">-->
+                        <!--<p class="wifimon-txt-tit">完成扫描！</p>-->
+                        <!--<p class="wifimon-txt-msg">根据扫描结果，<span>最优信道为10</span>，建议您去修改设置 <a href="<%=luci.dispatcher.build_url("admin", "network", "wifi_settings")%>">立即修改</a></p>-->
+                    <!--</div>-->
+                    <!--<div class="wifimon-btn"><button class="btn-agin">再次扫描</button></div>-->
+                <!--</div>-->
+                <div class="chart-cont">
+                    <p style="color: #999;width: 800px;margin: 0 auto;position: relative;top: 134px;left:52px;font-size: 13px;"><em>信道</em></em></p>
+                    <p style="color: #999;width: 800px;margin: 0 auto;position: relative;top: 140px;left:52px;font-size: 13px;"><em>强度</em></p>
+                    <div id="wireless_env" class="wireless-env"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/echarts.min.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/jquery.lineProgressbar.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+    T_alert._css.position = "fixed";
+    T_alert._css.left = "170px";
+
+    function normalCss(){
+        $('#progressbar1').css('display','block');
+        $('#progressbar1').LineProgressbar({
+            height:"3px",
+            fillBackgroundColor: '#2a5cff',
+            ShowProgressCount:false,
+            duration: 8000,
+            percentage: 80
+        });
+        $('.wifimon-img img').attr('src','<%=resource%>/images/newimg/fast-test-ing-new.png');
+        $('.wifimon-txt-tit').html('正在检测，请耐心等待');
+        $('.btn-agin').html('正在检测');
+        $('.item-msg img').attr("src","<%=resource%>/images/loading.gif");
+        $('.result-tip').css('display','none');
+    }
+
+    function scan_wireless_env() {
+        normalCss();
+        $('.wifimon-normal').css('display','none');
+        $('.wifimon-result-tit').css('display','block');
+
+        $.ajax({
+            url:"<%=luci.dispatcher.build_url("admin", "application", "wifimon", "scanWirelessEnv")%>",
+            success: function(data){
+                if (data.code == 0) {
+                    var best = data.chEnv[0].channel;
+                    $(".wifimon-txt-msg span").html('最优信道为' + best);
+                    $('.wifimon-result-cont').css("display",'block');
+                    $(".wifimon-normal").css('display','none');
+                    $(".chart-cont").css("display",'block');
+
+                    var series = [];
+                    series.push(
+                            {
+                                data: data.chEnv.sort(function(a, b){
+                                            return a.channel - b.channel;
+                                        }).map(function(ele) {
+                                            return {value: 100, count: ele.count};
+                                        })
+                            },
+                            {
+                                data: data.chEnv.map(function(ele) {
+                                            var value = 0;
+                                            if (ele.channel == best)
+                                                value = 100
+                                            return {value: value, count: ele.count};
+                                        })
+                            },
+                            {
+                                markPoint: {
+									label:{
+										normal:{
+											formatter:best + " 信道",
+										},
+									}
+                                },
+                                data: data.chEnv.map(function(ele) {
+                                            return ele.factor
+                                        })
+                            },
+                            {
+                                data: data.chEnv.map(function(ele) {
+                                            return ele.factor
+                                        })
+                            })
+
+                    wifiChart.setOption({
+                        series: series
+                    });
+
+                    $('.wifimon-txt-tit').html('完成扫描！')
+                } else {
+                    $(".wifimon-img img").attr("src","<%=resource%>/images/newimg/wifimon-error.png");
+                    $('.wifimon-txt-tit').html('扫描失败！');
+                    $(".wifimon-txt-msg").html('请确认2.4G wifi功能是否正常开启！');
+                    $('.wifimon-result-cont').css("display",'block');
+                    $(".wifimon-normal").css('display','none');
+                }
+
+                $(".loadingscan-img").css("display","none");
+                $(".btn-agin").html('<img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>再次扫描');
+
+
+                $('.wifimon-txt-msg').css('display','block');
+
+                $('#progressbar1').LineProgressbar({
+                    height:"3px",
+                    fillBackgroundColor: '#2a5cff',
+                    duration:0,
+                    ShowProgressCount:false,
+                    percentage: 100
+                });
+            },
+            ontimeout:function(){
+                T_alert.show("获取失败,请重试！",2000);
+				$(".btn-scan").html('<img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>重新扫描');
+                $(".loadingscan-img").css("display","none");
+            },
+            error: function(){
+                T_alert.show("获取失败,请重试",2000);
+                $(".btn-scan").html('<img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>重新扫描');
+                $(".loadingscan-img").css("display","none");
+            }
+        })
+    }
+
+    $(function () {
+        //scan_wireless_env();
+        $(".btn-scan").click(function(){
+            $(this).html('<img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>正在扫描');
+            $(".loadingscan-img").css("display","inline-block");
+            scan_wireless_env();
+        });
+        $(".btn-agin").click(function(){
+            $(this).html('<img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>正在扫描');
+            $(".loadingscan-img").css("display","inline-block");
+            scan_wireless_env();
+        })
+
+        wifiChart = echarts.init(document.getElementById("wireless_env"));
+        wifiChart.setOption({
+            title: {
+                text: '无线信道干扰情况',
+                padding: [0,0,0,52],
+                subtext: ''
+            },
+            tooltip: {
+                formatter: function(params) {
+                    return "当前有" + params.data.count + "个热点使用";
+                }
+            },
+            xAxis: [
+                {
+                    name: "\n\n信道",
+                    nameGap: 1,
+                    type: 'category',
+					nameTextStyle : {
+						color:'#999',
+						fontSize: 13,
+					}, 
+                    boundaryGap: true,
+                    axisLine: {show: false},
+                    axisTick: {show: false},
+                    data:['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']
+                },
+                {
+                    type: 'category',
+                    boundaryGap: true,
+                    axisLine: {show: false},
+                    axisTick: {show: false},
+                    data: []
+                }
+            ],
+            yAxis: [
+                {
+                    type: 'value',
+                    scale: true,
+                    show: false
+                },
+                {
+                    type: 'value',
+                    show: false,
+                    inverse: true
+                }
+            ],
+            series: [
+                {
+                    type:'bar',
+                    itemStyle: {
+                        normal: {
+                            color: '#f7f7f7'
+                        }
+                    },
+					barWidth: 30,
+                    data:[]
+                },
+                {
+                    name:'信道',
+                    type:'bar',
+                    //silent: true,
+                    xAxisIndex: 1,
+                    yAxisIndex: 0,
+                    itemStyle: {
+                        normal: {
+                            color: new echarts.graphic.LinearGradient(
+                                0, 0, 0, 1,
+                                [
+                                    {offset: 0, color: '#A0DEFF'},
+                                    {offset: 1, color: '#A8C7FF'}
+                                ]
+                            )
+                        }
+                    },
+					barWidth: 30,
+                    data:[]
+                },
+                {
+                    name:'干扰情况',
+                    type:'line',
+                    yAxisIndex: 1,
+                    smooth: true,
+                    symbol: 'none',
+					//symbolSize: 10,
+					itemStyle: {
+						normal: {
+                            color: {
+								type: 'linear',
+								x: 0,
+								y: 0,
+								x2: 0,
+								y2: 1,
+								colorStops: [{
+									offset: 0, color: '#2A5CFF' 
+								}, {
+									offset: 1, color: '#04ECF8'
+								}],
+								globalCoord: false
+							},
+                        }
+					},
+					lineStyle: {
+						normal: {
+							width: 4, //default value:2
+							shadowColor: 'rgba(0, 0, 0, 0.3)',
+							shadowBlur: 10,
+							shadowOffsetX:0,
+							shadowOffsetY:2
+						},
+					},
+                    markPoint: {
+                        //symbol:"pin",
+						//symbol: 'path://m 0,0 h 48 v 20 h -30 l -6,10 l -6,-10 h -6 z', // 'circle', 'rect', 'roundRect', 'triangle', 'diamond', 'pin', 'arrow', path://m 0,0 h 48 v 20 h -30 l -6,10 l -6,-10 h -6 z,  path://m 0,0 h 48 v 20 h -34 l -6,10 l -6,-10 h -2 z
+						symbol: 'path://m55.99786,227.653007l0,0c0,-7.54004 15.236302,-13.652458 34.031249,-13.652458l15.46875,0l0,0l74.250007,0l139.218716,0c9.025674,0 17.681649,1.438378 24.063758,3.998709c6.38207,2.560337 9.967507,6.032893 9.967507,9.653749l0,34.13115l0,0l0,20.478688l0,0c0,7.540045 -15.236303,13.652453 -34.03125,13.652453l-35.117318,0l-37.772623,-0.461736l-40.740581,24.917292l-32.466098,-24.455556l-67.372102,0l-15.468766,0c-18.794931,0 -34.031233,-6.112408 -34.031233,-13.652453l0,0l0,-20.478688l0,0l-0.000016,-34.13115z', 
+                        symbolSize:[65,33],
+						symbolOffset: ['0%', '-95%'],
+						silent: true,
+                        symbolKeepAspect: true,
+						label:{
+							normal:{
+								show: true,
+								color: '#000',
+								shadowBlur: 10,
+								position: ['18%', '20%'],
+								//verticalAlign:'middle',
+								fontSize: 13,
+							},
+						},
+						itemStyle:{
+							normal: {
+								color: '#fff',
+								shadowColor: 'rgba(0, 0, 0, 0.3)',
+								shadowBlur: 4,
+								shadowOffsetX:0,
+								shadowOffsetY:1
+							},
+						},
+                        data: [{type: 'min', name: '最优信道'}]
+                    },
+                    data:[]
+                },
+                {
+                    name:'圆点',
+                    type:'line',
+                    yAxisIndex: 1,
+                    smooth: true,
+                    symbol: 'none',
+					//symbolSize: 10,
+					itemStyle: {
+						normal: {
+                            color: {
+								type: 'linear',
+								x: 0,
+								y: 0,
+								x2: 0,
+								y2: 1,
+								colorStops: [{
+									offset: 0, color: '#2A5CFF'
+								}, {
+									offset: 1, color: '#04ECF8'
+								}],
+								globalCoord: false 
+							},
+                        }
+					},
+                    markPoint: {
+						symbol: "circle",
+                        symbolSize:[13,13],
+						symbolOffset: ['0%', '0%'],
+						silent: true,
+                        symbolKeepAspect: true,
+						label:{
+							normal:{
+								show: false,
+							},
+						},
+						itemStyle:{
+							normal: {
+								color: '#fff',
+								borderColor: '#2A5CFF',
+								borderWidth: 3,
+							},
+						},
+                        data: [{type: 'min', name: ''}]
+                    },
+                    data:[]
+                }
+            ]
+        });
+
+    })
+</script>
+
+<%include("bottom")%>

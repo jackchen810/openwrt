@@ -1,0 +1,604 @@
+<%
+    local ktwifi = require "ktapi.ktWifi"
+    local json = require "ktapi.ktJson"
+
+    local remote_addr = luci.http.getenv("REMOTE_ADDR")
+    local wifi5G = json.Encode(ktwifi.get_wifi_net("5G"))
+
+    include("top")
+%>
+
+<div class="main-container">
+    <div class="main">
+        <div class="connect_2 connect-2-new">
+            <div class="connect_2_2" style="padding-bottom:0;margin-bottom:0;">
+                <div class="devmenucont">
+                    <ul class="devmenu">
+                        <li class="current" style="margin-left:45px;">全部</li>
+                        <li>有线接入设备</li>
+                        <li>2.4G接入设备</li>
+                        <%if wifi5G ~= "[]" then%>
+                        <li>5G接入设备</li>
+                        <%end%>
+                        <li>离线设备</li>
+                    </ul>
+                </div>
+                <div id="connect-content" class="connect-content" style="max-height:600px;">
+                    <div class="connect_2_3">
+                        <ul class="ul-1">
+                            <li class="contdev1">基本信息 <span style="color:#666;">（共<span id="activeDeviceNum"></span>台）</span></li>
+                            <li class="contdev2">当前网速</li>
+                        </ul>
+                        <ul class="ul-2">
+                            <li class="contdev3">限速值</li>
+                            <li class="contdev5">限速白名单</li>
+                            <li class="contdev4">操作</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+    .connect-2-new .contup{
+        width:40%;
+    }
+    .connect-2-new .contdown{
+        width:60%;
+    }
+    .connect-2-new .connect_2_4_6{
+        width:55%;
+    }
+    .connect_2_3 ul .contdev1{
+        width:66%;
+    }
+    .connect_2_3 ul .contdev2{
+        width:33%;
+    }
+    .connect_2_3 ul .contdev3{
+        width:55%;
+    }
+    .connect_2_3 ul .contdev4{
+        width:26%;
+    }
+    .connect_2_3 ul .contdev5{
+        width:17%;
+    }
+    .connect_2_3 ul{
+        float: left;
+    }
+    .connect_2_3 .ul-1{
+        width:40%;
+    }
+    .connect_2_3 .ul-2{
+        width:58%;
+    }
+    .connect-2-new .connect_2_4_4{
+        width:17%;
+        margin-right:0;
+    }
+    .connect-2-new .connect_2_4_5{
+        width:26%;
+    }
+    .connect-2-new .connect_2_3{
+        overflow: hidden;
+    }
+    .connect-2-new .connect_2_3 ul{
+        padding:0;
+    }
+    .connect-2-new .switch{
+        margin:35px auto 0;
+        float: none;
+    }
+    .connect-2-new .connect_2_4_5 ul li button.disabledbtn{
+        background-color:#ddd;
+    }
+    .connect-2-new .connect_2_4_5 ul li button.disabledbtn:hover{
+        background-color:#ddd;
+        color:#666;
+        cursor: text;
+    }
+    .connect-2-new .connect_2_4_6 ul li.devbtn{
+        width:100%;
+        text-align: left;
+        padding-left: 10px;
+    }
+    .connect-2-new .connect_2_4_6 .nospeed{
+        margin-left: 10px;
+        background: #ddd;
+        display:none;
+    }
+    .connect-2-new .connect_2_4_6 .nolimit{
+        margin-left: 10px;
+    }
+     .connect-2-new .connect_2_4_5 ul li button{
+        margin-top:30px;
+    }
+</style>
+<script type="text/javascript" src="<%=resource%>/js/organization.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    var timer;
+
+    //连接设备tab页
+    function onChoose(ele) {
+        var source = $(".connect_2_4").attr("data-source");
+
+        $(".connect_2_4").hide();        
+        $(".connect_2_4[data-source = '"+ ele +"']").show();
+
+        var num = $(".connect_2_4[data-source = '"+ ele +"']").length;
+
+        if (ele == "all") {
+            $(".connect_2_4").show();
+            num = $(".connect_2_4").length;
+        }
+
+        $("#activeDeviceNum").html(num);
+    }
+
+    //编辑限速
+    function editSpeed(ele){
+        //停止页面刷新
+        stopTimer();
+        var i = $(".editspeed").index($(ele));
+        // console.log(i);
+        var upspan = $(".connect_2_4").eq(i).find(".connect_2_4_6").find('span:first');
+        var downspan = $(".connect_2_4").eq(i).find(".connect_2_4_6").find('span:last');
+        var up = upspan.find('.editupspeed').html();
+        var down = downspan.find('.editdownspeed').html();
+        upspan.empty();
+        downspan.empty();
+        upspan.append("<input type='text' value='"+up+"' class='upSpeed dev-input'/>KB/s");
+        downspan.append("<input type='text' value='"+down+"' class='downSpeed dev-input'/>KB/s");
+        $(ele).hide();
+        $(ele).siblings('.savespeed').show();
+        $(ele).siblings('.nospeed').show();
+        $(ele).siblings('.nolimit').hide();
+    }
+    //取消编辑
+    function noSpeed(ele){
+        //继续更新数据
+        startTimer();
+    }
+
+    //手机端点击查看
+    function showConnectDown(ele){
+        //停止页面刷新
+        stopTimer();
+        var down = $(ele).parent(".contup").siblings(".contdown");
+        if(down.css("display") == "none"){
+            down.slideDown();
+        }else{
+            down.slideUp();
+        }
+
+    }
+
+    function bandwidthLabel(by) {
+        var kby =(by / 1024).toFixed(2);
+
+        var uby = '<%:KB/s%>';
+
+        if (kby >= 1024)
+        {
+            uby = '<%:MB/s%>';
+            kby = (kby / 1024).toFixed(2);
+        }
+
+        //return String.format("%f %s",kby.toFixed(2), uby);
+        return kby + " " + uby;
+    }
+
+    //渲染全部数据
+    function requestData(data){
+        $(".connect-content .connect_2_4").remove();
+
+        $.each(data,function(i,ele){
+
+            if (ele.is_black == "1") return true;
+            if (ele.ipaddr == "") return true;
+
+            var deviceName = ele.hostname;
+            var mac = ele.macaddr;
+            var ip = ele.ipaddr;
+            var upSpeed = ele.up_rate;
+            var downSpeed = ele.down_rate;
+            var isWhiteList = ele.is_vip;
+            var upSpeedLimit = ele.up_quota;
+            var downSpeedLimet = ele.down_quota;
+            var macsource = ele.mac_source;
+            var vendor = ele.vendor;
+
+
+
+            var $con24 = $('<div class="connect_2_4" data-source="'+ macsource +'"></div>');
+            if(macsource == "offline"){
+                $con24 = $('<div class="connect_2_4" style="background-color:#fcfcfc;" data-source="'+ macsource +'"></div>');
+            }
+
+            var imageName = Organizations[vendor];
+            if (!imageName) {
+                if (macsource == "LAN") {
+                    imageName = "lan.png";
+                } else {
+                    imageName = "wireless.png";
+                }
+            }
+
+            var $contup = $('<div class="contup"></div>');
+            var $contdown = $('<div class="contdown"></div>');
+            var $contmiddle = $('<div class="contmiddle" onclick="showConnectDown(this);">点击设置</div>')
+
+            var $con241 = $('<div class="connect_2_4_1"></div>');
+            var $con241cont = $('<div class="connect_2_4_1_cont"></div>');
+            if (ip == "<%=remote_addr%>") {
+                var con2411 = '<div class="connect_2_4_11"><span class="benji">本机</span><img style="margin:0 25px 25px;" src="<%=resource%>/images/organiz/' + imageName + '" alt=""></div>';
+            } else {
+                var con2411 = '<div class="connect_2_4_11"><img src="<%=resource%>/images/organiz/' + imageName + '" alt=""></div>';
+            }
+            var $con2412 = $('<div class="connect_2_4_12"></div>');
+            var ul2411 = '<ul><li class="decname">' + deviceName + '</li><li>' + mac + '</li><li>' + ip + '</li></ul>';
+            $con2412.append(ul2411);
+            $con241cont.append(con2411).append($con2412);
+            $con241.append($con241cont);
+
+
+            var $con2431 = $('<div class="connect_2_4_3"></div>');
+            // var ul2431 = '<ul><li><img class="decimg" src="<%=resource%>/images/speed_up.png"><span class="upstyle"><em>' + bandwidthLabel(upSpeed) + '</em></span></li><li><img class="decimg" src="<%=resource%>/images/speed_down.png"><span class="downstyle"><em>' + bandwidthLabel(downSpeed) + '</em></span></li></ul>';
+            var ul2431 = '<ul><li><em style="color:#ff2f2f;">↑ </em><span class="upstyle">' + bandwidthLabel(upSpeed) + '</span></li><li><em style="color:#1fb41b;">↓ </em><span class="downstyle">' + bandwidthLabel(downSpeed) + '</span></li></ul>';
+            $con2431.append(ul2431);
+
+            var $con2442 = $('<div class="connect_2_4_4"></div>');
+            var $con244P = $('<p class="connect_2_4_4_p">限速白名单</p>');
+            var div2442 = '';
+
+            if(isWhiteList){
+                div2442 = '<div class="switch open1 switch-connect" onclick=switchWhiteList2(this);><div class="slide open2"></div></div>';
+            }else{
+                div2442 = '<div class="switch close1 switch-connect" onclick=switchWhiteList2(this);><div class="slide close2"></div></div>';
+            }
+            $con2442.append($con244P).append(div2442);
+
+            var $con246 = $('<div class="connect_2_4_6"></div>');
+            // var ul2461 = '<ul><li><img class="decimg" src="<%=resource%>/images/speed_up.png"><span class="upstyle"><em class="editupspeed">' + upSpeedLimit / 1024 + '</em>KB/s</span></li><li><img class="decimg" src="<%=resource%>/images/speed_down.png"><span class="downstyle"><em class="editdownspeed">' + downSpeedLimet / 1024 + '</em>KB/s</span></li></ul>';
+            var ul2461 = '<ul><li><i style="color:#ff2f2f;font-style: normal;">↑ </i><span class="upstyle"><em class="editupspeed">' + upSpeedLimit / 1024 + '</em>KB/s</span></li><li><i style="color:#1fb41b;font-style: normal;">↓ </i><span class="downstyle"><em class="editdownspeed">' + downSpeedLimet / 1024 + '</em>KB/s</span></li></ul>';
+
+            var ul2462;
+            if(upSpeedLimit== 0 && downSpeedLimet == 0){
+                ul2462 ="<ul><li class='devbtn'><button class='editspeed' onclick=editSpeed(this);>编辑限速</button><button class='savespeed' onclick=trafficControl(this);>确定</button><button class='nospeed' onclick=noSpeed(this);>取消</button></li></ul>";
+            }else{
+                ul2462 ="<ul><li class='devbtn'><button class='editspeed' onclick=editSpeed(this);>编辑限速</button><button class='nolimit' data-isLimit='1' onclick=noLimit(this);>取消限速</button><button class='savespeed' onclick=trafficControl(this);>确定</button><button class='nospeed' onclick=noSpeed(this);>取消</button></li></ul>";
+            }
+            $con246.append(ul2461).append(ul2462);
+
+            var $con245 = $('<div class="connect_2_4_5"></div>');
+            var ul245;
+            // if(isWhiteList){
+            //     ul245 = "<ul><li class='devbtn'><button class='whitelistbtn' data-isWhiteList='"+ isWhiteList +"' onclick=switchWhiteList(this);>取消限速</button></li><li class='devbtn'><button class='offline' onclick=linkControl(this);>禁止上网</button></li></ul>";
+            // }else{
+            //     ul245 = "<ul><li class='devbtn'><button class='whitelistbtn' data-isWhiteList='"+ isWhiteList +"' onclick=switchWhiteList(this);>限速白名单</button></li><li class='devbtn'><button class='offline' onclick=linkControl(this);>禁止上网</button></li></ul>";
+            // }
+            // if(upSpeedLimit== 0 && downSpeedLimet == 0){
+            //     ul245 = "<ul><li class='devbtn'><button class='whitelistbtn disabledbtn' data-isLimit='0' disabled>取消限速</button></li><li class='devbtn'><button class='offline' onclick=linkControl(this);>禁止上网</button></li></ul>";
+            // }else{
+            //     ul245 = "<ul><li class='devbtn'><button class='whitelistbtn' data-isLimit='1' onclick=noLimit(this);>取消限速</button></li><li class='devbtn'><button class='offline' onclick=linkControl(this);>禁止上网</button></li></ul>";
+            // }
+            ul245 = "<ul><li class='devbtn'><button class='offline' onclick=linkControl(this);>禁止上网</button></li></ul>";
+
+            $con245.append(ul245);
+
+            $contup.append($con241).append($con2431).append($contmiddle);
+            $contdown.append($con246).append($con2442).append($con245);
+            $con24.append($contup).append($contdown);
+
+            $(".connect-content").append($con24);
+        });
+
+        var i = $(".devmenu li").index($(".current"));
+        var str = "";
+        switch(i){
+            case 0 :
+                str = "all";
+                break;
+            case 1 :
+                str = "LAN";
+                break;
+            case 2 :
+                str = "2.4G";
+                break;
+            case 3:
+            <%if wifi5G ~= "[]" then%>
+                str = "5G";
+                break;
+            case 4 :
+            <%end%>
+                str = "offline";
+                break;
+        }
+
+        onChoose(str);
+    }
+
+    function getClientList() {
+        //路由连接设备信息
+        $.ajax({
+            url: "<%=luci.dispatcher.build_url("admin", "connect", "getAllClientList")%>",
+            data: {},
+            success: function (data) {
+                if (timer == 0) return false;
+
+                var json1 = eval("("+data+")");
+                requestData(json1);
+            }
+        });
+    }
+
+    function startTimer() {
+        getClientList();
+        timer = setInterval("getClientList()", 6000);
+    }
+
+    function stopTimer() {
+        clearInterval(timer);
+        timer = 0;
+    }
+
+    $(function () {
+        var height = $(document).height()-90>782+60?$(document).height()-90:782+60;
+        var width = window.innerWidth;
+        if(width>1350){
+            $('.nav').css('height','100%');
+        }else{
+            $('.nav').css('height',height);
+        }
+
+        startTimer();
+
+        $(".switch").bind("click",function () {
+            var i = $(".switch").index($(this));
+            //console.log(i);
+            var isWhiteList = "";
+            if ($(this).hasClass('open1')) {
+                $(this).removeClass('open1');
+                $(this).addClass('close1');
+                $(this).children().removeClass('open2');
+                $(this).children().addClass('close2');
+                isWhiteList = 0;
+            } else {
+                $(this).removeClass('close1');
+                $(this).addClass('open1');
+                $(this).children().removeClass('close2');
+                $(this).children().addClass('open2');
+                isWhiteList = 1;
+            }
+        });
+
+        $(".devmenu li").click(function(){
+            $(".devmenu li").removeClass("current");
+            $(this).addClass("current");
+            var i = $(".devmenu li").index($(this));
+            var str = "";
+            switch(i){
+                case 0 :
+                    str = "all";
+                    break;
+                case 1 :
+                    str = "LAN";
+                    break;
+                case 2 :
+                    str = "2.4G";
+                    break;
+                case 3:
+                <%if wifi5G ~= "[]" then%>
+                    str = "5G";
+                    break;
+                case 4 :
+                <%end%>
+                    str = "offline";
+                    break;
+            }
+            onChoose(str);
+        });
+    });
+
+    //    限速发送页面数据请求
+    function trafficControl(ele) {
+        var i = $(".savespeed").index($(ele));
+        var mac = $(".connect_2_4").eq(i).find(".connect_2_4_1").find('.connect_2_4_12').find("li").eq(1).html();
+        var ip = $(".connect_2_4").eq(i).find(".connect_2_4_1").find('.connect_2_4_12').find("li").eq(2).html();
+        var upspeed = $(".connect_2_4").eq(i).find(".connect_2_4_6").find('input:first').val();
+        var downspeed = $(".connect_2_4").eq(i).find(".connect_2_4_6").find('input:last').val();
+        // console.log(mac,ip,upspeed,downspeed);
+        if (!validators.limit(upspeed) || !validators.limit(downspeed)) {
+            T_alert.show("上传速率格式不正确.(范围0 ~ 38400)",2000);
+            return false;
+        }
+
+        if (ip.length < 1 || !validators.ipaddr(ip)) {
+            T_alert.show("未获取客户端IP地址,请稍后再试",2000);
+            return false;
+        }
+
+        var obj = {};
+        obj.mac = mac;
+        obj.ip = ip;
+        obj.upSpeed = upspeed * 1024;
+        obj.downSpeed = downspeed * 1024;
+        $.ajax({
+            url: "<%=luci.dispatcher.build_url("admin", "connect", "setQosIpRule")%>",
+            data: obj,
+            success: function (rsp) {
+                var status = rsp.code;
+                if (status == "0") {
+                    T_alert.show('保存成功！',2000);
+                } else {
+                    T_alert.show("失败",2000);
+                }
+
+                //继续更新数据
+                startTimer();
+            },
+            error: function (xhr, errText, errType) {
+                T_alert.show(xhr.status + errType,2000);
+            }
+        })
+    }
+
+    //取消限速
+    function noLimit(ele){
+        var mac = $(ele).parents('.connect_2_4').find(".connect_2_4_1").find(".connect_2_4_12").find("li").eq(1).html();
+        var ip = $(ele).parents('.connect_2_4').find(".connect_2_4_1").find(".connect_2_4_12").find("li").eq(2).html();
+
+        var upspeed = 0;
+        var downspeed = 0;
+
+        var obj = {};
+        obj.mac = mac;
+        obj.ip = ip;
+        obj.upSpeed = upspeed * 1024;
+        obj.downSpeed = downspeed * 1024;
+        $.ajax({
+            url: "<%=luci.dispatcher.build_url("admin", "connect", "setQosIpRule")%>",
+            data: obj,
+            success: function (rsp) {
+                var status = rsp.code;
+                if (status == "0") {
+                    T_alert.show('保存成功！',2000);
+                } else {
+                    T_alert.show("失败",2000);
+                }
+
+                //继续更新数据
+                startTimer();
+            },
+            error: function (xhr, errText, errType) {
+                T_alert.show(xhr.status + errType,2000);
+            }
+        })
+    }
+
+    //禁止上网操作
+    function linkControl(ele){
+        var c = confirm("是否确定禁用该设备的网络连接?");
+        if (c == true) {
+            var i = $(".offline").index($(ele));
+            var mac = $(".connect_2_4").eq(i).find(".connect_2_4_1").find(".connect_2_4_12").find("li").eq(1).html();
+            var ip = $(".connect_2_4").eq(i).find(".connect_2_4_1").find(".connect_2_4_12").find("li").eq(2).html();
+            var obj = {};
+            obj.mac = mac;
+            obj.ip = ip;
+            $.ajax({
+                url: "<%=luci.dispatcher.build_url("admin", "connect", "addToBlackList")%>",
+                data: obj,
+                success: function (rsp) {
+                    var status = rsp.status;
+                    if (status == "0") {
+                        T_alert.show('保存成功！',2000);
+                    } else {
+                        T_alert.show("失败",2000);
+                    }
+                },
+                error: function (xhr, errText, errType) {
+                    T_alert.show(xhr.status + errType,2000);
+                }
+            })         
+        }
+    }
+
+    //限速白名单
+    function switchWhiteList(ele){
+        var i = $(".whitelistbtn").index($(ele));
+        var hd ;
+        var isWhiteList = $(ele).attr("data-isWhiteList");
+        if(isWhiteList == 1){//是白名单
+            hd = 'del';
+        }else{
+            hd = 'add';
+        }
+        var mac = $(".connect_2_4").eq(i).find(".connect_2_4_1").find(".connect_2_4_12").find("li").eq(1).html();
+        var ip = $(".connect_2_4").eq(i).find(".connect_2_4_1").find(".connect_2_4_12").find("li").eq(2).html();
+        // return false;
+        // if ($(ele).hasClass('open1')) {
+        //     $(ele).removeClass('open1');
+        //     $(ele).addClass('close1');
+        //     $(ele).children().removeClass('open2');
+        //     $(ele).children().addClass('close2');
+        //     hd = "del";
+        // } else {
+        //     $(ele).removeClass('close1');
+        //     $(ele).addClass('open1');
+        //     $(ele).children().removeClass('close2');
+        //     $(ele).children().addClass('open2');
+        //     hd = "add";
+        // }
+
+        var obj = {};
+        obj.mac = mac;
+        obj.ip = ip;
+        obj.handle = hd;
+        $.ajax({
+            url: "<%=luci.dispatcher.build_url("admin", "connect", "setVipList")%>",
+            data: obj,
+            success: function (data) {
+                var status = data.status;
+                if (status == "0") {
+                    T_alert.show('保存成功！',2000);
+                } else {
+                    T_alert.show("失败",2000);
+                }
+            },
+            error: function (xhr, errText, errType) {
+                T_alert.show(xhr.status + errType,2000);
+            }
+        })
+    }
+    function switchWhiteList2(ele){
+        var i = $(".switch").index($(ele));
+        var hd ;
+        // console.log(i);
+        if ($(ele).hasClass('open1')) {
+            $(ele).removeClass('open1');
+            $(ele).addClass('close1');
+            $(ele).children().removeClass('open2');
+            $(ele).children().addClass('close2');
+            hd = "del";
+        } else {
+            $(ele).removeClass('close1');
+            $(ele).addClass('open1');
+            $(ele).children().removeClass('close2');
+            $(ele).children().addClass('open2');
+            hd = "add";
+        }
+
+        var mac = $(".connect_2_4").eq(i).find(".connect_2_4_12").find("li").eq(1).html();
+        var ip = $(".connect_2_4").eq(i).find(".connect_2_4_12").find("li").eq(2).html();
+        var obj = {};
+        obj.mac = mac;
+        obj.ip = ip;
+        obj.handle = hd;
+        $.ajax({
+            url: "<%=luci.dispatcher.build_url("admin", "connect", "setVipList")%>",
+            data: obj,
+            success: function (data) {
+                var status = data.status;
+                if (status == "0") {
+                    T_alert.show('保存成功！',2000);
+                } else {
+                    T_alert.show("失败",2000);
+                }
+            },
+            error: function (xhr, errText, errType) {
+                T_alert.show(xhr.status + errType,2000);
+            }
+        })
+    }
+</script>
+</body>
+<%include("bottom")%>
+</html>
+

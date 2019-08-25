@@ -1,0 +1,71 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2014 OpenWrt.org
+
+START=20
+
+USE_PROCD=1
+
+CONFIGFILE=/etc/rsyslog.conf
+RSYSLOGD=/usr/sbin/rsyslogd
+
+prepare_rsyslog_conf(){
+	local cfg=$1
+	local hostname
+	local kernel_hostname
+	local app_hostname
+	local enable
+
+    config_get hostname "$cfg" "server_hostname" "@@log1.kunteng.org:514"
+    config_get enable "$cfg" "enable" "1"
+
+    ##compatibility old config
+    if [ "$hostname" == "log1.kunteng.org:514" ]; then
+        hostname="@@log1.kunteng.org:514"
+        ##echo "old hostname:$hostname" >/dev/ttyS0
+    fi
+	
+    [ -f $CONFIGFILE ] && rm $CONFIGFILE
+		
+	#echo "hostname:$hostname" >/dev/ttyS0
+	app_hostname=`echo " $hostname" | sed 's/ /\nlocal0.* /g' | sort -u`
+	#echo "app_hostname:$app_hostname" >/dev/ttyS0
+
+	## sort in order to remove duplicate rows,  sed 's/  */ /g mean to match multiple blank
+	kernel_hostname=`echo " $hostname" | sed 's/  */\nif $syslogfacility-text == \"kern\" then:msg, contains, "kt-wdpi" /g' | sort -u | sed 's/then:msg/then\n:msg/g'`
+	#echo "kernel_hostname:$kernel_hostname" >/dev/ttyS0
+
+	
+    cat > $CONFIGFILE <<EOF
+module(load="imuxsock")
+module(load="imklog")
+module(load="imudp")
+input(type="imudp" port="514")
+
+\$ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat
+
+$app_hostname
+$kernel_hostname
+EOF
+
+}
+
+
+start_service() {
+	config_load rsyslog
+	config_foreach prepare_rsyslog_conf rsyslog
+
+	procd_open_instance
+	procd_set_param respawn 3600 5 0
+	procd_set_param command $RSYSLOGD
+	procd_close_instance
+}
+
+stop_service() {
+	service_stop $RSYSLOGD
+}
+
+restart()
+{  
+	stop  
+	start  
+} 

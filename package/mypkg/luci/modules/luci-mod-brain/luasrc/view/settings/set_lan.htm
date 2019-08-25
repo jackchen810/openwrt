@@ -1,0 +1,123 @@
+<%
+    local ntm = require "luci.model.network".init()
+    local uci  = require "luci.model.uci".cursor()
+    local lan_addr = uci:get("network", "lan", "ipaddr")
+    local netmask = uci:get("network", "lan", "netmask") or "255.255.255.0"
+
+    local wan_info = ntm:get_wannet()
+    if wan_info then
+        wan_addr  = wan_info:ipaddr() or "0.0.0.0"
+    end
+
+    include("top")
+%>
+<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+    <div class="">
+        <div class="article">
+            <div class="set-content">
+                    <!-- IP地址 -->
+                <div class="input-info">
+                    <label>IP &nbsp&nbsp地址</label>
+                    <input class="wid140" type="text" id="lan-ipaddr" value="<%=lan_addr%>"/>
+                </div>
+                    <!-- 子网掩码 -->
+                <div class="input-info" style="display:none;">
+                    <label>子网掩码</label>
+                    <input class="wid140" type="text" id="lan-netmask" value="<%=netmask%>"/>
+                </div>
+                    <!-- 提交按钮 -->
+                <div class="operate-btn ml190">
+                    <input type="button" value="保 存" class="off" id="save"/>
+                    <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var LAN_ADDR = "<%=lan_addr%>" ;
+    var NETMASK = "<%=netmask%>" ;
+    var WAN_ADDR = "<%=wan_addr%>";
+
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    $(function () {
+        $("#save").click(function () {
+            if (!checkInputData()) {
+                return false;
+            }
+
+            loadSave("before", "save");
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "network", "set_lan_info")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', data : LAN_ADDR, mask : NETMASK},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp){
+                    if(rsp.result == true){
+                        T_alert.show("保存成功！",2000);
+                    }else{
+                        T_alert.show("保存失败！",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    loadSave("after", "save");
+                    T_alert.show("保存错误！",2000);
+                },
+                ontimeout:function(){
+                    loadSave("after", "save");
+                    T_alert.show("保存超时！",2000);
+                }
+            });
+        })
+    });
+
+    function checkInputData() {
+        var ipaddr = $("#lan-ipaddr").val();
+        var netmask = $("#lan-netmask").val();
+        var reg = /^[0-9]+$/;
+
+        if(ipaddr == LAN_ADDR && netmask == NETMASK){
+            T_alert.show("配置未改变！",2000);
+            return false;
+        }
+
+        if (ipaddr.length < 1 || netmask < 1) {
+            T_alert.show("地址不能为空.",2000);
+            return false;
+        } else if (!validators.ipaddr(ipaddr)) {
+            T_alert.show("IP地址格式不正确.",2000);
+            return false;
+        } else if (!validators.netmask(netmask)) {
+            T_alert.show("子网掩码格式不正确.",2000);
+            return false;
+        }
+
+        var pos_of_lan_addr = parseInt(ipaddr.lastIndexOf("."));
+        var pos_of_wan_addr = parseInt(WAN_ADDR.lastIndexOf("."));
+        if (ipaddr.substring(0, pos_of_lan_addr) == WAN_ADDR.substring(0, pos_of_wan_addr)) {
+            T_alert.show("IP地址与外网IP处于同一网段.",2000);
+            return false;
+        }
+
+        LAN_ADDR = ipaddr;
+        NETMASK = netmask;
+
+        return true;
+    }
+</script>
+
+<%include("bottom")%>

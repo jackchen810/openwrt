@@ -1,0 +1,43 @@
+config network
+	option init 'network'
+	list affects 'firewall'
+	list affects 'dhcp'
+	list affects 'wifidog'
+	list affects 'apfreeqos'
+
+config wireless
+	option exec '/sbin/wifi reload'
+
+config firewall
+	option exec '/sbin/fw3 reload'
+
+config wifidog
+	option init 'wifidog'
+
+config dhcp
+	option init 'dnsmasq'
+	list affects 'odhcpd'
+	
+config udhcpc
+	option exec 'kill -USR1 $(pidof udhcpc)'
+
+config dropbear
+	option init 'dropbear'
+
+config fstab
+	option init 'fstab'
+
+config system
+	option init 'led'
+
+config ntpclient
+	option init 'ntpclient'
+
+config samba
+	option init 'samba'
+	
+config rsyslog
+	option init 'rsyslog'
+
+config apfreeqos
+	option init 'apfreeqos'

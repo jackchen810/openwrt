@@ -1,0 +1,112 @@
+* {;
+    margin: 0;
+    padding: 0;
+    font-family: "Microsoft Yahei";
+    list-style-type: none;
+    font-weight: normal
+}
+
+.flaotL {
+    float: left;
+}
+
+a {
+    text-decoration: none;
+    color: #ffffff;
+}
+
+.login {
+    color: #ffffff;
+    font-size: 20px;
+    margin: 16px 50% 0 55px;
+    display: inline-block
+}
+
+.block {
+    display: table;
+    width: 100%;
+    height: 100%;
+    background-color: #2573bf;
+    margin: 0 auto;
+}
+
+img {
+    margin: 0px auto;
+    display: block;
+    margin: 0 auto 0px auto;
+}
+
+.a {
+    text-align: center;
+    font-size: 18px;
+    color: #ffffff;
+    margin-top: 39px;
+}
+
+input {
+    width: 220px;
+    height: 28px;
+    /*border-radius: 2px;*/
+    padding-left: 19px;
+    color: #a7a7a7;
+    font-size: 12px;
+    /*margin: 37px 346px 19px 345px;*/
+    outline:none;
+    border:none;
+    resize:none;
+    border-radius:19px;
+    line-height:25px;
+    margin:37px auto 19px;
+}
+
+html {
+    height: 100%;
+}
+body {
+    height: 100%;
+}
+.container {
+    /*width:980px;*/
+    /*height:640px;*/
+    /*margin:0 auto;*/
+    /*background:url("../images/login/login_bg.png") no-repeat;*/
+    /*display: table-cell;*/
+    text-align: center;
+    /*vertical-align: middle;*/
+
+   width:100%;
+    margin-top:100px;
+    text-align:center;
+    background:url("../icons/images/login/login_bg2.jpg") no-repeat;
+    background-size: cover;
+    background-position: center center;
+}
+.button {
+    width: 239px;
+    height: 28px;
+    border-radius: 19px;
+    /*background-color: #5a9ad7;*/
+    background-color:#28bd2b;
+    text-align: center;
+    color: #ffffff;
+    font-size: 14px;
+    margin: 0 auto;
+    line-height: 28px;
+    outline:none;
+    border:none;
+}
+.button:hover{
+    background-color:#28d53a;
+}
+
+.loginbg{
+    width:960px;
+    height:450px;
+    margin:0 auto;
+}
+@media screen and (max-width: 959px) {
+    .loginbg{
+        width:100%;
+    }
+}
+

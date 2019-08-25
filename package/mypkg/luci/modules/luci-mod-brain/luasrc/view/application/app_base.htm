@@ -1,0 +1,48 @@
+<%
+    local disp = require "luci.dispatcher"
+    local system_node = disp.get("admin", "application")
+    local childs = disp.node_childs(system_node)
+
+    include("top")
+%>
+
+<div class="main">
+    <%include("application/menuer")%>
+    
+    <div class="">
+        <!--<div class="title">-->
+            <!--<h3>已安装应用</h3>-->
+        <!--</div>-->
+        <div class="article">
+            <div class="apple-info">
+                <ul>
+                <%
+                    if #childs > 0 then
+                        for i, v in ipairs(childs) do
+                            local nnode = system_node.nodes[v]
+                            if nnode.index then 
+                %>
+                <li>
+                    <div class="apply-icon"><img src="<%=resource%>/images/apps/<%=v%>.png" alt=""/></div>
+                        <div class="apply-con">
+                            <h5 style="text-align:center"><%=striptags(translate(nnode.title))%></h5>
+                            <!--<p> <a href="<%=luci.dispatcher.build_url("admin", "application", v)%>"><input type="submit" name="submit" value="进入" class="enter"/></a></p>-->
+                            <p><input type="button" onclick="window.location.href='<%=luci.dispatcher.build_url("admin", "application", v)%>'" name="submit" value="进入" class="enter"/></p>
+
+                        </div>
+                </li>
+                <%
+                            end
+                        end
+                    end    
+                %>
+
+                    <div class="clean"></div>
+                </ul>
+                <div class="clean"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%include("bottom")%>

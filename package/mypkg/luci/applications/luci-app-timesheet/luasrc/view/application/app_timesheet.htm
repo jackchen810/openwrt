@@ -1,0 +1,615 @@
+<%
+	local fs  = require "nixio.fs"
+    local uci = require "luci.model.uci".cursor()
+
+    local serviceConf = fs.readfile("/etc/msmtprc")
+    local host = serviceConf:match("host (%S+)")
+    local port = serviceConf:match("port (%S+)")
+    local user = serviceConf:match("user (%S+)")
+    local passwd = serviceConf:match("password (%S+)")
+
+    local crontab = fs.readfile("/etc/crontabs/root")
+    local period  = crontab:match("sendmail.sh (%S+)")
+
+    local arrivalTime = uci:get("attendence", "time", "arrival_time") or "09:00"
+    local leaveTtime = uci:get("attendence", "time", "leave_time") or "18:00"
+
+    include("top")
+%>
+
+    <link href="<%=resource%>/css/foundation-datepicker.css" rel="stylesheet" type="text/css">
+    <link href="<%=resource%>/css/timePicker.css" rel="stylesheet" type="text/css">
+    <script src="<%=resource%>/js/foundation-datepicker.js"></script>
+    <script src="<%=resource%>/js/jquery-timepicker.js"></script>
+    <!--<script src="<%=resource%>/js/locales/foundation-datepicker.zh-CN.js"></script>-->
+<div id="add_member" class="layer">
+    <div class="bglayer"></div>
+
+    <div class="white_content" style="top:20%;">
+        <div class="findclose">
+            <span class="findclose" id="close_layer"><img src="<%=resource%>/images/i_close.png" alt=""/></span>
+        </div>
+
+        <div class="cont_inner">
+            <h4 class="layertitle">员工信息录入</h4>
+            <div class="input-info">
+                <label>姓名</label>
+                <input class="wid140" type="text"  id="member_name"/>
+            </div>
+            <div class="input-info">
+                <label>MAC地址</label>
+                <input class="wid140" type="text"  id="member_mac"/>
+                <label>手机MAC地址</label>
+            </div>
+            <div class="input-info">
+                <label>邮箱地址</label>
+                <input class="wid140" type="text"  id="member_email"/>
+            </div>
+            <div class="operate-btn">
+                <input type="button" value="保 存" class="s off" id="add_save"/>
+                <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="box">
+    <div class="main">
+        <%include("application/menuer")%>
+
+        <div class="content">
+            <div class="title">
+                <h3>WiFi考勤</h3>
+            </div>
+            <div class="article">
+                <ul class="wd-tab">
+                    <li class="current tab1">考勤明细</li>
+                    <li class="tab2">员工名单</li>
+                    <li class="tab3">考勤设置</li>
+                    <li class="tab4">邮件提醒</li>
+                </ul>
+                <style>
+                    #tab1 em{display:inline-block;line-height:30px;padding:0 10px;margin:10px 4px;border-radius: 2px;cursor: pointer;}
+                    .timer input{width:110px;height:30px;line-height:30px;padding-left:5px; border-radius: 4px;border: 1px solid #e8e8e8;}
+                    #tab1 .act{border:1px solid #0abcdf;color:#0abcdf;padding:0 9px;}
+                    #tab1 .operate-btn,#tab2 .operate-btn{margin:43px 0 0 0;}
+                    #add{margin-right:15px;}
+                    .member{margin:10px 0;}
+                    .member input{width:110px;height:30px;line-height:30px;margin-left: 8px; border-radius: 4px;border: 1px solid #e8e8e8;}
+                    .mt41{margin-top:41px;}
+                    .tab4{margin-left: 40px;}
+                </style>
+                <div class="set-content">
+                    <div class="wf_tab_cont" id="tab1">
+                        <div class="timer">
+                            <label>时间范围：</label>
+                            <em id="today" class="act">今天</em>
+                            <em id="yesterday">昨天</em>
+                            <em id="week">本周</em>
+                            <em id="month">本月</em>
+                            <em id="lastmonth">上月</em>
+                            <input class="time" type="text" id="datePicker"placeholder="开始日期"/>　至　
+                            <input class="time" type="text" id="datePicker2"placeholder="截止日期"/>
+                        </div>
+                        <div class="status">
+                            <label>状　　态：</label> <em id="all">全部</em> <em id="normal">正常</em> <em id="abnormal">异常</em>
+                        </div>
+                        <div class="member">
+                            <label>员　　工：</label> <input class="wid140" type="text"  id="name" />
+                        </div>
+                        <br/>
+                        <div class="operate-btn">
+                            <input type="button" value="查 询" class="s off" id="query_attd"/>
+                            <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                        </div>
+
+                        <hr id="hr2" style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                        <div id="connect-content" style="width:650px">
+                            <p class="d_tit">明细列表</p>
+                            <table class="d_tab" id="time_sheet">
+                                <tr>
+                                    <th>序号</th>
+                                    <th>员工</th>
+                                    <th>上线时间</th>
+                                    <th>下线时间</th>
+                                    <th>状态</th>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="wf_tab_cont mt41" id="tab2" style="display: none;">
+                        <div class="member">
+                            <label>员　　工：</label> <input class="wid140" type="text"  id="member-name" />
+                        </div>
+                        <div class="operate-btn">
+                            <input type="button" value="添 加" class="s off" id="add"/>
+                            <input type="button" value="查 询" class="s off" id="query_member"/>
+                            <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                        </div>
+
+                        <hr style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                        <div style="width:650px">
+                            <table class="d_tab" id="member_sheet">
+                                <tr>
+                                    <th>序号</th>
+                                    <th>姓名</th>
+                                    <th>MAC</th>
+                                    <th>电子邮箱</th>
+                                    <th>操作</th>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="wf_tab_cont mt64" id="tab3" style="display: none;">
+                        <div class="input-info">
+                            <label>上班时间</label>
+                            <input class="wid140" type="text"  id="working" value="<%=arrivalTime%>"/>
+                        </div>
+                        <div class="input-info">
+                            <label>下班时间</label>
+                            <input class="wid140" type="text"  id="closed" value="<%=leaveTtime%>"/>
+                        </div>
+                        <hr id="hr2" style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                        <div class="operate-btn">
+                            <input type="button" value="保 存" class="s off" id="save1"/>
+                            <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                        </div>
+                    </div>
+
+                    <div class="wf_tab_cont mt64" id="tab4" style="display: none;">
+                        <div class="input-info">
+                            <label>邮箱账号</label>
+                            <input class="wid140" type="text"  id="account" value="<%=user%>"/>
+                        </div>
+                        <div class="input-info">
+                            <label>邮箱密码</label>
+                            <input class="wid140" type="password"  id="password" value="<%=passwd%>"/>
+                        </div>
+                        <div class="input-info">
+                            <label>发件服务器</label>
+                            <input class="wid140" type="text"  id="outgoing" value="<%=host%>"/>
+                        </div>
+                        <div class="input-info">
+                            <label>服务器端口</label>
+                            <input class="wid140" type="text"  id="serverport" value="<%=port%>"/>
+                        </div>
+                        <div class="input-info">
+                            <label>发送周期</label>
+                            <select class="opt" id="period">
+                                <option value="day" <%if period == "day" then%>selected="selected"<%end%>>每天 </option>
+                                <option value="week" <%if period == "week" then%>selected="selected"<%end%>>每周</option>
+                                <option value="month" <%if period == "month" then%>selected="selected"<%end%>>每月</option>
+                            </select>
+                        </div>
+                        <hr id="hr2" style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                        <div class="operate-btn">
+                            <input type="button" value="保 存" class="s off" id="save"/>
+                            <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+        T_alert._css.lineHeight = "40px";
+
+    var queryRequest = {};
+        queryRequest.date = "today";
+    var Status = "all";
+
+    var arrivalTime = "<%=arrivalTime%>";
+    var leaveTtime = "<%=leaveTtime%>";
+
+    var nowTemp = new Date();
+    var checkin = $('#datePicker').fdatepicker({
+        format: 'yyyy-mm-dd'
+    }).on('changeDate', function (ev) {
+        $(".timer em").removeClass('act');
+        if (ev.date.valueOf() > checkout.date.valueOf()) {
+            var newDate = new Date(ev.date)
+            newDate.setDate(newDate.getDate() + 1);
+            checkout.update(newDate);
+        }
+        checkin.hide();
+        $('#datePicker2')[0].focus();
+    }).data('datepicker');
+
+    var checkout = $('#datePicker2').fdatepicker({
+        format: 'yyyy-mm-dd',
+        onRender: function (date) {
+            return date.valueOf() <= checkin.date.valueOf() ? 'disabled' : '';
+        }
+    }).on('changeDate', function (ev) {
+        checkout.hide();
+    }).data('datepicker');
+
+    $("#working").hunterTimePicker();
+    $("#closed").hunterTimePicker();
+
+    function checkQueryRequest() {
+        queryRequest.name = $("#name").val();
+        queryRequest.datePicker = $("#datePicker").val();
+        queryRequest.datePicker2 = $("#datePicker2").val();
+        if (queryRequest.datePicker.length > 1) {
+            queryRequest.date = "";
+        }
+        return true;
+    }
+
+    function changeTab(tabnum) {
+        $(".wd-tab li").removeClass("current");
+        $('.'+tabnum).addClass("current");
+        $(".wf_tab_cont").css("display","none");
+        $("#"+tabnum).css("display","block");
+    }
+
+    function delone(id) {
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "application", "timesheet", "delAttendance")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>',  id: id},
+            timeout:2000,
+            type: "POST",
+            success: function(rsp) {
+                if (rsp > 0) {
+                    T_alert.show("删除成功",2000);
+                } else {
+                    T_alert.show("未找到数据",2000);
+                }
+                queryContacts();
+            },
+            error: function(x){
+                T_alert.show("操作错误！",2000);
+            },
+            ontimeout:function(){
+                T_alert.show("操作超时！",2000);
+            }
+        });
+    }
+ 
+    function queryContacts() {
+        var name = $("#member-name").val();
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "application", "timesheet", "getContacts")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', name:name},
+            timeout:2000,
+            type: "POST",
+            success: function(rsp) {
+                var tb = document.getElementById('member_sheet');
+                if (rsp) {
+                    /* clear all rows */
+                    while( tb.rows.length > 1 )
+                        tb.deleteRow(1);
+
+                    for( var i = 0; i < rsp.length; i++ ) {
+                        var tr = tb.insertRow(-1);
+                            //tr.className = 'cbi-section-table-row cbi-rowstyle-' + ((i % 2) + 1);
+
+                        tr.insertCell(-1).innerHTML = rsp[i].id;
+                        tr.insertCell(-1).innerHTML = rsp[i].name;
+                        tr.insertCell(-1).innerHTML = rsp[i].mac.toUpperCase();
+                        tr.insertCell(-1).innerHTML = rsp[i].email;
+                        tr.insertCell(-1).innerHTML = '<a href="javascript:;" onclick="delone('+rsp[i].id+')">删除</a>';
+                    }
+
+                    if( tb.rows.length == 1 ) {
+                        var tr = tb.insertRow(-1);
+                            //tr.className = 'cbi-section-table-row';
+
+                        var td = tr.insertCell(-1);
+                            td.colSpan = 5;
+                            td.innerHTML = '<em><%:空%></em>';
+                    }
+                }
+            }
+        });
+    }
+
+    $(function() {
+        $(".wd-tab li").click(function() {
+            $(".wd-tab li").removeClass("current");
+            $(".wf_tab_cont").css("display","none");
+
+            $(this).addClass("current");
+            var i = $(".wd-tab li").index($(this));
+
+            if (i == 0) {
+                $("#tab1").css("display","block");
+            } else if (i == 1) {
+                $("#tab2").css("display","block");
+            } else if (i == 2) {
+                $("#tab3").css("display","block");
+            } else if (i == 3) {
+                $("#tab4").css("display","block");
+            }
+        });
+
+        //选择时间范围
+        $('.timer em').click(function(){
+            //console.log($(this).attr('id'));
+            $(".timer em").removeClass('act');
+            $(this).addClass('act');
+            queryRequest.date = $(this).attr('id');
+            $("#datePicker").val("");
+            $("#datePicker2").val("");
+        });
+
+        $('.status em').click(function(){
+            //console.log($(this).attr('id'));
+            $(".status em").removeClass('act');
+            $(this).addClass('act');
+            Status = $(this).attr('id');
+        });
+
+        $("#close_layer").click(function(){
+            $("#add_member").css("display","none");
+        });
+
+        $("#add").click(function(){
+            $("#add_member").css("display","block");
+        });
+
+        $("#add_save").click(function(){
+            var name = $("#member_name").val();
+            var mac = $("#member_mac").val();
+            var email = $("#member_email").val();
+
+            if (name.length < 1) {
+                T_alert.show("姓名不能为空",2000);
+                $("#member_name").focus();
+                return false;
+            }
+
+            if (!validators.macaddr(mac)){
+                T_alert.show("MAC白名单格式不正确",2000);
+                $("#member_mac").focus();
+                return false;
+            }
+
+            if (!validators.email(email)){
+                T_alert.show("邮箱格式不正确",2000);
+                $("#member_email").focus();
+                return false;
+            }
+
+            loadSave("before", "save");
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "timesheet", "addAttendance")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', name: name, mac:mac, email:email},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp > 0) {
+                        $("#member_name").val("");
+                        $("#member_mac").val("");
+                        $("#member_email").val("");
+                        T_alert.show("添加成功",2000);
+                    } else {
+                        T_alert.show("添加失败",2000);
+                    }
+                    loadSave("after", "save");
+                    queryContacts();
+                },
+                error: function(x){
+                    T_alert.show("操作错误！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("操作超时！",2000);
+                    
+                }
+            });
+        });
+
+        function comptime(a, b) {
+            var st = a.split(" ");
+            var lt = b.split(" ");
+            
+            if (!st[1] || !lt[1]) {
+                if (Status == "normal") return false;
+                return '<em style="color:red"><%:异常%></em>'
+            }
+
+            var mydate = new Date();
+            if (queryRequest.date == "today" && Date.parse('01/01/2000 ' + mydate.getHours() + ':' + mydate.getMinutes() + ':' + mydate.getSeconds()) < Date.parse('01/01/2000 ' + arrivalTime)) {
+                if (Date.parse('01/01/2000 ' + st[1]) < Date.parse('01/01/2000 ' + arrivalTime)) {
+                    return '<em style="color:green"><%:正常%></em>'
+                } else {
+                    return '<em style="color:red"><%:迟到%></em>'
+                }
+            }
+
+            if (Date.parse('01/01/2000 ' + st[1]) < Date.parse('01/01/2000 ' + arrivalTime) && Date.parse('01/01/2000 ' + lt[1]) > Date.parse('01/01/2000 ' + arrivalTime)) {
+                if (Status == "abnormal") return false;
+                return '<em style="color:green"><%:正常%></em>'
+            } else {
+                if (Status == "normal") return false;
+                return '<em style="color:red"><%:异常%></em>'
+            }
+        }
+
+        $("#query_attd").click(function () {
+            if (!checkQueryRequest()) return false;
+            loadSave("before", "save");
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "timesheet", "getAttendance")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>',  reqdata: JSON.stringify(queryRequest)},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp) {
+                    var tb = document.getElementById('time_sheet');
+                    if (rsp) {
+                        /* clear all rows */
+                        while( tb.rows.length > 1 )
+                            tb.deleteRow(1);
+
+                        for( var i = 0; i < rsp.length; i++ ) {
+                            var timestr = "";
+                            if (rsp[i].firstHitCardTime && rsp[i].lastHitCardTime) {
+                                timestr = comptime(rsp[i].firstHitCardTime, rsp[i].lastHitCardTime);
+                                if (!timestr) continue;
+                            } else {
+                                if (Status != "all") continue;
+                            }
+
+                            var tr = tb.insertRow(-1);
+                                //tr.className = 'cbi-section-table-row cbi-rowstyle-' + ((i % 2) + 1);
+
+                            tr.insertCell(-1).innerHTML = rsp[i].id;
+                            tr.insertCell(-1).innerHTML = rsp[i].name;
+                            tr.insertCell(-1).innerHTML = rsp[i].firstHitCardTime;
+                            tr.insertCell(-1).innerHTML = rsp[i].lastHitCardTime ? rsp[i].lastHitCardTime : '';
+                            tr.insertCell(-1).innerHTML = timestr;
+                        }
+
+                        if( tb.rows.length == 1 ) {
+                            var tr = tb.insertRow(-1);
+                                //tr.className = 'cbi-section-table-row';
+
+                            var td = tr.insertCell(-1);
+                                td.colSpan = 5;
+                                td.innerHTML = '<em><%:空%></em>';
+                        }
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    T_alert.show("查询失败！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("查询失败！",2000);
+                    loadSave("after", "save");
+                }
+            });
+        });
+
+        $("#query_member").click(function () {
+            loadSave("before", "save");
+            queryContacts();
+            setTimeout("loadSave(\"after\", \"save\");", 300);
+        });
+
+        $("#save").click(function () {
+            var account = $("#account").val();
+            var password = $("#password").val();
+            var outgoing = $("#outgoing").val();
+            var serverport = $("#serverport").val();
+            var period = $("#period").val();
+
+            if (!validators.email(account)){
+                T_alert.show("邮箱格式不正确",2000);
+                $("#account").focus();
+                return false;
+            }
+
+            if (password.length < 1) {
+                T_alert.show("邮箱密码不能为空",2000);
+                $("#password").focus();
+                return false;
+            }
+            if (outgoing.length < 1) {
+                T_alert.show("发件服务器不能为空",2000);
+                $("#outgoing").focus();
+                return false;
+            }
+
+            if (!validators.port(serverport)){
+                T_alert.show("服务器端口不正确",2000);
+                $("#serverport").focus();
+                return false;
+            }
+
+            loadSave("before", "save");
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "timesheet", "setMailService")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', email: account, passwd:password, server:outgoing, port:serverport, period:period},
+                timeout:20000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.code == 0) {
+                        T_alert.show("保存成功！",2000);
+                    } else {
+                        T_alert.show("保存失败！",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    T_alert.show("保存错误！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("保存超时！",2000);
+                    loadSave("after", "save");
+                }
+            });
+        });
+
+        var regTime = /^(\d{1,2}):(\d{1,2})$/;
+        $("#save1").click(function () {
+            var aTime = $("#working").val();
+            var lTime = $("#closed").val();
+
+            if (!regTime.exec(aTime)){
+                T_alert.show("上班时间设置错误",2000);
+                $("#arrivalTime").focus();
+                return false;
+            }
+
+            if (!regTime.exec(lTime)){
+                T_alert.show("下班时间设置错误",2000);
+                $("#leaveTtime").focus();
+                return false;
+            }
+
+            arrivalTime = aTime;
+            leaveTtime = lTime;
+            loadSave("before", "save");
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "timesheet", "setAttendanceTime")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', aTime: aTime, lTime:lTime},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.code == 0) {
+                        T_alert.show("保存成功！",2000);
+                    } else {
+                        T_alert.show("保存失败！",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    T_alert.show("保存错误！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("保存超时！",2000);
+                    loadSave("after", "save");
+                }
+            });
+        });
+    })
+</script>
+
+<%include("bottom")%>

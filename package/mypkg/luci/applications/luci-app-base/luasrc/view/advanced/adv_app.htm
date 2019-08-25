@@ -1,0 +1,71 @@
+<%
+	local disp = require "luci.dispatcher"                                
+	local system_node = disp.get("admin", "application")
+	local childs = disp.node_childs(system_node)
+
+%>
+
+<%+header%>
+
+<script type="text/javascript">
+	
+	$(function () {
+		set_header_icon_lighted("pic_fun_gj");
+	});
+
+	function url_dialog(data){
+		top.dialog({
+			url: data.uri,
+			title: data.title,
+			width: 850,
+			height: 540,
+			onclose: function () {
+			},
+			oniframeload: function () {
+			//console.log('iframe ready')
+			}
+		})
+		.showModal();
+		return false;	
+	}
+	
+</script>	
+
+<div class="soft_con">
+	<div class="soft_con2">
+		<div class="banben gaoji_box">
+			<div class="gaoji_left">
+				<ul>
+					<% include("themes/" .. theme .. "/menuer") %>
+				</ul>
+			</div>
+			
+			<div class="function1 gaoji_right">
+				<ul class="app_list">
+				<%
+					if #childs > 0 then
+						for i, v in ipairs(childs) do
+							local nnode = system_node.nodes[v]
+							if nnode.index then 
+				%>
+				<li>
+					<a onclick='url_dialog({uri:"<%=luci.dispatcher.build_url("admin", "application", v)%>", title:"<%=striptags(translate(nnode.title))%>"})'>
+						<i><img src="<%=resource%>/icons/apps/<%=v%>.png" alt=""/></i>
+						<p><%=striptags(translate(nnode.title))%></p>
+					</a>
+				</li>
+				<%
+							end
+						end
+					end	
+				%>
+
+				</ul>
+
+			</div>
+		
+		</div>
+	</div>
+</div>
+
+<%+footer%>

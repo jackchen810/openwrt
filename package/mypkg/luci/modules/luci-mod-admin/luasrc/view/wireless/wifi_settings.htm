@@ -1,0 +1,304 @@
+<%
+local _uci = require "luci.model.uci".cursor()
+local kt_wifi = require "luci.kt_uci_api"
+local ntm = require "luci.model.network".init()
+
+local has_wifi = ((fs.stat("/etc/config/wireless", "size") or 0) > 0)
+local lan_ip_addr, wifi_ssid, wifi_encryption, wifi_password, wan_ipaddr
+
+local apmode = _uci:get("network", "lan", "proto")
+if apmode == "dhcp" then
+	local net = ntm:get_network("lan")
+	
+	local device = net and net:get_interface()
+	if device and table.getn(device:ipaddrs()) > 0 then
+		for _, a in ipairs(device:ipaddrs()) do
+			lan_ip_addr = a:host():string()
+		end
+	end
+else
+	lan_ip_addr = _uci:get("network", "lan", "ipaddr")
+end
+
+if has_wifi then
+	local cfg_iface_2g		= kt_wifi.get_wifi_iface_cfg_id("2G")
+	
+	wifi_ssid			= _uci:get("wireless", cfg_iface_2g, "ssid")
+	wifi_encryption		= _uci:get("wireless", cfg_iface_2g, "encryption")
+	wifi_password		= _uci:get("wireless", cfg_iface_2g, "key")
+end
+
+local wan_info = ntm:get_wannet()
+if wan_info then
+	wan_addr  = wan_info:ipaddr() or "0.0.0.0"
+end
+%>
+
+<%+header%>
+<script type="text/javascript">
+
+	var global_data =
+	{
+		"gateway": "<%=lan_ip_addr%>",
+		"ssid": "<%=wifi_ssid%>",
+		"encryption": "<%=wifi_encryption%>",
+		"password": "<%=wifi_password%>"
+	}
+	
+	var wan_addr = "<%=wan_addr%>"
+	
+	$(function () {
+		set_header_icon_lighted("pic_fun_project");
+		set_config_data();
+	});
+	
+	function set_config_data() {
+		$('#lan_gate_way').val(global_data.gateway);
+		
+		$('#ssid').val(global_data.ssid)		
+		if (global_data.encryption == "psk-mixed+tkip+ccmp") {
+			$('#encryption').val(global_data.encryption);
+			$('#password').val(global_data.password);
+			$("#password_tr").css("display", "table-row");
+		}
+	}
+	
+	function check_ssid() {
+		var obj = document.getElementById("ssid");
+		var str = obj.value;
+		if (str.indexOf(" ") >= 0) {
+			tip_dialog({msg:"<%:SSID cannot contain spaces.%>", id:"ssid"});
+			return false;
+		}
+		var myreg = new RegExp("[`~!@#$%^&*()=+|{}':;',\\[\\]<>/?~！￥……（）【】‘；：”“'。，、？§№☆★○●◎◇◆℃‰€°¤〓↓↑←→※▲△■＃＆＠＼︿♂♀]");
+		var realLength = 0;
+		var len = str.length;
+		var charCode = -1;
+		
+		for (var i = 0; i < len; i++) {
+			charCode = str.charCodeAt(i);
+			if (charCode >= 0 && charCode <= 128) {
+				realLength += 1;
+			} else {
+				realLength += 3;
+			}
+		}
+		
+		if (realLength < 1) {
+			tip_dialog({msg:"<%:SSID cannot be empty.%>", id:"ssid"});
+			return false;
+		} else if (myreg.test(str)) {
+			tip_dialog({msg:"<%:Character is not allowed in SSID.%>", id:"ssid"});
+			return false;
+		} else if (realLength > 30) {
+			tip_dialog({msg:"<%:Length is not allowed in SSID.%>", id:"ssid"});
+			return false;
+		}
+		
+		return true;
+	}
+	
+	function check_Password() {
+		var obj = document.getElementById("password");
+		var str = obj.value;
+		var reg = /^[0-9a-zA-Z]*$/g;
+		
+		if (reg.test(str) != true) {
+			tip_dialog({msg:"<%:Character is not allowed in password.%>", id:"password"});
+			return false;
+		}
+		if (str.indexOf(" ") >= 0) {
+			tip_dialog({msg:"<%:Password cannot contain spaces.%>", id:"password"});
+			return false;
+		}
+		var password = obj;
+		if (str.length == 0) {
+			tip_dialog({msg:"<%:Password cannot be empty!%>", id:"password"});
+			return false;
+		} else if (str.length < 8) {
+			tip_dialog({msg:"<%:Insufficient passphrase length.it should be a minimum of 8 characters log.%>", id:"password"});			
+			return false;
+		} else if (str.length > 63) {
+			tip_dialog({msg:"<%:Length is not allowed in password.%>", id:"password"});			
+			return false;
+		} else {
+			return true;
+		}
+	}
+	
+	function check_gateway() {
+		var lan_addr = document.getElementById("lan_gate_way").value;		
+		var laststr = lan_addr.split(".");
+		
+		if (parseInt(laststr[0]) > 223) {
+			tip_dialog({msg:"<%:Invalid IP address.Plase try again.%>", id:"lan_gate_way"});
+			return false;
+		}
+		
+		var pos_of_lan_addr = parseInt(lan_addr.lastIndexOf("."));
+		var pos_of_wan_addr = parseInt(wan_addr.lastIndexOf("."));
+		if (lan_addr.substring(0, pos_of_lan_addr) == wan_addr.substring(0, pos_of_wan_addr)) {
+			tip_dialog({msg:"<%:IP addresses with WAN on the same IP subnet.%>", id:"lan_gate_way"});
+			return false;
+		}
+		
+		return true;
+	}
+	
+	function check_input_data() {
+	
+		<%- if apmode ~= "dhcp" then %> 
+		if (!check_ip_by_tag_id("lan_gate_way")) {
+			tip_dialog({msg:"<%:Invalid gateway address.%>", id:"lan_gate_way"});	
+			return false;
+		}
+		
+		if (!check_gateway()) return false;
+		<% end %>
+		if (!check_ssid()) return false;
+		
+		if ($('#encryption').val() != "none") {
+			if (!check_Password()) return false;
+		}
+
+		$("#lansave").prop("disabled", true);
+		$(".lansave").show();
+		submit_data();
+	}	
+		
+	function set_global_cache() {
+		global_data.gateway = document.getElementById('lan_gate_way').value;
+		global_data.ssid = document.getElementById('ssid').value;
+		global_data.encryption = document.getElementById('encryption').value;
+		
+		if (global_data.encryption == "psk-mixed+tkip+ccmp") {
+			global_data.password = document.getElementById('password').value;
+		}
+	}
+
+	function submit_data(){
+        set_global_cache();
+        var set = JSON.stringify(global_data);
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "wireless", "set_vap")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', data: set},
+            timeout:10000,
+            type: "POST",
+            success: function(rsp){
+                if(rsp.result == true){
+                    success_prop("lansave");
+                }else{
+                    failed_prop(rsp.result,"lansave");
+                }
+            },
+            error: function(x){
+                error_prop(x.statusText,"lansave");
+            },
+            ontimeout:function(){
+                timeout_prop();
+            }
+        });
+    }
+</script>
+<div class="soft_con">
+	<div id="jywsz" class="soft_con2">
+		<div class="function1" style="border: none">
+			<section>
+				<div style="">
+					<table class="tr">
+						<tr  <%if apmode == "dhcp" then%> style="display:none;" <%end%>>					
+							<td><span class="function1_left3"><%:Lan IP Address%></span></td>						
+							<td>
+								<span class="function1_m2">:</span>
+								<input type="text" id="lan_gate_way" class="shurukuan"/>
+								</td>							
+							<td></td>
+						</tr>
+
+						<tr <%if not has_wifi then%> style="display:none" <%end%>>
+							<td><span class="function1_left3"><%:Wireless SSID%></span></td>
+							<td>
+								<span class="function1_m2">:</span>							
+								<input type="text" id="ssid" class="shurukuan" maxlength="31" />
+								</td>
+							<td></td>
+						</tr>
+						
+						<tr <%if not has_wifi then%> style="display:none" <%end%>>
+							<td><span class="function1_left3"><%:Security Options%></span></td>
+							<td><span class="function1_m2">:</span>
+								<select class="shurukuan" id="encryption">
+									<option value="none"><%:None%></option>
+									<option value="psk-mixed+tkip+ccmp">WPA/WPA2</option>
+								</select>
+								</td>
+							<td></td>
+						</tr>
+						
+						<tr id="password_tr" style="display: none">
+							<td><span class="function1_left3"><%:Password%></span></td>
+
+							<td><span class="function1_m2">:</span>
+								<input type="password" style="ime-mode:disabled;"
+								class="shurukuan" id="password"
+								onpaste="return false"
+								onselectstart="return false"
+								maxlength="68"
+								onkeyup="this.value=this.value.replace(/[\u4e00-\u9fa5]/g,'')"/>
+								</td>
+							<td>
+								<input type="checkbox" autocomplete="off" id="togglePassword2"/>
+								<label for="togglePassword2"><%:Reveal%></label>
+								</td>
+						</tr>
+						
+						<script >
+							$(function () {
+								
+								$('#password').togglePassword({
+									el: '#togglePassword2'
+								});
+								
+								$("#encryption").click(function () {
+									show_password_table();
+								});
+							})
+							
+							function show_password_table() {
+								var type = $('#encryption option:selected').val();
+								if (type == "psk-mixed+tkip+ccmp") {
+									document.getElementById("password_tr").style.display = "table-row";
+								} else if (type == "none" || type == "") {
+									document.getElementById("password_tr").style.display = "none";
+								}
+							}
+						</script>
+						
+						<tr>
+							<td></td>
+							<td>
+								<span class="function1_m2">&nbsp;</span>
+								</td>
+							<td></td>
+						</tr>
+						
+						<tr>
+							<td></td>
+							<td>
+								<div>
+									<button id="lansave" style="margin-left:7px;outline:none;border:none;" onclick="check_input_data();" class="hold"><%:Save%></button>
+									<img class="lansave" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+								</div>
+								</td>
+							<td></td>
+						</tr>
+					</table>
+				</div>
+			</section>
+		</div>
+	</div>	
+</div>	
+	
+<%+footer%>

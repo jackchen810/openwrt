@@ -1,0 +1,516 @@
+#/bin/sh
+
+# 网络诊断 v1.2
+
+. /lib/functions.sh
+. /usr/share/libubox/jshn.sh
+. /lib/functions/network.sh
+
+export VERBOSE=0
+export REPAIR=0
+
+WAN_INTERFACE_NAME=$(uci -q get network.wan.ifname)
+
+if [ "$(uci -q get network.lan.proto)"  = "dhcp" ]; then
+	WAN_INTERFACE_NAME=$(uci -q get network.lan.ifname | awk -F" " '{print $2}')
+fi
+
+if [ "$(uci -q get network.wan.apclient)"  = "1" ]; then
+	WAN_INTERFACE_NAME=$(uci -q get network.wan.defifname)
+fi
+
+WAN_VLAN_ID=$(echo "$WAN_INTERFACE_NAME" | awk -F. '{print $2}')
+
+WAN_PORT_ID=0
+LAN_PORT_ID="1 2 3 4"
+WAN_PROTO=$(uci -q get network.wan.proto)
+
+LOG_FILE="/var/log/netdoctor.log"
+:> $LOG_FILE
+
+SAVE_SWCONFIG_COMMND_SHOW="/tmp/log/switch"
+
+# hotplug
+SAVE_SWITCH_LINK_STATUS="/tmp/state/switch"
+
+usage() {
+	cat <<EOF
+Usage: $0 [<option>...]
+
+option:
+	-a | auto	全部检测
+	-r | repair	尝试修复
+	-c | check <arg> 单步检测 
+	-g | get <arg>	获取信息
+	-v | verbos	显示详细信息
+	-h | help	帮助
+EOF
+}
+
+f_log() {
+	local value="$1"
+
+	if [ "$VERBOSE" == 1 ];then
+		echo "$1" > /dev/tty
+	fi
+
+	echo "$(date "+%T") ${value#--}" >> $LOG_FILE
+}
+
+print_json() {
+	json_init
+	json_add_string code "$1"
+	json_add_string msg "$2"
+	json_add_string time $(date +%s)
+	echo "$(json_dump)"
+}
+
+check_ip() {
+	if echo $1 |egrep -q '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' ; then
+		a=`echo $1 | awk -F. '{print $1}'`
+		b=`echo $1 | awk -F. '{print $2}'`
+		c=`echo $1 | awk -F. '{print $3}'`
+		d=`echo $1 | awk -F. '{print $4}'`
+		for n in $a $b $c $d; do
+			if [ $n -ge 255 ] || [ $n -le 0 ]; then
+				return 1
+			fi
+		done
+	else
+		return 1
+	fi
+
+return 0
+}
+
+get_external_ip() {
+	local urls_path="/tmp/urls"
+
+	[ -f "$urls_path" ] || {
+		cat >>$urls_path <<EOF
+http://ip.tyk.nu
+http://whatismyip.akamai.com
+http://l2.io/ip
+http://ident.me
+http://ipof.in/txt
+http://wgetip.com
+http://bot.whatismyipaddress.com
+http://ipecho.net/plain
+http://ifconfig.co
+EOF
+}
+
+	for url in $(awk -vN=4 -vC="`wc -l /tmp/urls`" 'BEGIN{srand();while(n<N){i=int(rand()*C+1);if(!(i in a)){a[i]++;n++}}}NR in a' /tmp/urls); do
+		local ip=$(curl -s -m 2 $url)
+		check_ip "$ip" && {
+			echo "$ip"
+			break
+		}
+	done
+}
+
+wan_status() {
+	ubus -S list "network.interface.$INTERFACE" >/dev/null || {
+		f_log "Interface $INTERFACE not found" 
+		exit 1
+	}
+
+	local status_info=$(ubus call network.interface status "{ \"interface\" : \"$INTERFACE\" }")
+
+	json_load "$status_info"
+	json_get_var var1 uptime
+	json_get_var var2 proto
+
+	json_select "ipv4-address"
+	json_select "1"
+	json_get_var var3 "address"
+
+	echo "Uptime:$var1" 
+	echo "Proto :$var2" 
+	echo "Ipaddr:$var3" 
+}
+
+check_gateway() {
+	local gateway=$(/sbin/route | awk '/default/ {print $2}')
+
+	[ -z  "$gateway" ] && f_log "There is no gateway."
+
+	[ -z "$WANADDR" ] || {
+		f_log "Has gateway. Go ping it"
+
+		ping $gateway -c 1 -W 2 &>/dev/null
+		if [ $? -eq 0 ]; then
+			f_log "Gateway $gateway pingable, Need try to reconnect "
+			break
+		fi
+	}
+
+	f_log "Something is wrong with WAN (Gateway unreachable). reload wan interface"
+}
+
+# 0 Connected
+# 1 Disconnected
+# 3 Dns resolution error
+check_net_by_ping() {
+	f_log "Proceeding with Ping check."
+
+	local rv=1
+	local domains="www.baidu.com www.taobao.com"
+	local ipaddrs="223.5.5.5 114.114.114.114"
+
+	for d in $ipaddrs; do
+		f_log "Pinging $d to check for internet connection."
+
+		ping $d -c 1 -W 2 &>/dev/null
+
+		[ $? -eq 0 ] && rv=3 &&	break
+
+	done
+
+	[ "$rv" -eq 3 ] && {
+		for d in $domains; do
+			f_log "Pinging $d to check for internet connection."
+
+			#ping $d -c 1 -W 2 &>/dev/null
+			curl --silent --connect-timeout 2 -m 2 $d &>/dev/null
+			[ $? -eq 0 ] && rv=0 &&	break
+		done
+	}
+
+	echo "$rv"
+}
+
+f_nslookup() {
+	local name=$1
+	local server=$2
+	local timeout=$3
+
+	[ -z "$name" ] && return 1
+	[ -z "$server" ] && return 1
+	[ -z "$server" ] && timeout=2
+
+	local tmpfile="/tmp/f_nslookup"
+	:> $tmpfile
+
+	nslookup $name $server >$tmpfile 2>&1 &
+	local nl_pid=$!
+
+	local i=0
+	while [ $i -le $timeout ]; do
+		cat $tmpfile | tail -n +5 | grep Address &>/dev/null && {
+			i=0
+			break
+		}
+		let i=$i+1
+		sleep 1
+	done
+
+	kill $nl_pid 2>/dev/null
+
+	return $i
+}
+
+# 0 succecss
+# 1 fail
+# 2 server error
+# 4 no server
+check_net_by_nslookup() {
+	local rv=1
+	local servers=""
+	local server=""
+
+	f_log "Proceeding with DNS check."
+	f_log "Get DNS server in resolv.conf to check name resolution"
+
+	servers=$(awk '{if ($1== "nameserver") print $2}' /tmp/resolv.conf.auto)
+	if [ -z "$servers" ]; then
+		f_log "/tmp/resolv.conf.auto not exist, Please reload dnsmasq"
+		return 4
+	else
+		f_log "Step:1 Review current DNS settings for resolves www.baidu.com"
+		for server in $servers; do
+			f_log "Commond: nslookup www.baidu.com $server"
+			f_nslookup www.baidu.com $server 3 && {
+				rv=0
+				break
+			}
+		done
+	fi
+
+	local public="1.2.4.8 114.114.114.114"
+	if [ "$rv" -eq 1 ]; then
+		f_log "Step:2 Review Public DNS for resolves www.baidu.com"
+		for server in $public; do
+			f_log "Commond: nslookup www.baidu.com $server"
+			f_nslookup www.baidu.com $server 3 && {
+				rv=2
+				f_log "Current Dns server settings error, Please add $server to /tmp/resolv.conf.auto"
+				break
+			}
+		done
+	fi
+
+	echo "$rv"
+}
+
+lookup_switch_vlan_conf() {
+	local cfg=$1
+	local cfg_vlan_id
+	local cfg_port_id
+
+	config_get cfg_vlan_id "$cfg" "vlan" "2"
+	config_get cfg_port_id "$cfg" "ports" "0"
+
+	if [ $WAN_VLAN_ID = $cfg_vlan_id ]; then
+		WAN_PORT_ID=`echo $cfg_port_id | awk '{print $1}'`
+	else
+		LAN_PORT_ID="$cfg_port_id" 
+	fi
+}
+
+port_link_detect() {
+	swconfig dev switch0 show  >$SAVE_SWCONFIG_COMMND_SHOW
+
+	json_init
+
+	# ar71xx switch
+	if [ -z "$WAN_VLAN_ID" ]; then
+		local status=`cat /sys/class/net/$WAN_INTERFACE_NAME/carrier`
+		json_add_string wan "$status"
+	else
+		# ramips switch
+		config_load network
+		config_foreach lookup_switch_vlan_conf switch_vlan
+
+		if [ -z "$WAN_PORT_ID" ]; then
+			WAN_PORT_ID=0
+		fi
+
+		if [ -n "`cat $SAVE_SWCONFIG_COMMND_SHOW | grep port:$WAN_PORT_ID | grep up`" ]; then
+			json_add_string wan "1"
+		else
+			json_add_string wan "0"
+		fi
+	fi
+
+	local v=1
+	for x in $LAN_PORT_ID; do
+		if [ -n "`cat $SAVE_SWCONFIG_COMMND_SHOW | grep port:$x | grep up`" ]; then
+			json_add_string lan$v "1"
+		else
+			json_add_string lan$v "0"
+		fi
+
+		v=`expr $v + 1`
+	done
+
+	echo "$(json_dump)"
+}
+
+get_info_usage() {
+	cat <<EOF
+Usage: $0 -g <argument>...
+
+argument:
+	status	获取外网连接状态
+	port	获取网线连接状态
+EOF
+}
+
+get_info() {
+	local option=$1
+
+	case "$option" in
+		port) port_link_detect $2; break;;
+		status) wan_status; break;;
+		*)
+			echo "Invalid option: $1"
+			get_info_usage
+			exit
+		;;
+	esac
+}
+
+get_wifi_type() {
+	if [ -f "/lib/wifi/qcawifi.sh" ]; then
+		echo "qcawifi"
+	else
+		echo "ralink"
+	fi
+}
+
+get_wifi_sta_auth_mode() {
+	local auth_mode
+	local type=$(get_wifi_type)
+
+	if [ "$type" = "ralink" ]; then
+		auth_mode=$(uci -q get wireless.@wifi-iface[0].apcli_authmode)
+		[ "$auth_mode" = "OPEN" ] && return 1
+	else
+		for i in 0 1 2 3; do
+			local cfgname=@wifi-iface[$i]
+			local mode=$(uci -q get wireless.${cfgname}.mode)
+			if [ "$mode" = "sta" ]; then
+				auth_mode=$(uci -q get wireless.${cfgname}.encryption)
+				[ "$auth_mode" = "none" ] && return 1
+				break
+			fi
+		done
+	fi
+
+	return 0
+}
+
+look_for_wan_down_reasons() {
+	local proto=$1
+	local probe_msg
+	local mode_probe=$(ktpriv get_wan_mode)
+
+	f_log "Interface wan down."
+
+	if [ "$mode_probe" != "NOT FOUND" ] && [ "$proto" != "$mode_probe" ]; then
+		probe_msg="检测到上级网络已开启$mode_probe服务,请尝试切换上网方式!"
+	fi
+
+	case "$proto" in
+		pppoe)
+			local pppoe_ret=$(lua /usr/lib/lua/ktapi/ktPPPoe.lua)
+			[ "$pppoe_ret" == "nil" ] && pppoe_ret="PPPoE正在连接..."
+
+			echo "$pppoe_ret""$probe_msg"
+			;;
+		dhcp)
+			echo "路由器没有获取到外网IP地址.""$probe_msg"
+			;;
+		relay)
+			if $(get_wifi_sta_auth_mode); then
+				echo "未连接到上级无线网络,请检查网络是否可用及wifi密码是否正确"
+			else
+				echo "未连接到上级无线网络,请检查网络是否可用"
+			fi
+			;;
+	esac
+}
+
+is_gateway_reachable() {
+	local gateway="$1"
+	local wandev="$2"
+
+	ping -c 2 -W 2 -q "$gateway" > /dev/null ||
+		arping -f -q -c 3 -w 2 -I "$wandev" "$gateway" ||
+			return 1
+	return 0
+}
+
+router_mode() {
+	local gateway
+	local wandev
+
+	local proto=$(uci -q get network.wan.proto)
+	local apcli_mode=$(uci -q get network.wan.apclient)
+	[ -z "$apcli_mode" ] && apcli_mode=0
+	[ "$apcli_mode" -eq 1 ] && proto='relay'
+
+	json_init
+
+	f_log "Start...."
+
+	f_log "Check wired internet connection"
+	if [ -f "$SAVE_SWITCH_LINK_STATUS" ]; then 
+		local port_link_status=$(cat $SAVE_SWITCH_LINK_STATUS)
+	else
+		local port_link_status=$(port_link_detect)
+	fi;
+
+	json_load "$port_link_status"
+	json_get_var var1 wan
+
+	[ "$var1" -eq 0 -a "$apcli_mode" -eq 0 ] && {
+		print_json 1 "WAN口未连接网线, 请检查网线是否插好"
+		return 1
+	}
+
+	f_log "Check wan interface is up?"
+	network_is_up wan || {
+		print_json 2 $(look_for_wan_down_reasons "$proto")
+		return 1
+	}
+
+	network_get_gateway gateway wan
+	network_get_physdev wandev wan
+
+	f_log "Interface wan up, gateway: $gateway device: $wandev "
+
+	[ "$proto" = "pppoe" ] || is_gateway_reachable "$gateway" "$wandev" || {
+		if [ "$proto" = "static" ]; then
+			print_json 30 "外网网关无法访问, 请检查默认网关是否配置正确"
+		else
+			print_json 3 "外网网关无法访问, 请检查上级网络服务状态"
+		fi
+
+		return 1
+	}
+
+	local ping_reply=$(check_net_by_ping)
+	[ "$ping_reply" -eq 0 ] && {
+		print_json 0 $(get_external_ip)
+		return 1
+	}
+
+	[ "$ping_reply" -eq 3 ] && {
+		local ns_reply=$(check_net_by_nslookup)
+
+		[ "$ns_reply" -eq 0 ] && print_json 40 "DNS缓存错误,请尝试重启DHCP服务"
+		[ "$ns_reply" -eq 2 ] && print_json 42 "当前DNS服务器不可用,请尝试重新配置外网DNS"
+		[ "$ns_reply" -eq 1 ] && print_json 41 "DNS服务不可用,请检查上级网络是否存在DNS劫持"
+		[ "$ns_reply" -eq 4 ] && print_json 44 "没有可用的DNS服务地址,请尝试重启DHCP服务"
+
+		return 1
+	}
+
+	print_json 5 "外网网关未转发网络请求,无法访问互联网"
+
+	return 0
+}
+
+ap_mode() {
+	local ping_reply=$(check_net_by_ping)
+	[ "$ping_reply" -eq 0 ] && {
+		print_json 0 $(get_external_ip)
+		return 1
+	}
+
+	print_json 5 "外网网关未转发网络请求,无法访问互联网"
+}
+
+check_entry() {
+	if [ "$(uci -q get network.lan.proto)" = "dhcp" ]; then
+		ap_mode
+	else
+		router_mode
+	fi
+}
+
+export ARGV="$*"
+export ARGC="$#"
+
+if [ ! -n "$1" ]; then 
+	usage; exit 1
+fi
+
+while [ -n "$1" ]; do
+	case "$1" in
+		-r|repair) export REPAIR="1";;
+		-v|verbos) export VERBOSE="1";;
+		-a|auto) echo auto; break;;
+		-c|check) check_entry; break;;
+		-g|get) get_info $2 $3; break;;
+		-h|help) usage; break;;
+		*)
+			echo "Invalid option: $1"
+			usage
+			exit 1
+		;;
+	esac
+	shift;
+done

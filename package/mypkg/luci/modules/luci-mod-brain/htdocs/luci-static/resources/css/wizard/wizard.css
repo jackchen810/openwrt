@@ -1,0 +1,468 @@
+@charset "utf-8";
+/* CSS Document */
+.clearfix:after{content:".";visibility:hidden;overflow:hidden;display:block;clear:both;height:0;}
+.clearfix{*zoom:1;}
+.fll{float:left;}
+body{font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size:12px;}
+.line{width: 888px;height: 70px;border-bottom:1px solid #eeeeee;margin: 0 auto}
+.line p{width: 888px;text-align: center;padding-top:38px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #777777}
+.comn-form{width:515px;float:left;margin-left:252px}
+.hidden_form{display: none}
+.pppoe-state{width:383px;float:left;margin-lefT:135px;padding-top: 30px}
+.user-tip2{float:left;height: 16px;background: url(../../images/wizard/icon.png) 0 0 no-repeat;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #bbbbbb;padding-left: 20px;margin-left: 56px}
+.user-tip3{float:left;height: 16px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #bbbbbb;padding-left: 2px;margin-left: 23px}
+.user-tip5{float:left;height: 16px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #ff6666;padding-left: 10px;margin-left: 23px}
+.pppoe-state a{float: left;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #3399cc;margin-left: 8px}
+.select_tie{width:100%;/*margin-left:92px;*/float:left;}
+.item{/*width: 306px;*/height:40px;margin-top:20px}
+.divselect{width:200px;position:relative; z-index:1000;float:left;}
+.kelong .divselect{z-index: 200}
+#divselect2{width:409px}
+.divselect span{width:196px; height:38px;line-height:38px; display:block; color:#333; cursor:pointer;font-style:normal;
+padding-left:10px; padding-right:30px; border:1px solid #ececec;color:#272f47;
+background:#fff url(../../images/wizard/xiala.png) no-repeat 214px center;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;}
+.divselect ul{width:236px;border:1px solid #ececec; background-color:#ffffff; position:absolute; z-index:500; margin-top:-1px; display:none;}
+.divselect ul li{height:38px; line-height:38px;}
+.divselect ul li a{display:block; height:38px; color:#555; text-decoration:none; padding-left:10px; padding-right:10px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;color:#272f47;}
+.divselect ul li a:hover{background-color:#2a5cff;color:#fff;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;}
+.outset-label{width:60px;height:40px;line-height:40px; margin-right:20px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;float: left;color:#272f47;}
+.outset-labelme{height:40px;line-height:40px; width:60px;text-align: left;margin-right:20px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;float: left;color:#272f47;}
+.select_tie2 .outset-label{color:#ddd}
+.select-panel{/*width: 306px;*/height:40px;position:relative;margin-top: 25px;}
+.comn-input{width:240px;height:38px;line-height:38px;border: 1px #ececec solid;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;float: left;color:#777777;padding: 0 8px;}
+.item-in{width:16px;height:16px;background: url(../../images/wizard/ico.png) 0 0 no-repeat;position: absolute;left:274px;top:10px}
+.item-in2{width:16px;height:16px;background: url(../../images/wizard/ico5.png) 0 0 no-repeat;position: absolute;left:274px;top:10px}
+.error-tip{width:160px;height: 26px;line-height: 26px;color: #cc6666;padding-left: 25px; border:2px #fbdbdb solid;overflow:hidden;position: absolute;background:#fff5f5 url(../../images/wizard/wu.png) 5px center no-repeat;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;left:54px;z-index:1000;top:-44px;}
+.sets {width: 302px;float: left;height: 18px;overflow: hidden;margin-top: 20px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;margin-left: 66px}
+.sets a{float:left;width:16px;height: 16px;background: url(../../images/wizard/chang.png) 0 0 no-repeat;margin-right: 12px}
+.sets3 .sets2{float:left;width:12px;height: 12px;border: 2px #eeeeee solid; margin-right: 12px}
+.sets a:hover{background: url(../../images/wizard/xuan.png) 0 0 no-repeat;}
+.sets .dianji{background: url(../../images/wizard/xuazhong.png) 0 0 no-repeat;}
+.sets .dianji:hover{background: url(../../images/wizard/xuazhong.png) 0 0 no-repeat;}
+.kelong{float: left;margin-left: -29px;margin-top: 20px;position: relative}
+.shuoming{width:16px;height: 16px;background: url(../../images/wizard/ico.png) 0 0 no-repeat;position: absolute;top:9px;left: 304px;z-index:1000; cursor: pointer}
+.select_tie .kelong_hidden{display: none}
+.kelong .outset-label{float:left}
+.kelong .outset-label_p{margin-right: 10px}
+.sets3 strong{color: #ddd}
+.kelong p{float: left;width: 473px;padding-left: 92px; line-height: 20px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color:#c0c0c0}
+.select-pane{float: left;margin-left: -36px;margin-top: 20px;position: relative;width: 446px;}
+.select-pane .comn-input{color:#333333;font-size: 12px;line-height: 30px;}
+.zidingyi{float: left;margin-left:17px;margin-top: 20px;overflow: hidden;width: 505px}
+.outset-labere{ height:30px;line-height:30px;margin-right:12px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;float: left;color:#777777}
+.guanbi{width:60px;height: 30px;background: url(../../images/wizard/close.png) 0 0 no-repeat;cursor: pointer}
+.text{height:30px;line-height:30px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;float: left;color:#777777;padding-left: 12px}
+/* 开启按钮clsss名*/
+.zidingyi .closed{background: url(../../images/wizard/kaiqi.png) 0 0 no-repeat;}
+.shouxuan{float: left;margin-left:45px;margin-left:49px;width:326px;display: none;*position: relative;left: 45px;}
+.baocun{display:inline-block;width: 90px;height:30px;line-height: 30px;border-radius:2px;text-align: center;background: #2a5cff;/*float: left;*/font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;color:#fff;cursor: pointer;/*margin-top:30px;margin-left: 66px;margin-left:67px;margin-bottom: 42px*/margin:20px auto 10px;}
+.baocun:hover{background: #1443dd;}
+.baocun_p{width: 200px;height:40px;line-height: 40px;text-align: center;background: #cbd2d8;float: left;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color:#fff;margin-top:30px;display: block;margin-left: 67px;margin-bottom: 42px}
+#divselect .slect_lis{background:url(../../images/wizard/san.png) no-repeat scroll 183px center;border: 1px #eeeeee solid;width:164px; height:30px;line-height:30px; display:block; color:#807a62; font-style:normal;
+padding-left:4px; padding-right:30px;}
+.pppoe-state .user-tip8{background-image: none;margin-left: 21px}
+
+ .header .dongtai{display: block;width: 320px;}
+ .header .mima{display: none;width: 320px;}
+ .header .jingtai_block{display: block}
+ .mima{display: none;position: relative}
+.jingtai_yincang{display: none;position: relative}
+.boma{width: 140px;height: 18px;}
+.comn-input{border:1px #ececec solid;}
+.comn-input_active{border:1px #ff6666 solid;}
+.error {border: solid 1px #f25d50;}
+.focus{border:solid 1px #00a7e4;}
+.morenzhi .focus{border:solid 1px #ececec;}
+.wife .focus{border:solid 1px #00a7e4;}
+.divselect .open{border:1px #ececec solid}
+/* 高级设置样式*/
+.tab_box .hide{display:none;}
+.box{width:970px;margin:20px auto 0; background: #fff;overflow: hidden;}
+div.box_top{margin-top: 0}
+.tab_menu{width: 145px;height: 470px;background: #f7fcfe; float:left;}
+.tab_menu li{width:143px;height: 50px;float:left;border-left: 2px #f7fcfe solid;}
+.tab_menu li.current{border-left: 2px #0abcdf solid;background: #fff;}
+.tab_box{float: left;width: 825px;}
+.tab_menu li a{float:left;width:105px;height:50px;line-height: 50px;padding-left:40px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;color: #333333}
+.tab_menu li a:hover{color: #4ebddb}
+.tab_menu li.current a{color: #4ebddb}
+.tab_menu li .mianban{text-align: left;margin-left: 40px}
+.tab_guan{width: 745px;margin: 0 auto;position: relative}
+.neiwang{width:745px;margin:0 auto;overflow: hidden;text-align: center;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 14px;color: #999;height: 45px;line-height: 45px;margin-top: 25px; border-bottom: 1px #eeeeee solid}
+.form_tip{width: 324px;margin:20px auto 0;position: relative;*zoom: 1;clear:both;}
+.form_tip:after{content: "";display: block; height: 0; clear: both; visibility: hidden;}
+.tab_guan .form_tips{margin-top: 40px;}
+.form_tip label{height: 32px;width: 58px;line-height: 32px;float: left;text-align: right;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #999;margin-right: 4px}
+.form_tip .focus{border:solid 1px #00a7e4;}
+.form_tip input{width: 182px;height: 30px;border:1px #bbbbbb solid;line-height: 30px;float:left;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #111;padding: 0 8px;}
+.baocun_btn{width: 200px;height: 40px;line-height: 40px;text-align: center;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #fff;cursor: pointer;background: #19b2d5;margin:30px auto 0}
+.baocun_btn:hover{background: #00a4cd;}
+.neiwang_fu{width:745px;margin:0 auto;overflow: hidden;}
+.fenpei{width:530px;float: left;margin-left: 186px;margin-top:30px;overflow: hidden}
+.fenpei_bi{float: left;width: 542px;height: 50px;}
+.dhcp{float:left;width:68px;height: 50px;line-height: 50px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #999;}
+.dhcp_open{float:left;width:60px;height: 50px;cursor: pointer} 
+.opened{background: url(../../images/wizard/kaiqi.png) center center no-repeat;}
+.closed{background: url(../../images/wizard/close.png) center center no-repeat;}
+.fenpei_bi p{float: left;height: 36px;line-height: 22px;margin-top: 3px;margin-left: 8px; font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #999;}
+.fenpeifanwei{float:left;width:346px;height:32px;margin-top: 20px; font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #999;}
+.fenpeifanwei input{float: left;width:30px;height: 30px;line-height: 30px; border:1px #bbbbbb solid;padding: 0 8px;}
+.ipfen{float: left;width:70px;height: 32px;line-height: 32px;}
+.quzhi{float: left;width:65px;height: 32px;line-height: 32px;margin-left: 8px;margin-right: 8px}
+.quzhi_p{width:31px;height: 32px;line-height: 32px;text-align: center;float: left}
+.baocun_btn_t{width: 200px;height: 40px;line-height: 40px;text-align: center;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #fff;cursor: pointer;background: #19b2d5;;float: left;margin:30px 0 0 80px}
+.mtushezhi{width:745px;margin:0 auto;overflow: hidden;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;}
+.kuandai_bo{width:270px;margin:40px 0 0 256px;}
+.baocun_btn_t:hover{background: #00a4cd;}
+.kuandai_bo .baocun_btn_t_cun{margin:12px 0 0 0 }
+.morenzhi{width: 270px;height: 32px;position: relative;}
+.morenzhi input{width: 180px;height: 30px;border: 1px #bbbbbb solid;line-height: 30px;margin-right: 6px;padding: 0 8px;}
+.morenzhi a{color: #3399cc}
+.kuandai_bo p{height:34px;line-height: 34px;color: #c5c5c5}
+.UPnpshezhi{width:745px;margin:0 auto;overflow: hidden;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;}
+.kongzhi{display:block;width:60px;height: 30px;margin:32px auto 0;cursor: pointer}
+.xietong{font-size: 12px;color: #bbbbbb;width: 100%;text-align: center;margin-top: 20px}
+.upnpstaref{float:left;width:68px;height: 30px;line-height: 30px;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #999;margin-left: 270px;}
+.xietong_hidden{font-size: 12px;color: #bbbbbb;width: 100%;text-align: center;margin-top: 20px;display: none}      
+.baocun_btn_tn{width: 200px;height: 40px;line-height: 40px;text-align: center;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;font-size: 12px;color: #fff;cursor: pointer;background: #19b2d5;;float: left;margin:30px 270px}  
+.baocun_btn_tn:hover{background: #00a4cd;}
+.mianban{width:745px;margin:0 auto;overflow: hidden;font-family:"Microsoft YaHei",微软雅黑,"MicrosoftJhengHei",华文细黑,STHeiti,MingLiu;position: relative}
+.chenggong{width:200px;height:60px;position: absolute;background: #000;filter:alpha(opacity=70);opacity:0.7}
+.chenggong span{display: block;width:67px;height: 24px;margin: 0 auto;background: url(../../images/wizard/dui.png) 0 0 no-repeat;font-size: 12px;color: #fff;margin-top:22px;padding-left: 23px}
+.noupdate{width:250px;height:60px;position: absolute;background: #000;filter:alpha(opacity=70);opacity:0.7}
+.noupdate span{display: block;width:160px;height: 24px;margin: 0 auto;background: url(../../images/wizard/dui.png) 0 0 no-repeat;font-size: 12px;color: #fff;margin-top:22px;padding-left: 23px}
+.shibai{width:276px;height: 46px;position: absolute;background: #000;filter:alpha(opacity=70);opacity:0.7}
+.shibai span{display: block;height: 35px;margin: 0 0 15px 20px;background: url(../../images/wizard/wu.png) 0 0 no-repeat;font-size: 12px;color: #fff;margin-top:15px;padding-left: 23px}
+
+.sto_seta .loading{width:196px;margin:-21px 20px 0 100px;}
+.mianban .loading{width:109px;margin:15px 0px  0 350px;}
+.pass_Mananger .loading{width:109px;margin:20px 0px  0 430px;}
+.UPnpshezhi .loading{width:109px;margin:20px 0px  0 330px;}
+.select_tie .loading{min-width:100px;width: auto;padding-left: 18px}
+
+
+.select-open .sel-val{border:1px #0abcdf solid;border-bottom: none;}
+.select-open .options{display: block;width: 88px;top: 31px;padding: 0px 0px;height: 165px;overflow-y: auto;border: solid 1px #0abcdf;}
+
+/*---------------------------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------配置引导页CSS--------------------------------------*/
+.lianwang-holder{position: absolute;top: 12px;left: 90px;color: #999;font-size:14px;z-index:14;}
+
+.body_configure{background:#e8f7fb url(../../images/wizard/body_t.png) 0 0 repeat-x;}
+.conter_configur{width:970px;height:377px;margin: 0 auto 30px;background: url(../../images/wizard/pei_zhi.png) 0 0 no-repeat;overflow:hidden;}
+.kuaisu_configur{width:220px;height: 40px;margin: 0 auto 32px;line-height: 40px;text-align: center;background:#61bf06;font-size: 14px;color:#fff;display: block}
+.kuaisu_disable{width:220px;height: 40px;margin: 0 auto 32px;line-height: 40px;text-align: center;background:#d0d0d0;font-size: 14px;color:#666;display: block}
+.text_configu{width:970px;margin: 0 auto;overflow: hidden;}
+.kuaisu_configur:hover{background:#3aaf00}
+.close_btne{width: 33px;height: 33px;background: url(../../images/wizard/de_close.png) 0 0 no-repeat;position: absolute;right: 0;top:0;}
+.close_btne:hover{background: url(../../images/wizard/hover.png) 0 0 no-repeat}
+.conter_xieyi{width:635px;float: left;margin-left: 40px;height: 380px;position: relative;overflow: hidden;margin-top: 12px;font-size: 12px;color: #333333;line-height: 20px}
+.body_youtu{/*min-width: 1250px;*/background:#eee url(../../images/wizard/body_x.png) 0 0 repeat-x;}
+.conter_conte{width:970px;height:220px;border-bottom: 1px #c8ecf5 solid;margin:0 auto 0;position: relative;top:80px;}
+.con_bg{width:970px;height: 131px;padding-top: 19px; margin:0 auto 0px}
+.set_hulian{width:175px;height: 95px;position: absolute;left: 294px;top:123px}
+.access .hulain{background: url(../../images/wizard/b_1.png) 0 0 no-repeat;}
+.access .text_defu{color:#6ccee4}
+.access .hulain{background: url(../../images/wizard/b_1.png) 0 0 no-repeat;}
+.access .text_defu{color:#6ccee4}
+.website .hulain{background: url(../../images/wizard/img1.png) 0 0 no-repeat;}
+.website .text_defu{color:#6ccee4}
+.website_ri .hulain_left{background: url(../../images/wizard/img1.png) 0 0 no-repeat;}
+.website_ri .text_defu_ca{color:#6ccee4}
+.hulain{display: block;width:50px;height: 56px;background: url(../../images/wizard/img2.png) 0 0 no-repeat;margin:0 auto}
+.text_defu{font-size: 16px;width: 100%;text-align: center;color: #22aad0;height: 42px;line-height: 42px}
+.set_loh{width:175px;height: 95px;position: absolute;left:523px;top:123px}
+.hulain_left{display: block;width:50px;height: 56px;background: url(../../images/wizard/bg1.png) 0 0 no-repeat;margin:0 auto}
+.access_right .hulain_left{background: url(../../images/wizard/bg3.png) 0 0 no-repeat;}
+.access_right .text_defu_ca{color:#22aad0;}
+.text_defu_ca{font-size: 16px;width: 100%;text-align: center;color: #7fd4e7;height: 42px;line-height: 42px}
+.guide-container{width: 970px;margin: 0 auto;overflow: hidden}
+.guide .outset-label{color: #666}
+.guide{width: 970px;float: left;}
+.guide .comn-input{border:1px #a3e0ee solid}
+.guide .divselect span{border: 1px #a3e0ee solid}
+.guide .outset-labere{color: #666}
+.guide .tiaoguo{width:46px;height: 42px;line-height: 42px;font-size: 12px;float: left;margin-top:30px;text-align: center;color: #63add5}
+.step_er{width: 970px;float: left;}
+.shebei{width: 970px;height: 24px;line-height: 24px;text-align: center;color: #6ccee4;font-size: 12px;margin-top: 17px}
+.name_wife{float:left;width:278px;/*margin-left: 312px;*/margin-left: 335px;}
+.wuxian{width:278px;height: 32px;margin-top: 18px;position:relative;}
+.wuxian label{float:left;width:66px;text-align: right;font-size: 12px;color: #666;height: 32px;line-height: 32px;}
+.wuxian input{float: left;width:198px;height: 30px;line-height: 30px; border: 1px #a3e0ee solid;margin-left: 12px;}
+.wuxian .comn-input{width: 182px}
+.pu_t{float: left;margin-left: 12px;width:198px;height: 16px;line-height: 16px;}
+.pu_t span{float: left;width: 16px;height:16px;background: url(../../images/wizard/cheak.png) 0 0 no-repeat;cursor: pointer}
+.pu_t b{float: left;font-weight: normal;font-size: 12px;color: #666;margin-left: 5px}
+.pu_t span.active_box{background: url(../../images/wizard/xuazhong.png) 0 0 no-repeat}
+.name_wife .wuxian_hei{height: 16px}
+.sto_seta{float:left;width:278px;margin-left: 335px;margin-top: 18px;}
+.sto_seta_cont{float:left;}
+.shangbu{float:left;width:66px;text-align: right;font-size: 12px;color: #6ccee4;height: 40px;line-height: 40px;}
+.shangbu2{float:left;width:40px;text-align: right;font-size: 12px;color: #6ccee4;height: 40px;line-height: 40px;margin-top:18px;}
+.tao_cun{float: left;width: 200px;height: 40px;line-height: 40px;text-align: center;font-size: 12px;color: #fff;background: #0abcdf;margin-left: 12px;}
+.tao_cun:hover{background: #00a4cd}
+.luyoupeizhi{width: 970px;margin: 0 auto;display: none}
+.suishi{width:970px;height: 16px;line-height: 16px;text-align: center;font-size: 14px;color: #666;margin-top: 25px}
+.suishi a{color:#60be06}
+.weijie{width:970px;height: 16px;line-height: 16px;text-align: center;font-size: 14px;color: #6ccee4;margin-top:10px}
+.weijie a{color:#60be06}
+.tiyan{margin: 0 auto 0;width:200px;height: 40px;line-height: 40px;text-align: center;color: #fff;font-size: 14px;background: #0abcdf;margin-top: 30px;display: block}
+.step_er .step_mn{display: none}
+.step_er .step_block{display: block}
+.guide-scroll{width:1940px}
+
+.conter_bg .conter_logo{width:150px;height:130px;margin:44px auto 0px auto;background:url(../../images/wizard/wirelesslog.png) center center no-repeat;}
+.conter_configur .conter_logo{width:150px;height:130px;margin:80px auto;background:url(../../images/wizard/wirelesslog.png) center center no-repeat;}
+
+.no-cont{
+ text-align: center;
+}
+.no-cont i{
+ display:block;
+}
+.no-cont h3{
+ font-size:18px;
+ font-weight: bold;
+ color:#333;
+ margin:18px auto;
+}
+.no-cont p{
+ font-size:13px;
+ color:#999;
+}
+.no-cont p a{
+ color:#333;
+ cursor: pointer;
+ text-decoration: underline;
+}
+
+.wizard-main{
+ width: auto;
+ margin: 60px;
+ position: absolute;
+ left: 236px;
+ right: 0;
+ top: 90px;
+ bottom: 0;
+ box-sizing: border-box;
+}
+/*form styles*/
+#msform {
+ width: 435px;
+ height:440px;
+ margin: 0 auto;
+ /*text-align: center;*/
+ position: relative;
+}
+#msform fieldset {
+ background: white;
+ border: 0 none;
+ border-radius: 6px;
+ /*box-shadow: 0 2px 8px 0 rgba(255,197,2,0.22);*/
+ padding: 20px 30px;
+ box-sizing: border-box;
+ width: 100%;
+ margin: 0 auto;
+ position: absolute;
+ margin-bottom:60px;
+}
+/*Hide all except first fieldset*/
+#msform fieldset:not(:first-of-type) {
+ display: none;
+}
+/*inputs*/
+#msform input, #msform textarea {
+ /*padding: 15px;*/
+ border-right: 1px solid #ececec;
+ /*border-radius: 2px;*/
+ /*margin-bottom: 10px;*/
+ /*width:89%;*/
+ box-sizing: border-box;
+ font-family: montserrat;
+ color: #272f47;
+ font-size: 14px;
+ outline:none;
+}
+#msform input:focus{
+ /*border:1px solid #2a5cff;*/
+}
+/*buttons*/
+#msform .action-button {
+ width: 100px;
+ background: #27AE60;
+ font-weight: bold;
+ color: white;
+ border: 0 none;
+ border-radius: 1px;
+ cursor: pointer;
+ padding: 10px 5px;
+ margin: 10px 5px;
+}
+#msform .action-button:hover, #msform .action-button:focus {
+ box-shadow: 0 2px 8px 0 rgba(255,197,2,0.22);
+}
+/*headings*/
+.fs-title {
+ font-size: 15px;
+ text-transform: uppercase;
+ color: #2C3E50;
+ margin-bottom: 10px;
+}
+.fs-subtitle {
+ font-weight: normal;
+ font-size: 14px;
+ color: #999;
+ margin-bottom: 20px;
+ text-align: left;
+}
+/*progressbar*/
+#progressbar {
+ margin-bottom: 35px;
+ overflow: hidden;
+ /*CSS counters to number the steps*/
+ counter-reset: step;
+ text-align: center;
+}
+#progressbar li {
+ list-style-type: none;
+ color: #272f47;
+ text-transform: uppercase;
+ font-size: 14px;
+ width: 33.33%;
+ float: left;
+ position: relative;
+}
+#progressbar li:before {
+ content: counter(step);
+ counter-increment: step;
+ width: 30px;
+ line-height: 30px;
+ display: block;
+ font-size: 10px;
+ color: #333;
+ background: white;
+ border-radius: 15px;
+ margin: 0 auto 12px auto;
+ position: relative;
+ z-index:3;
+}
+/*progressbar connectors*/
+#progressbar li:after {
+ content: '';
+ width: 100%;
+ height: 2px;
+ background: #e3e6ec;
+ position: absolute;
+ left: -50%;
+ top: 15px;
+ z-index: 1; /*put it behind the numbers*/
+}
+#progressbar li:first-child:after {
+ /*connector not needed before the first step*/
+ content: none;
+}
+/*marking active/completed steps green*/
+/*The number of the step and the connector before it = green*/
+#progressbar li.active:before,  #progressbar li.active:after{
+ background: #2a5cff;
+ color: white;
+ box-shadow:0 3px 6px 0 rgba(42,92,255,0.34);
+}
+.leader-tit{
+ margin-bottom:25px;
+ font-size:24px;
+ color:#272f47;
+ text-align: center;
+}
+#progressbar li.active{
+ background:none;
+}
+
+
+
+.zhongji{
+ display:none;
+ position: relative;
+}
+.wizard-main #msform{
+ /*width:460px;*/
+ width:468px;
+}
+.zhongji .wire-name{
+ margin-left:0;
+ margin-right:10px;
+ height:40px;
+ border-radius: 2px;
+}
+.zhongji .wire-name .wn{
+ height:38px;
+ line-height:38px;
+ padding-left:16px;
+ border:none;!important;
+}
+.zhongji .choose_wire{
+ height:38px;
+ line-height:38px;
+ padding-left:10px;
+}
+.zhongji .wn_list{
+ margin-left:0;
+ max-height:150px;
+}
+.zhongji .comn-input{
+ border:1px solid #ececec;
+}
+.zhongji .showspan{
+ color: #999;
+ vertical-align: middle;
+ display: inline-block;
+ height: 38px;
+ line-height: 38px;
+}
+.zhongji .showspan .inp-checkbox{
+ width:16px;
+ height:16px;
+ margin-right:4px;
+ vertical-align: middle;
+}
+
+
+/*响应式*/
+@media screen and(min-width: 970px){
+}
+@media screen and (min-width: 768px) and (max-width: 969px){
+
+ .body_youtu{width:auto;}
+
+
+}
+@media  screen and (max-width:767px){
+
+ .body_youtu{width:auto;}
+ .conter_conte{width:100%;}
+ .con_bg{width:100%;}
+ .set_loh{left:175px;right:0;}
+ .set_hulian{left:0;}
+ .guide-container{width:100%;}
+ .guide{width:100%;}
+ .comn-form{margin-left:0;width:100%;}
+ .name_wife{margin-left:0;}
+ .sto_seta{margin-left:0;}
+ .select_tie{margin-left:10px;}
+ .step_er{width:100%;display:none;}
+ .guide-scroll{width:100%;}
+ .luyoupeizhi,.suishi,.weijie{width:100%;}
+
+ .conter_configur{width:100%;}
+
+
+
+}
+
+
+
+
+
+
+

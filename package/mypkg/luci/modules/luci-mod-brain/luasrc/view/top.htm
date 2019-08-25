@@ -1,0 +1,372 @@
+<%
+    local fs = require "nixio.fs"
+    local http = require "luci.http"
+    local disp = require "luci.dispatcher"
+
+    local request  = disp.context.path
+    local request2 = disp.context.request
+
+    local category = request[1]
+    local cattree  = category and disp.node(category)
+
+    local leaf = request2[#request2]
+
+    local tree = disp.node()
+    local node = disp.context.dispatched
+
+    local categories = disp.node_childs(tree)
+
+    local c = tree
+    local i, r
+    -- tag all nodes leading to this page
+    for i, r in ipairs(request) do
+        if c.nodes and c.nodes[r] then
+            c = c.nodes[r]
+            c._menu_selected = true
+        end
+    end
+
+    local function nodeurl(prefix, name, query)
+        local url = controller .. prefix .. name .. "/"
+        if query then
+            url = url .. http.build_querystring(query)
+        end
+        return pcdata(url)
+    end
+
+    local recents = {}
+    local cachepath = "/tmp/luci-modulecache/recentscache"
+    if fs.access(cachepath) then
+        for ln in io.lines(cachepath) do
+            if ln then
+                local k, v = ln:match("^(%S+) (%S+)")
+                if k and v then
+                    table.insert(recents,{
+                        ["title"] = k,
+                        ["href"] = v
+                    })
+                end
+            end
+        end
+    end
+
+    local function update_recents(title, href)
+        local strings = title .. " " .. href .. "\n"
+        for i = 1, 5, 1 do
+            if recents[i] and recents[i].title ~= title then
+                strings = strings .. recents[i].title .. " " .. recents[i].href .. "\n"
+            end
+        end
+
+        fs.writefile(cachepath, strings)
+    end
+-%>
+<!DOCTYPE html>
+<html lang="<%=luci.i18n.context.lang%>">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <!--启用360浏览器的极速模式(webkit) -->
+    <!--<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>-->
+    <meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+    <!--[if lt IE 9]
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+    <![endif]>-->
+
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <title>紫薯</title>
+    <link rel="shortcut icon" href="<%=media%>/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/style.css">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/n-style.css">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/set.css">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/use.css">
+    <%local files = fs.dir("/www" .. resource .. "/css/app/")
+    if files then
+        local f
+        for f in files do%>
+    <link type="text/css" rel="stylesheet" href="<%=resource%>/css/app/<%=f%>" />
+        <%end
+    end%>
+    <script type="text/javascript" src="<%=resource%>/js/jquery-1.9.1.min.js"></script>
+    <script type="text/javascript" src="<%=resource%>/js/toast.js"></script>
+    <style>
+        #G-lightbox-popup .lightbox-pic-view{background:url("<%=resource%>/images/loading2.gif") no-repeat;background-size:50px 50px;}
+    </style>
+</head>
+
+<body>
+<div class="header">
+    <h4>
+        <div class="logo">
+            <span>
+                <img src="<%=resource%>/images/newimg/logo.png" alt="">
+            </span>
+        </div>
+        <p class="late-use">
+            最近使用：
+            <span>
+            <% for i = #recents, 1, -1 do
+                if recents[i] then%>
+            <a href="<%=recents[i].href%>"><%=recents[i].title%></a>
+            <%end
+              end%>
+            </span>
+        </p>
+        <div class="h-contact">
+            <p><span>CALL NOW</span><b>400 818 0365</b></p>
+        </div>
+    </h4>
+</div>
+<div class="nav">
+    <div class="n-nav">
+        <!--<div class="nav-top">-->
+            <!--<div id="mini" style="border-bottom:1px solid rgba(255,255,255,.1)"><img src="<%=resource%>/images/newimg/mini.png" ></div>-->
+        <!--</div>-->
+        <ul>
+             <li class="nav-item">
+                <a href="<%=luci.dispatcher.build_url("admin", "home")%>">
+                    <i class="my-icon n-nav-icon"><img src="<%=resource%>/images/newimg/icon-index.png" alt=""></i>
+                    <span>首页</span>
+                </a>
+             </li>
+             <%-
+             local function submenu(prefix, node)
+				 local childs = disp.node_childs(node)
+				 if #childs > 0 then
+				 %>
+					 <ul <% if node._menu_selected then %>style="display:block;"<%end%>>
+						 <%-
+						 for i, r in ipairs(childs) do
+						 local nnode = node.nodes[r]
+						 local href  = controller .. prefix .. r ..
+						 (nnode.query and http.build_querystring(nnode.query) or "")
+						 %>
+						 <li <% if nnode._menu_selected then update_recents(nnode.title,pcdata(href)) %>class="nav-show"<%end%>><a data-title="<%=pcdata(striptags(nnode.title))%>" href="<%=pcdata(href)%>"><span><%=pcdata(striptags(translate(nnode.title)))%></span></a></li>
+						 <%-
+						 end
+						 %>
+					 </ul>
+				 <%-
+				 end
+             end
+
+             childs = disp.node_childs(cattree)
+
+             if #childs > 0 then
+                 for i, r in ipairs(childs) do
+                     local nnode = cattree.nodes[r]
+                     local grandchildren = disp.node_childs(nnode)
+					 local menu_name = r
+
+                     if nnode.index then %>
+             <li class="nav-item <%if nnode._menu_selected then%>nav-show<%end%>">
+                <a href="javascript:;">
+					<%if nnode._menu_selected then menu_name = r .. "-hover" end%>
+                    <i class="my-icon n-nav-icon"><img src="<%=resource%>/images/newimg/icon-<%=menu_name%>.png" alt=""></i>
+                    <span><%=pcdata(striptags(nnode.title))%></span>
+                    <% if #grandchildren > 0 then%>
+                    <i class="my-icon nav-more"></i>
+                    <%end%>
+                </a>
+                 <%- submenu(category .. "/" .. r .. "/", nnode) %>
+             </li>
+             <%
+                    end
+                end
+             end
+             %>
+        <style>
+            .nav{
+                padding:30px 0;
+                box-sizing: border-box;
+            }
+            .n-nav{
+                padding-top:0;
+                padding-bottom:60px;
+                box-sizing: border-box;
+            }
+            .nav-exit{
+                width:140px;
+                margin:0 auto;
+            }
+            .nav-exit a{
+                display: block;
+                /*width:140px;*/
+                height:34px;
+                line-height: 34px;
+                border-radius: 17px;
+                border:1px solid #373e61;
+                text-align: center;
+                padding: 0;
+                margin:40px 0;
+            }
+            .nav-exit a:hover{
+                background-color:rgba(0,0,0,0.1);
+            }
+            .n-nav .nav-exit a span{
+                margin:0;
+            }
+        </style>
+             <li class="nav-exit">
+                 <hr style="border-top:1px solid rgba(55,62,97,0.39);margin-top:30px;">
+                <a href="<%=luci.dispatcher.build_url("admin", "logout")%>">
+                    <!-- <i class="my-icon n-nav-icon"><img src="<%=resource%>/images/newimg/icon-index.png" alt=""></i> -->
+                    <span>退出</span>
+                </a>
+             </li>
+        </ul>
+    </div>
+
+</div>
+
+<script src="<%=resource%>/js/lightbox.js"></script>
+<script type="text/javascript">
+    $(function () {
+        // var width = document.body.clientWidth;
+        var width = window.innerWidth;
+        var height = $(document).height()-90;
+        // console.log(width,height);
+        if(width>1350){
+        // if(width>1366){
+            //console.log('da');
+            $('.nav').css('height','100%');
+        }else{
+            $('.nav').css('height',height);
+        }
+        // nav收缩展开
+        $('.nav-item>a').on('click',function(){
+            if (!$('.n-nav').hasClass('nav-mini')) {
+                if ($(this).next().css('display') == "none") {
+                    //展开未展开
+                    $('.nav-item').children('ul').slideUp(300);
+                    $(this).next('ul').slideDown(300);
+                    var oldsrc = $('.nav-show').find('.my-icon img').attr('src');
+                    if(oldsrc){
+                        oldsrc = oldsrc.replace('-hover.png','.png');
+                    }else{
+                        oldsrc = '';
+                    }
+                    // console.log(oldsrc);
+                    $('.nav-show').find('.my-icon img').attr('src',oldsrc);
+                    var srcstr = $(this).find('.my-icon img').attr('src').replace('.png','-hover.png');
+                    // console.log(srcstr);
+                    $(this).find('.my-icon img').attr('src',srcstr);
+                    $(this).parent('li').addClass('nav-show').siblings('li').removeClass('nav-show');
+                }else{
+                    //收缩已展开
+                    $(this).next('ul').slideUp(300);
+                    var srcstr2 = $(this).find('.my-icon img').attr('src').replace('-hover.png','.png');
+                    $(this).find('.my-icon img').attr('src',srcstr2);
+                    $('.nav-item.nav-show').removeClass('nav-show');
+                }
+            }
+        });
+        //nav-mini切换
+        $('#mini').on('click',function(){
+            if (!$('.nav').hasClass('nav-mini')) {
+                $('.nav-item.nav-show').removeClass('nav-show');
+                $('.nav-item').children('ul').removeAttr('style');
+                $('.nav').addClass('nav-mini');
+            }else{
+                $('.nav').removeClass('nav-mini');
+            }
+        });
+
+
+        $(".hd-icon").click(function(){
+            if($(".nav").css("display") == "none"){
+                $(".nav").slideDown(500);
+                setTimeout(function(){$(".header h4 .hd-right").slideDown(200);},200);
+
+            }else{
+                $(".header h4 .hd-right").slideUp(500);
+                setTimeout(function(){$(".nav").slideUp(700);},0);
+            }
+        })
+
+    })
+
+    function Confirm(msg,callback) {
+        var popmask = $(document.createElement("div"));
+        popmask.attr('id', 'G-lightbox-mask');
+        var popup = $(document.createElement("div"));
+        popup.attr('id', 'G-lightbox-popup');
+        popup.width('300px');
+        popup.css({
+            'padding':'20px',
+            'margin-left':'-170px'
+        });
+
+        var strHtml = '<div class="lightbox-title">'+msg+'</div>';
+        strHtml += "<p class='pop-btn-cont'></p>";
+        popup.html(strHtml);
+        $('body').append(popmask,popup);
+///////////////////////////////////////////////////
+        var btnok = $(document.createElement('input')), btncancel = $(document.createElement('input'));
+        var me = this;
+//        btncancel.attr({ type: 'button', class: 'popup-btn popup-btn-exit', value: '取 消' }).click(function () { me.cancel(); });
+//        btnok.attr({ type: 'button', class: 'popup-btn popup-btn-sure', value: '确 定' }).click(function(){me.ok(callback);});
+        btncancel.addClass('popup-btn popup-btn-exit');
+        btnok.addClass('popup-btn popup-btn-sure');
+        btncancel.attr({ type: 'button',value: '取 消' }).click(function () { me.cancel(); });
+        btnok.attr({ type: 'button',value: '确 定' }).click(function(){me.ok(callback);});
+        popup.find('p').append(btncancel).append(btnok);
+///////////////////////////////////////////////////
+        this.ok = function (callback) {
+            popup.hide();
+            popmask.hide();
+            callback();
+            return true;
+        };
+        this.cancel = function () {
+            popup.hide();
+            popmask.hide();
+            return false;
+        };
+
+        return false;
+    }
+    function loadSave(str, id){
+        if(str == "before"){
+            $("#" + id).attr("disabled",true);
+            $("#" + id).val("保存中...");
+            $("." + id + "-loading").css("display","inline-block");
+        }
+
+        if(str == "after"){
+            $("#" + id).attr("disabled",false);
+            $("#" + id).val("保 存");
+            $("." + id + "-loading").css("display","none");
+        }
+    }
+
+    function objCopy(src) {
+        var dest = {};
+
+        for (var key in src) {
+            dest[key] = typeof src[key] == 'object' ? objCopy(src[key]) : src[key];
+        }
+
+        return dest;
+    }
+
+    function cRoute(c, ip) {
+        $.ajax({
+            type: "GET",
+            cache: false,
+            url: "http://"+ ip +"/luci-static/resources/images/h_home.png",
+            success: function(){
+                window.location.href = "http://"+ ip +"/cgi-bin/luci";
+            },
+            ontimeout:function(){
+                setTimeout("cRoute("+ c +", '"+ ip +"');", 2000);
+            },
+            error:function(){
+                setTimeout("cRoute("+ c +", '"+ ip +"');", 2000);
+            }
+        });
+
+        if (c++ > 10) window.location.href = "http://"+ ip +"/cgi-bin/luci";
+    }
+</script>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="<%=luci.i18n.context.lang%>">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+		<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+		<meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+		<!--[if lt IE 9]
+			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+			<script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+		<![endif]>-->
+
+		<title>K.T路由器后台</title>
+		<link rel="shortcut icon" href="<%=media%>/favicon.ico">
+		
+		<link type="text/css" href="<%=resource%>/ktcss/style.css" rel="stylesheet"/>
+		<link rel="stylesheet" href="<%=resource%>/ktcss/ui-dialog.css"/>
+
+		<script type="text/javascript" src="<%=resource%>/js/jquery-1.9.0.min.js"></script>
+
+		<!-- <script src="<%=resource%>/js/dialog-min.js"></script> -->
+		<script src="<%=resource%>/js/dialog-plus-min.js"></script>
+		<script src="<%=resource%>/laydate/laydate.js"></script>
+
+		<script type="text/javascript" src="<%=resource%>/js/json2.js"></script>
+		<script type="text/javascript" src="<%=resource%>/js/jquery.toggle-password.js"></script>
+		<script type="text/javascript" src="<%=resource%>/cbi.js"></script>
+		<script type="text/javascript" src="<%=resource%>/xhr.js"></script>
+		
+	</head>
+
+	<body>
+		<script>
+		
+			$(function () {
+
+				ipv6_default();
+							
+				$("#ipv6save").click(function(){
+					ipv6_save();
+				})				
+				
+				$("#unbind").click(function(){
+					$("#unbind").hide();
+					$("#tr_passwd").show("");
+					$("#ipv6_user").val("");
+					$("#ipv6_pwd").val("");
+					$("#ipv6save").show();
+				})
+				
+			});
+			
+			function success_prop(id){
+				setTimeout(function(){
+					top.dialog({
+						title: '提示',
+						okValue: '确定',
+						content: '恭喜您，保存成功！',
+						ok: function () {
+						},
+						onclose: function () {
+							var dialog = top.dialog.get(window);
+							dialog.close().remove();
+						},
+						cancel: false
+					}).showModal();
+				},100);
+				$("#"+id).prop("disabled", false);
+				$("."+id).hide();
+			}	
+		
+			function ipv6_default(){
+				$.ajax({
+					url:"<%=luci.dispatcher.build_url("admin", "application", "6box", "vpn_status")%>",
+					cache:false,
+					dataType:"json",
+					data:{token: '<%=token%>'},
+					timeout:2000,
+					type:"POST",
+					success: function(rsp){
+						if(rsp.result == true){
+							if (rsp.username && rsp.username != "") {
+								$("#ipv6_user").val(rsp.username);
+								$("#tr_passwd").hide();
+								$("#ipv6save").hide();
+								$("#unbind").show();
+							}
+						}						
+					}
+				})
+			}
+
+			function check_v6usr(){
+				return true;
+			}
+			function check_v6pwd(){
+				return true;
+			}
+			
+			function ipv6_save(){
+				if(check_v6usr() != true || check_v6pwd() != true){
+					return false;
+				}
+				var v6user = $("#ipv6_user").val();
+				var v6pwd = $("#ipv6_pwd").val();
+				$.ajax({
+					url:"<%=luci.dispatcher.build_url("admin", "application", "6box", "vpn_set")%>",
+					cache:false,
+					dataType:"json",
+					data:{token: '<%=token%>' , v6user:v6user , v6pwd:v6pwd, mode:"6box"},
+					timeout:6000,
+					type:"POST",
+					success: function(rsp){
+						if(rsp.result == true){
+							success_prop();
+						}else{
+							failed_prop(rsp.result);
+						}
+					},
+					error: function(x){
+						error_prop(x.statusText);
+					},
+					ontimeout:function(){
+						timeout_prop();
+					}
+				})
+			}
+
+		</script>
+		
+		
+		<div id="MyDivipv6" style="height: 193px;">
+				<div style="text-align: right; cursor: default; height: 30px; ">
+					<div class="Edit_title1">账号绑定</div>
+				</div>
+				<table class="wirelessChannel">
+					<tr>
+						<td>6box账号</td>
+						<td>:</td>
+						<td>
+							<input id="ipv6_user" type="text"/>
+						</td>
+					</tr>
+					<tr id="tr_passwd">
+						<td>6box密码</td>
+						<td>:</td>
+						<td>
+							<input id="ipv6_pwd" type="password"/>
+						</td>
+					</tr>
+				</table>
+				<button class="wirelessChannel_btn" id="ipv6save">绑定</button>
+				<button class="wirelessChannel_btn" id="unbind" style="display: none">解绑</button>
+		</div>
+	</body>
+</html>

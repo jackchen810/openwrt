@@ -1,0 +1,759 @@
+<%
+    local ktNetwork = require "ktapi.ktNetwork"
+
+    local uci = require "luci.model.uci".cursor()
+
+    local hasNetdata = tonumber((luci.sys.exec(" ps |grep [n]etdata|wc -l") or ""):match("%d+")) or 0
+    local serverPort = tonumber(luci.http.getenv("SERVER_PORT"))
+
+    local lanInfo = ktNetwork.getLanInfo()
+
+    local trafficInterface = uci:get("network", "wan", "ifname") or "br-lan"
+
+	local lanAddr = lanInfo.ipaddr or "wifi.kunteng.org.cn"
+
+	-- 51盒子税号
+
+	local BoxTaxNumber = uci:get("aisino", "global", "taxnumber") or ""
+
+	-- /dev/ttyACM0 码牌设备
+	has_qr_dev = 0
+	local fs = require "nixio.fs"
+	if fs.access("/dev/ttyACM0") then
+		has_qr_dev = 1
+	end
+%>
+
+<%include("top")%>
+<style>
+    .login_cont1{margin-top:50px;}
+    .lan{right:162px;}
+    .wan{right:65px;}
+    .lan3{right:106px;}
+    .lan2{right:134px;}
+    .pic5{width: 180px;height: 240px;position: relative;display: inline-block;bottom: 50px;}
+    .topimg{}
+    .topimg span{display:inline-block;position: relative;top:20px;}
+    .topimg .pic5{top:-45px;}
+    .login_cont1 ul{position: relative;bottom:120px;}
+    .login_cont1 ul .li3{position: relative;top:30px;}
+    .login_cont1 ul .li4{float: right;margin-right: 115px;width: 100px;position: relative;bottom: 102px;}
+    .login_cont1 ul li span{color:#666;}
+    #loading_all{
+        width:100%;
+        height:100%;
+        position:fixed;
+        z-index:6999;
+        background-color:rgba(0,0,0,0.3);
+    }
+    #loading_all div{
+        position:absolute;
+        width:60px;
+        height:60px;
+        top:50%;
+        margin-top:-60px;
+        left:50%;
+        margin-left:-20px;
+
+    }
+    .img-responsive{
+        width:60px;
+        height:60px;
+    }
+	.header{
+		min-width:1336px;
+	}
+</style>
+<div id="loading_all">
+    <div>
+        <img src="<%=resource%>/images/loading2.gif" class="img-responsive">
+    </div>
+</div>
+<div class="home-cont">
+	<main>
+		<div class="contain home-main" id="main">
+			<div class="m-msg" style="display:none">
+				<p>正在扫描设备状态....</p>
+			</div>
+			<style>
+				.m-b-pos em, .m-top-ma em, .m-top-box em, .m-b-point em{
+					display: inline-block;
+					width:6px;
+					height:6px;
+					border-radius: 3px;
+					margin-right:6px;
+				}
+				.line{
+					background-color:#00ab1a;
+				}
+				.notReday{
+					background-color:#ffec0b;
+				}
+				.unline{
+					background-color:#ff2f2f;
+				}
+				.m-mid-mid{
+					width:180px;
+					height:30px;
+					font-size:17px;
+					text-align: center;
+					position:absolute;
+					top:220px;
+					left:408px;
+				}
+				.mvBtn{
+					display:none;
+				}
+				.scroll-table .tr-1{
+					width:80px;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					max-width: 90px;
+				}
+			</style>
+			<div class="main-cont">
+				<div class="m-top">
+					<p class="m-top-ma"><i></i><b><em class="unline"></em>二维码牌<span>(未连接)</span></b></p>
+					<p class="m-top-box">
+						<b><em class="unline"></em>51盒子<span>(未连接)</span></b>
+						<i></i>
+						<a href="<%=luci.dispatcher.build_url("admin", "clients", "aisino_51box")%>">管理</a>
+					</p>
+				</div>
+				<div class="m-mid">
+					<p class="m-mid-inter">
+						<i></i>
+						<b><em></em>互联网<span>（未连接）</span></b>
+						<a href="<%=luci.dispatcher.build_url("admin", "detection", "net_diagnose")%>">网络诊断</a>
+					</p>
+					<div class="m-mid-line mvBox">
+						<img class="mvBtn" src="<%=resource%>/images/newimg/i-main-line-hover.png" style="/*left: 355px;*/left:90px;">
+					</div>
+					<div class="m-mid-mid">
+						<p>智能中枢</p>
+					</div>
+					<div class="m-mid-line mvBox2">
+						<img class="mvBtn2" src="<%=resource%>/images/newimg/i-main-line-hover.png" style="left:90px;">
+					</div>
+					<p class="m-mid-wifi">
+						<b><em></em>内部网络</b>
+						<i></i>
+						<a href="<%=luci.dispatcher.build_url("admin", "detection", "wifimon")%>">WIFI环境检测</a>
+					</p>
+				</div>
+				<div class="m-bottom">
+					<p class="m-b-pos">
+						<i></i><b><em class="unline"></em>智能POS<span>(未连接)</span></b>
+					</p>
+					<p class="m-b-point">
+						<b><em class="unline"></em>打印机<span>(未连接)</span></b>
+						<i></i>
+						<a href="<%=luci.dispatcher.build_url("admin", "clients", "printer_list")%>">管理</a>
+					</p>
+				</div>
+				<p class="m-button">
+					<span><button id="ch_button">  一键检测</button></span>
+				</p>
+			</div>
+		</div>
+	</main>
+
+
+    <div class="indexcont">
+        <div class="chart1 index_cont" style="float: left;">
+            <div class="">
+                <div class="index_title">
+                    <!--<h3>路由器状态信息</h3>-->
+                    <h3>连接设备 （共 <span id="devnum">0</span> 台）</h3>
+                </div>
+                <style>
+                    .index_cont1{
+                        position: relative;
+                        height:235px;
+                    }
+                    .h-new-table{
+                        width: 90%;
+                        font-size: 11px;
+                        color: #333;
+                        border-width: 1px;
+                        border-color: #efefef;
+                        border-collapse: collapse;
+                        margin: 0 auto;
+                        overflow: hidden;
+                        position: relative;
+                    }
+                    .h-new-table tr{
+                        height:46px;
+                        line-height:46px;
+                    }
+                    .n-new-table-data{
+                        max-height: 300px;
+                        overflow: scroll;
+                    }
+                    .n-new-table-data tr:hover{
+                        background-color:#f9f9f9;
+                    }
+                    .h-new-table thead{
+                        border:1px solid #eee;
+                        border-bottom:none;
+                    }
+                    .h-new-table th{
+                        height:45px;
+                        background-color:#f1f5ff;
+                        color:#333;
+                        font-size:16px;
+                        text-align: left;
+                        padding-left:10px;
+                        font-weight:normal;
+                    }
+                    table.h-new-table td {
+                        font-size: 14px;
+                        height: 46px;
+                        border-width: 1px;
+                        text-align:left;
+                        padding-left:10px;
+                        border-style: solid;
+                        border-color: #efefef;
+                        background-color: #ffffff;
+                    }
+                    table.h-new-table td .td-em-up{
+                        color:#ff2f2f;
+                    }
+                    table.h-new-table td .td-em-down{
+                        color:#1fb41b;
+                    }
+                    .h-new-table-td-span{
+                        padding-right:8px;
+                        display: inline-block;
+                        width:80px;
+                    }
+                    .scroll-table{
+                        overflow-y: auto;
+                        height: 200px;
+                    }
+                    .scroll-table::-webkit-scrollbar {/*滚动条整体样式*/
+                        width: 2px;     /*高宽分别对应横竖滚动条的尺寸*/
+                        height: 1px;
+                    }
+                    .scroll-table::-webkit-scrollbar-thumb {/*滚动条里面小方块*/
+                        background: #fff;
+                    }
+                    .scroll-table::-webkit-scrollbar-track {/*滚动条里面轨道*/
+                        background: #fff;
+                    }
+                </style>
+                <div class="index_cont1">
+                    <table class="h-new-table">
+                        <thead>
+                        <tr>
+                            <th width="90px">设备信息</th>
+                            <th width="30%">IP地址</th>
+                            <th width="*">当前网速</th>
+                        </tr>
+                        </thead>
+                    </table>
+                    <div class="scroll-table">
+                        <table class="h-new-table n-new-table-data">
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="float: right;" class="index_cont chart2">
+            <div class="index_title">
+                <h3>实时网络状态</h3>
+                <!--<p class="chart-speed"><em class="up">上行：<span id="txByte">0 KB/s</span></em><em class="down" style="">下行：<span id="rxByte">0 KB/s</span></em></p>-->
+            </div>
+            <div class="chart-info">
+                <p class="speedunit" style="color:#1757fb;"><em >KB</em></p>
+                <div id="net"></div>
+                <div class="bottom">
+                    <p class="speed-info"><em class="average">上行峰值  <span id="maxtxByte" style="color:#ff2f2f;">0 KB/s</span></em><em class="down-speed">下行峰值  <span id="maxrxByte" style="color:#1d5bfc;">0 KB/s</span></em></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--<script type="text/javascript" src="<%=resource%>/js/echarts.simple.min.js"></script>-->
+<script src="<%=resource%>/js/jquery-1.9.1.min.js"></script>
+<script language="javascript">
+    var delVal = 4;
+    function autoMove() {
+        delVal++;
+        delVal = delVal > 60 ? 1 : delVal;
+        $(".mvBtn").css("left", delVal);
+        $(".mvBtn2").css("left", delVal);
+    }
+    setInterval(autoMove, 8);
+</script>
+
+<script type="text/javascript" src="<%=resource%>/js/three.min.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/echarts.min.js"></script>
+<script type="text/javascript">
+    var TxRateArry = new Array();//上传数组
+    var RxRateArry  = new Array();//下载数组
+
+    var RxByte = 0;
+    var TxByte = 0;
+    var MaxRxByte = 0;
+    var MaxTxByte = 0;
+    var Time = 30;
+
+    var netChart;
+    var TrafficInterface = "<%=trafficInterface%>";
+    var lanAddr = "<%=lanAddr%>";
+    var REQUEST_NETDATA_URI = "http://" + lanAddr + ":19999/api/v1/data";
+
+    function initArry() {
+        for (var i = 0; i < Time; i++) {
+            RxRateArry.push(0);
+            TxRateArry.push(0);
+        }
+    }
+
+    function bandwidthLabel(kby) {
+        var uby = '<%:KB/s%>';
+
+        if (kby >= 1024) {
+            uby = '<%:MB/s%>';
+            kby = (kby / 1024).toFixed(2);
+        }
+
+        // return String.format("%f %s",kby.toFixed(2), uby);
+        return kby + " " + uby;
+    }
+
+    function requestConnectData(data){
+        var num = data.length;
+
+        $(".n-new-table-data tbody").empty();
+        $('#devnum').html(num);
+
+        $.each(data,function(i,ele) {
+            var deviceName = (ele.hostname =='unknown') ? '未知' : ele.hostname;
+            var upSpeed = (ele.up_rate / 1024).toFixed(2);
+            var downSpeed = (ele.down_rate / 1024).toFixed(2);
+            var $tr = $('<tr></tr>');
+            var tds = '<td class="tr-1" width="90px">'+ deviceName +'</td>' +
+                        '<td width="30%">'+ ele.ipaddr +'</td>' +
+                        '<td width="*">' +
+                            // '<span class="h-new-table-td-span"><img src="<%=resource%>/images/newimg/speed_up.png" alt=""> '+ bandwidthLabel(upSpeed) + '</span>' +
+                            '<span class="h-new-table-td-span"><em class="td-em-up">↑</em> '+ bandwidthLabel(upSpeed) + '</span>' +
+                            // '<span><img src="<%=resource%>/images/newimg/speed_down.png" alt=""> '+ bandwidthLabel(downSpeed) + '</span>' +
+                            '<span><em class="td-em-down">↓</em> '+ bandwidthLabel(downSpeed) + '</span>' +
+                        '</td>';
+
+			$tr.append(tds);
+			$('.n-new-table-data tbody').append($tr);
+
+			// 判断是否为智能POS
+			if (ele.macaddr.indexOf("00:1d:fa") == 0) {
+				//console.log(ele.macaddr);
+				$(".m-b-pos b em").addClass('line').removeClass('unline');
+				$(".m-b-pos b span").html('(已连接)');				
+			}
+			
+		})
+	}
+
+    function addTrafficData(arry) {
+        <%if hasNetdata == 1 and serverPort ~= 443 then%>
+        RxByte = (arry[0]/8).toFixed(2);
+        TxByte = (Math.abs(arry[1])/8).toFixed(2);
+        <%else%>
+        var arrLen = arry.length;
+        var privLine = arry[arrLen-2];
+        var lastLine = arry[arrLen-1];
+
+        var splitPrivLine= new Array();
+        var splitLastLine = new Array();
+
+        splitPrivLine = privLine.split(",");
+        splitLastLine = lastLine.split(",");
+
+        var time0 = splitPrivLine[0].replace("[ ", "");
+        var time1 = splitLastLine[0].replace("[ ", "");
+        // console.log( time0, time1);
+        // 首次打开会有时差
+        if ((time1 - time0) != 1) return false;
+
+        // 当前速率
+        RxByte = ((splitLastLine[1] - splitPrivLine[1])/1024).toFixed(2);
+        TxByte = ((splitLastLine[3] - splitPrivLine[3])/1024).toFixed(2);
+        <%end%>
+
+        if (TrafficInterface == "br-lan") {
+            var tmp = RxByte;
+            RxByte = TxByte;
+            TxByte = tmp;
+        }
+
+        // 计算峰值
+        MaxRxByte = Math.max(MaxRxByte, RxByte);
+        MaxTxByte = Math.max(MaxTxByte, TxByte);
+
+        // 存储速率
+        RxRateArry.push(RxByte);
+        TxRateArry.push(TxByte);
+
+        if (TxRateArry.length > Time) {
+            TxRateArry.shift();
+            RxRateArry.shift();
+        }
+    };
+
+    function getWanTraffic() {
+        <%if hasNetdata == 1 and serverPort ~= 443 then%>
+        var t = 2000;
+        $.getJSON(REQUEST_NETDATA_URI, {chart:"net." + TrafficInterface, format: "array", points:"2", options:"jsonwrap", _:Math.random()}, function(data) {
+            //console.log(data);
+            addTrafficData(data.latest_values);
+        <%else%>
+        var t = 6000;
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "network", "getWanTraffic")%>", {iface: TrafficInterface}, function(data) {
+            addTrafficData(data);
+        <%end%>
+
+            $("#maxrxByte").html(bandwidthLabel(MaxRxByte));
+            $("#maxtxByte").html(bandwidthLabel(MaxTxByte));
+            $("#rxByte").html(bandwidthLabel(RxByte));
+            $("#txByte").html(bandwidthLabel(TxByte));
+
+            netChart.setOption({
+                series: [{data: TxRateArry},{data: RxRateArry}]
+            });
+        });
+
+        setTimeout("getWanTraffic()", t);
+    };
+
+    //路由连接设备信息
+    function getClientList() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "connect", "getAllClientList")%>", {}, function(data) {
+                requestConnectData(data);
+        });
+
+		setTimeout("getClientList()", 10000);
+	}
+	var T_alert = new Toast();
+	T_alert._css.lineHeight = "40px";
+	function SystemState() {
+		// 正在检测样式
+		$("#loading_all").css('display','block');
+		$(".m-msg p").html('');
+
+		// 二维码牌
+		if ("<%=has_qr_dev%>" == 0) {
+			// 未连接
+			$(".m-top-ma b em").addClass('unline').removeClass('line');
+			$(".m-top-ma b span").html('(未连接)');
+			$(".m-msg").css('display','block');
+			$(".m-msg p").html('二维码牌无法连接，请检查二维码牌是否开启，连接线是否正确插入？');
+		} else {
+			// 已连接
+			$(".m-top-ma b em").addClass('line').removeClass('unline');
+			$(".m-top-ma b span").html('(已连接)');
+		}
+
+		var BoxNormalState = {
+			"51盒子与金税盘绑定状态" : "绑定",
+			"专票抄报清卡状态" : "已清卡",
+			"普票抄报清卡状态" : "已清卡",
+			"卷票抄报清卡状态" : "已清卡",
+			"电子票抄报清卡状态" : "已清卡",
+			"金税盘授权状态" : "已授权",
+			"未上传的发票" : "没有",
+			"51平台登录状态" : "已登录",
+		}
+		// 查询51盒子状态
+		$.getJSON("/cgi-bin/aisino/spooler/manage", {id: "boxlist"}, function(data) {
+				// 设置图标状态, 
+				//console.log(data);
+				if (data.BOXES.length == 0) {
+					// 未连接
+					$(".m-top-box b em").addClass('unline').removeClass('line notReday');
+					$(".m-top-box b span").html('(未连接)');
+					$(".m-msg").css('display','block');
+					$(".m-msg p").html('51盒子无法连接，请检查51盒子是否开启，连接线是否正确插入？');
+				} else {
+					// 已连接
+					$(".m-top-box b em").addClass('line').removeClass('unline notReday');
+					$(".m-top-box b span").html('(已连接)');
+
+					taxnumber = "<%=BoxTaxNumber%>";
+					if (data.BOXES[0].NSRSBH) {
+						taxnumber = data.BOXES[0].NSRSBH;
+					}
+
+					checkflag = true;
+					if (taxnumber != "" || taxnumber != "0") {
+						$.getJSON("/cgi-bin/aisino/spooler/manage", {id:"boxcheck", boxip:data.BOXES[0].IPADDR, boxnum:taxnumber}, function(data) {
+							if (data.CODE == 0) {
+								msg = data.DATA;
+								var resultarr = msg.split('~');
+								var obj = {};
+								for (var i in resultarr) {
+									obj[resultarr[i].split(':')[0]] = resultarr[i].split(':')[1];
+								}
+
+								Object.keys(obj).forEach(function(key) {
+									if (BoxNormalState[key]) {
+										if (BoxNormalState[key] != obj[key]) {
+											checkflag = false;
+										}
+									}
+								});
+								
+								if (checkflag) {
+									$(".m-top-box b span").html('(已就绪)');								
+								} else {
+									$(".m-top-box b em").addClass('notReday').removeClass('line unline');
+									$(".m-top-box b span").html('(未就绪)');								
+								}
+							}
+						});
+					}
+				}
+			}
+		);
+
+		// 打印机状态
+		$.getJSON("/cgi-bin/aisino/spooler/manage", {id: "list"}, function(data) {
+				//console.log(data);
+				if (data.PRINTERS.length == 0) {
+					// 未连接
+					$(".m-b-point b em").addClass('unline').removeClass('line');
+					$(".m-b-point b span").html('(未连接)');
+					$(".m-msg").css('display','block');
+					$(".m-msg p").html('打印机无法连接，请检查打印机是否开启，连接线是否正确插入？');
+				} else {
+					// 已连接
+					$(".m-b-point b em").addClass('line').removeClass('unline');
+					$(".m-b-point b span").html('(已连接)');
+				}
+			}
+		);
+
+		// 外网状态
+		$.getJSON("<%=luci.dispatcher.build_url("admin", "system", "getDeviceInfo")%>", null, function(data) {
+			$("#loading_all").css('display','none');
+			if (data.wanState.code != 0) {
+				// 外网未连接
+				$(".m-mid-inter b em").addClass('unline').removeClass('line');
+				$(".m-mid-inter b span").html('(未连接)');
+				$(".mvBtn").css('display','none');
+				$(".m-msg").css('display','block');
+				$(".m-msg p").html('外网未连接, 请检查网络设置');
+			} else {
+				// 外网已连接
+				$(".m-mid-inter b em").addClass('line').removeClass('unline');
+				$(".m-mid-inter b span").html('(已连接)');
+				$('.mvBtn').css('display','block');
+			}
+		});
+	}
+
+    $(function () {
+        initArry();
+        getClientList();
+        getWanTraffic();
+
+        SystemState();
+
+        //        图表1请求数据
+        netChart = echarts.init(document.getElementById("net"));
+        netChart.setOption({
+            color: ['#ff2f2f','#1757fb', '#61a0a8'],
+            grid: {
+                x: '15%',
+                y: '3%',
+                x2: '8%',
+                height: '73%'
+            },
+            xAxis: {
+                data: ['','','','','','','','','','','','','','','','','','','','','','','','','','','','','',''],
+                axisLine: {
+                    show: true,
+                    lineStyle: {
+                        color: '#999',
+                        type: 'dashed'
+                    }
+                }
+            },
+            yAxis: {
+                axisLabel: {
+                },
+                splitLine: {
+                    lineStyle: {
+                        color: '#f3f3f3'
+                    }
+                },
+                smooth: true,
+                axisLine: {
+                    lineStyle: {
+                        color: '#1d5bfc',
+                        width: 1
+                    }
+                },
+                min: 0
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    animation: false,
+                    lineStyle: {
+                        color:"#999"
+                    }
+                }
+            },
+            series: [{
+                name: "上行",
+                type: 'line',
+                symbol:'none',
+                smooth: true,
+                animation: false,
+                areaStyle: {
+                    normal: {
+                    color: '#ff2f2f'
+                    }
+                },
+                lineStyle: {
+                    normal: {
+                        // color: '#ff2f2f',
+                        // width: 1,
+                        // color:'#2bc449',
+                        color:new echarts.graphic.LinearGradient(0,0,0,1,[{
+                            offset:0,
+                            color:'#ff2f2f'
+                        },{
+                            offset:1,
+                            color:'rgba(116,155,255,0.1)'
+                        }])
+                    }
+                },
+                markArea: {
+                    silent: true
+                },
+                data: TxRateArry
+            },{
+                name: "下行",
+                type: 'line',
+                symbol:'none',
+                smooth: true,
+                animation: false,
+                areaStyle: {
+                    normal: {
+                        color: '#1757fb'
+                        // color: '#00ab1a'
+                    }
+                },
+                lineStyle: {
+                    normal: {
+                        // color: '#1757fb',
+                        // width: 1
+                        color:new echarts.graphic.LinearGradient(0,0,0,1,[{
+                            offset:0,
+                            color:'#1757fb'
+                        },{
+                            offset:1,
+                            // color:'rgba(116,155,255,0.1)'
+                            color:'rgba(80,209,239,0.1)'
+                        }])
+                    }
+                },
+                markArea: {
+                    silent: true
+                },
+                data: RxRateArry
+            }]
+        });
+
+        $("#ch_button").click(function () {
+
+            SystemState();
+        });
+    })
+
+// ======================= 背景 =============================
+	var SEPARATION = 100, AMOUNTX = 50, AMOUNTY = 50;
+	// var container;
+	var camera, scene, renderer;
+	var particles, particle, count = 0;
+	var mouseX = 80, mouseY = -300;
+	var windowHalfX = window.innerWidth / 2;
+	var windowHalfY = window.innerHeight / 2;
+
+    function init() {
+        var container = document.createElement( 'div' );
+        container.setAttribute('id','main-bg');
+        document.getElementById('main').appendChild( container );
+        // camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 10000 );
+        camera = new THREE.PerspectiveCamera( 75, window.innerWidth / 800, 1, 10000 );
+        camera.position.z = 1000;
+        scene = new THREE.Scene();
+        particles = new Array();
+        var PI2 = Math.PI * 2;
+        var material = new THREE.ParticleCanvasMaterial({
+            color: 0x0d5e9d,
+            program: function ( context ) {
+                context.beginPath();
+                context.arc( 0, 0, 1, 0, PI2, true );
+                context.fill();
+            }
+        });
+        var i = 0;
+        for ( var ix = 0; ix < AMOUNTX; ix ++ ) {
+            for ( var iy = 0; iy < AMOUNTY; iy ++ ) {
+                particle = particles[ i ++ ] = new THREE.Particle( material );
+                particle.position.x = ix * SEPARATION - ( ( AMOUNTX * SEPARATION ) / 2 );
+                particle.position.z = iy * SEPARATION - ( ( AMOUNTY * SEPARATION ) / 2 );
+                scene.add( particle );
+            }
+        }
+        renderer = new THREE.CanvasRenderer();
+        // renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.setSize( window.innerWidth, 800 );
+        // renderer.setSize( window.innerWidth, '400' );
+        container.appendChild( renderer.domElement );
+        window.addEventListener( 'resize', onWindowResize, false );
+    }
+
+    function onWindowResize() {
+        windowHalfX = window.innerWidth / 2;
+        // windowHalfY = window.innerHeight / 2;
+        windowHalfY = 800 / 2;
+        // camera.aspect = window.innerWidth / window.innerHeight;
+        camera.aspect = window.innerWidth / 800;
+        camera.updateProjectionMatrix();
+        // renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.setSize( window.innerWidth, 800 );
+    }
+
+    function animate() {
+        requestAnimationFrame( animate );
+        render();
+    }
+
+    function render() {
+        camera.position.x += ( mouseX - camera.position.x ) * .05;
+        camera.position.y += ( - mouseY - camera.position.y ) * .05;
+        camera.lookAt( scene.position );
+        var i = 0;
+        for ( var ix = 0; ix < AMOUNTX; ix ++ ) {
+            for ( var iy = 0; iy < AMOUNTY; iy ++ ) {
+                particle = particles[ i++ ];
+                particle.position.y = ( Math.sin( ( ix + count ) * 0.3 ) * 50 ) + ( Math.sin( ( iy + count ) * 0.5 ) * 50 );
+                particle.scale.x = particle.scale.y = ( Math.sin( ( ix + count ) * 0.3 ) + 1 ) * 2 + ( Math.sin( ( iy + count ) * 0.5 ) + 1 ) * 2;
+            }
+        }
+        renderer.render( scene, camera );
+        count += 0.1;
+    }
+
+    init();
+    animate();
+</script>
+<%include("bottom")%>

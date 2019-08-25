@@ -1,0 +1,28 @@
+<%
+local OEM = require "ktapi.oem"
+%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+<!--[if lt IE 9]
+    <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+    <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+<![endif]>-->
+<title><%=OEM.WEBSITE_TIELE%> - 欢迎使用</title>
+<link rel="stylesheet" type="text/css" href="<%=resource%>/css/wizard/reset.css">
+<link rel="stylesheet" type="text/css" href="<%=resource%>/css/wizard/wizard.css">
+</head>
+<body class="body_configure">
+    <div class="conter_configur">
+    	<div class="conter_logo"></div>
+    </div>
+    <div class="text_configur">
+        <a href="<%=luci.dispatcher.build_url("admin", "wizard")%>" class="kuaisu_configur">快速配置</a>
+		<span class="kuaisu_disable" style="display:none;">快速配置</span>
+    </div>
+</body>
+</html>

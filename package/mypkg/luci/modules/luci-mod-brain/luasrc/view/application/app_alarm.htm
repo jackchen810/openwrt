@@ -1,0 +1,145 @@
+<%
+	local ktUtil = require "ktapi.ktUtil"
+	local ktNetwork = require "ktapi.ktNetwork"
+	local lanInfo = ktNetwork.getLanInfo()
+
+	local routerMac = ktUtil.officalMac(lanInfo.macaddr) or "unknow"
+
+	local qrcodeSRC = luci.util.exec("curl http://wechat.kunteng.org.cn/route?mac=" .. routerMac) or ""
+
+	include("top")
+%>
+<div class="main">
+	<style>
+		.alarm-tab{
+			background-color:#f8f9fd;
+		}
+		.alarm-tab .aside-set{
+			font-size:22px;
+			color:#333;
+			font-weight: bold;
+		}
+		.alarm-td-1{-
+			border-right:1px solid #f3f3f3;
+		}
+		#alarm_status_table{
+			margin:0;
+			border:none;
+
+		}
+		#alarm_status_table td{
+			height:70px;
+			line-height:70px;
+			font-size:16px;
+			color:#333;
+			text-align: left;
+			padding-left:50px;
+		}
+		.alarm-td-1{
+			width:46%;
+		}
+		#alarm_status_table tr:hover{
+			background-color:#f8f8f8;
+		}
+		#alarm_status_table tr:hover .alarm-td-1{
+			padding-left:48px;
+			border-left:2px solid #2a5cff;
+		}
+		.alarm-ma{
+			text-align: center;
+			margin-bottom:60px;
+		}
+		.alarm-ma span{
+			display: block;
+			font-size:16px;
+			color:#333;
+		}
+		.alarm-ma i{
+			display: block;
+			width:220px;
+			height:220px;
+			padding:2px;
+			border:1px solid #dedede;
+			border-radius: 8px;
+			margin:10px auto;
+		}
+		.alarm-ma i img{
+			width:100%;
+			height:100%;
+		}
+		.alarm-cont{
+			max-height:426px;
+			margin-bottom:50px;
+			overflow-y:auto ;
+		}
+		.alarm-cont::-webkit-scrollbar {/*滚动条整体样式*/
+			width: 10px;     /*高宽分别对应横竖滚动条的尺寸*/
+			height: 1px;
+		}
+		.alarm-cont::-webkit-scrollbar-thumb {/*滚动条里面小方块*/
+			border-radius: 10px;
+			/*-webkit-box-shadow: inset 0 0 5px rgba(0,0,0,0.1);*/
+			background: #aaa;
+		}
+		.alarm-cont::-webkit-scrollbar-track {/*滚动条里面轨道*/
+			/*-webkit-box-shadow: inset 0 0 5px rgba(0,0,0,0.1);*/
+			/*border-radius: 10px;*/
+			background: #f1f1f1;
+		}
+
+	</style>
+		<div class="article aside">
+			<ul class="wd-tab alarm-tab">
+				<li class="aside-set">报警通知</li>
+			</ul>
+
+			<div id="connect-content" class="d_cont alarm-cont">
+				<table class="d_tab" id="alarm_status_table">
+					<!--<tr>-->
+						<!--<td class="alarm-td-1">连接中断</td>-->
+						<!--<td class="alarm-td-2">2018-5-10 17:50:20</td>-->
+					<!--</tr>-->
+				</table>
+			</div>
+
+			<div class="qrcode alarm-ma">
+				<span>扫一扫，及时获得设备异常通知</span>
+				<i><img src="" alt=""></i>
+			</div>
+		</div>
+</div>
+
+
+<script type="text/javascript" src="<%=resource%>/xhr.js"></script>
+<script type="text/javascript" src="<%=resource%>/cbi.js"></script>
+<script type="text/javascript">
+
+	$(function () {
+		XHR.get('<%=luci.dispatcher.build_url("admin", "system", "getAlarmMessages")%>', null, 
+			function(x, st)
+			{
+			    // console.log(st);
+			    if(st){
+                    $('#alarm_status_table').empty();
+                    $.each(st,function(i,ele){
+
+						var $tr = $('<tr></tr>');
+						var tdstr = '<td class="alarm-td-1">'+ ele.msg +'</td>'+
+									'<td class="alarm-td-2">'+ ele.s_date +'</td>';
+						$tr.append(tdstr);
+						$('#alarm_status_table').append($tr);
+
+					})
+				}
+
+			    return;
+			}
+		);
+
+		if ("<%=qrcodeSRC%>" != "") {
+			$('.qrcode img').attr("src", "<%=qrcodeSRC%>");
+		}
+	});
+
+</script>
+<%include("bottom")%>

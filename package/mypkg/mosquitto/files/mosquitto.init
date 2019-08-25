@@ -1,0 +1,44 @@
+#!/bin/sh /etc/rc.common
+# Basic init script for mosquitto
+# April 2012, OpenWrt.org
+# Provides support for the luci-app-mosquitto package, if installed
+
+START=90
+APP=`which mosquitto`
+USE_UCI_CONFIG=$(uci -q get mosquitto.owrt.use_uci)
+if [ $? -eq 1 ]; then
+    USE_UCI_CONFIG=0
+fi
+
+SYNC_WIFIDOG=`/usr/bin/wdctl status|grep WiFiDog`
+CHECKING_WD=`/bin/pidof wifidog`
+
+SERVICE_DAEMONIZE=1
+SERVICE_WRITE_PID=1
+
+start() {
+        user_exists mosquitto 200 || user_add mosquitto 200
+        if [ "$USE_UCI_CONFIG" -eq 1 ]; then
+            #CONF=/tmp/mosquitto.converted.$$.conf
+            #victor@20160224 modify CONF file to the same file not pid file before
+	    if [ -z $CHECKING_WD ]; then
+		echo 'NO WD, start mosquitto anyway'>/dev/ttyS0
+	    else
+	        if [ "WiFiDog status" != "$SYNC_WIFIDOG" ]
+		then
+		    echo "WD is not ready, waiting...">/dev/ttyS0
+		    exit 0
+		fi
+	    fi
+
+            CONF=/tmp/mosquitto.conf
+            mosquitto.uci.convert -f $CONF
+        else
+            CONF=/etc/mosquitto/mosquitto.conf
+        fi
+        service_start $APP -c $CONF
+}
+
+stop() {
+        service_stop $APP
+}

@@ -1,0 +1,180 @@
+<%
+    local task = luci.util.exec("crontab -l | grep reboot | cut -d\" \" -f 1-5"):gsub("\n", "")
+    include("top")
+%>
+
+<div class="box">
+    <div class="main">
+        <div class="aside">
+            <ul>
+                <%include("settings/menuer")%>
+            </ul>
+        </div>
+
+        <div class="">
+            <div class="reboot-cont">
+                <div class="reboot-item reboot-item-left">
+                    <button id="restart"><img src="<%=resource%>/images/newimg/reboot-icon-cq.png" alt=""> 重启智能中枢</button>
+                    <p>重启操作设备</p>
+                </div>
+                <div class="reboot-item reboot-item-right">
+                    <button id="reset"><img src="<%=resource%>/images/newimg/reboot-icon-hf.png" alt=""> 恢复出厂设置</button>
+                    <p>请做好备份，谨慎操作</p>
+                </div>
+            </div>
+            <div class="title" style="height:60px;">
+                <h3 style="font-size:16px;line-height:60px;">定时重启</h3>
+            </div>
+            <div class="article" style="overflow: visible;">
+                <div class="set-content">
+                    <div class="input-info" style="overflow: hidden;">
+                        <label style="float: left;width:90px;height:30px;line-height: 24px;">启用定时重启</label>
+
+                        <div style="float: left;">
+                            <input class="magic-checkbox" type="radio" name="reboot-switch" id="switch-yes" value="yes">
+                            <label for="switch-yes" class="checkbox-txt" style="margin-left: 40px;line-height:22px;width:50px;">是</label>
+                        </div>
+                        <div style="float: left;width:160px;">
+                            <input class="magic-checkbox" type="radio" name="reboot-switch" id="switch-no" value="no">
+                            <label for="switch-no" class="checkbox-txt" style="line-height:22px;">否</label>
+                        </div>
+
+                        <!--<div id="onoff" class="switch open1" style="margin:17px 0 2px 36px">-->
+                            <!--<div class="slide open2"></div>-->
+                        <!--</div>-->
+                        <!--<div class="clean"></div>-->
+                    </div>
+
+                    <div class="input-info" style="margin-top:50px;">
+                        <label class="autolabel" style="width:90px;">设定重启时间</label>
+                        <input class="cron-reboot" value="<%=task%>" style="display:none;"/>
+                    </div>
+
+                    <!--<hr id="hr2" class="hr-new">-->
+                    <div class="operate-btn" style="margin:60px 0 32px 200px;">
+                        <input type="button" value="保 存" class="s off" id="save"/>
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript" src="<%=resource%>/js/jqCron.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/jqCron.cn.js"></script>
+<script src="<%=resource%>/js/lightbox.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+        T_alert._css.lineHeight = "40px";
+
+    var cron = $('.cron-reboot').jqCron().jqCronGetInstance();
+
+    function switchButton(action) {
+        if (action == "off") {
+            // $("#onoff").removeClass('open1');
+            // $("#onoff").addClass('close1');
+            // $("#onoff").children().removeClass('open2');
+            // $("#onoff").children().addClass('close2');
+            $("#save").css("display", "none")
+
+            cron.disable();
+        } else {
+            // $("#onoff").removeClass('close1');
+            // $("#onoff").addClass('open1');
+            // $("#onoff").children().removeClass('close2');
+            // $("#onoff").children().addClass('open2');
+
+            $("#save").css("display", "inline-block")
+
+            cron.enable();
+        }
+    }
+
+    function setTask(task) {
+        loadSave("before", "save");
+
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "application", "autoReboot", "task")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>',  task: task},
+            timeout:20000,
+            type: "POST",
+            success: function(rsp) {
+                if (rsp.code == 0) {
+                    T_alert.show("保存成功！",2000);
+                } else {
+                    T_alert.show("保存失败！",2000);
+                }
+                loadSave("after", "save");
+            },
+            error: function(x){
+                T_alert.show("保存错误！",2000);
+                loadSave("after", "save");
+            },
+            ontimeout:function(){
+                T_alert.show("保存超时！",2000);
+                loadSave("after", "save");
+            }
+        });
+    }
+
+    $(function(){
+        //重启路由器
+        $("#restart").click(function () {
+            var c = new Confirm('是否确定重启路由器？',function(){
+                var lightbox = new LightBox("正在重启，请稍后...", "重启路由器");
+                $.getJSON("<%=luci.dispatcher.build_url("admin", "system", "reboot")%>",null,function(rsp) {
+                    setTimeout("cRoute(0, '" + window.location.host + "');", 30000);
+                })
+            })
+        });
+        //恢复出厂设置
+        $("#reset").click(function () {
+            var c = new Confirm('是否确定恢复出厂设置？',function(){
+                var lightbox = new LightBox("正在恢复出厂设置，请稍后...", "恢复出厂设置");
+                $.getJSON("<%=luci.dispatcher.build_url("admin", "system", "reset")%>",null,function(rsp) {
+                    setTimeout("cRoute(0, '192.168.199.1');", 30000);
+                })
+            })
+        })
+
+
+        <%if task ~= "" then%>
+        $('input[type=radio][value=yes]').attr('checked',true);
+        switchButton("on");
+        <%else%>
+        $('input[type=radio][value=no]').attr('checked',true);
+        switchButton("off");
+        <%end%>
+
+        $("#onoff").click(function() {
+            if ($(this).hasClass('open1')) {
+                switchButton("off");
+                // 提交关闭
+                setTask(null);
+            } else {
+                switchButton("on");
+            }
+        });
+
+        $('input[type=radio][name=reboot-switch]').change(function(){
+          if(this.value == 'yes'){
+              switchButton("on");
+          }else{
+              switchButton("off");
+              // 提交关闭
+              setTask(null);
+          }
+        })
+
+        $("#save").click(function() {
+            console.log($(".cron-reboot").val());
+            var inputVal = $(".cron-reboot").val();
+            setTask(inputVal);
+        });
+    })
+</script>
+
+<%include("bottom")%>

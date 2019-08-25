@@ -1,0 +1,244 @@
+<%
+    local uci = require("luci.model.uci").cursor()
+    local mounts = luci.sys.mounts()
+    
+    local _, z
+    local share = {}
+    
+    uci:foreach("samba", "sambashare",
+        function(s)
+            local t = {}
+            t.sname = s[".name"]
+            t.name = s.name
+            t.path = s.path
+            t.read_only = s.read_only
+            t.description = s.description
+            t.guest_ok = s.guest_ok
+
+            table.insert(share, t)
+        end
+    )
+    
+
+--[[
+    luci.sys.net.ipv4_hints(function(ip, name)
+        clientAddr[#clientAddr+1] = ip
+    end)
+--]]
+    
+    include("top")
+%>
+
+<div class="box">
+<div class="main">
+
+    <%include("application/menuer")%>
+    
+    <div class="content">
+        <div class="title">
+            <h3>文件共享</h3>
+        </div>
+        <div class="article">
+            <div class="section top">
+                <table class="tab-list" style="margin-bottom:20px;">
+                    <thead>
+                    <tr>
+                        <th class="portname-css">名称</th>
+                        <th width="190px">路径</th>
+                        <th width="70px">只读</th>
+                        <th width="70px">匿名访问</th>
+                        <th width="170px">描述</th>
+                        <th width="80px">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody id="list_rule">
+                    <%for _, z in ipairs(share) do%>
+                        <tr class="addedtr" name="rule_<%=z.name%>">
+                            <td class="portname-css"><%=z.name%></td><td><%=z.path%></td><td><%=z.read_only%></td><td><%=z.guest_ok%></td><td><%=z.description%></td><td><a class="fw_rule" href="javascript:;" data-sport="<%=z.name%>">删除</a></td>
+                        </tr>
+                    <%end%>
+                        <tr class="tr">
+                            <td>
+                                <input id="smb-name" class="p-inp" type="text"/>
+                            </td>
+                            <td style="position:relative;width:160px;height:50px;">
+                                <span class="sel_span1 selwid110">
+                                    <input id="smb-path" class="sel_inp mac" type="text" name="mac" value="">
+                                </span>
+                                <span class="sel_span2 selwid110 clip110">
+                                    <select id="sel-hide" class="sel_select aabb sel_sel_wid130" name="aabb" onclick="simOptionClick4IE()">
+                                    <option value="" onclick="showOptionValue( this )">自定义</option>
+                                    <%for _, z in ipairs(mounts) do%>
+                                        <option value="<%=z.mountpoint%>" onclick="showOptionValue( this )"><%=z.mountpoint%></option>
+                                    <%end%>
+                                    </select>
+                                </span>
+                            </td>
+                            <td>
+                                <input type="checkbox" id="smb-readonly"/>
+                            </td>
+                            <td>
+                                <input type="checkbox" id="smb-guest"/>
+                            </td>
+                            <td>
+                                <input id="smb-desc" class="p-inp" type="text" value=""/>
+                            </td>
+                            <td>
+                                <a href="javascript:;" class="addTr">添加</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script type="text/javascript">
+    var oHeight;
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+    
+    // 删除行
+    function delone(name){
+//        var a=otr.parentNode.parentNode;
+//        a.parentNode.removeChild(a);
+        
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "application", "delSambaShare")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', name:name},
+            timeout:2000,
+            type: "POST",
+            success: function(rsp){
+                if(rsp.code == 0){        
+                    $('tr[name=rule_'+ name +']').remove();
+                    T_alert.show("删除成功",2000);
+                }
+                else{
+                    T_alert.show("删除失败",2000);
+                }
+            },
+            error: function(x){
+                T_alert.show("删除失败, 请重试",2000);
+            },
+            ontimeout:function(){
+                T_alert.show("删除失败, 请重试",2000);
+            }
+        });
+    }
+
+    function simOptionClick4IE() {
+        var evt=window.event;
+        var selectObj=evt?evt.srcElement:null;
+        // IE Only
+        if (evt && selectObj &&  evt.offsetY && evt.button!=2 && (evt.offsetY > selectObj.offsetHeight || evt.offsetY<0 ) ) {
+            // 记录原先的选中项
+            var oldIdx = selectObj.selectedIndex;
+            setTimeout(function(){
+                var option=selectObj.options[selectObj.selectedIndex];
+                // 此时可以通过判断 oldIdx 是否等于 selectObj.selectedIndex
+                // 来判断用户是不是点击了同一个选项,进而做不同的处理.
+                $("#smb-path").val($(option).val());
+            }, 60);
+        }
+    }
+
+    function showOptionValue(opt) {
+        $("#smb-path").val($(opt).val());
+    }
+    
+    $(function () {
+//        $(".aabb").bind("change",function(){
+//            var str = $(this).val();
+//            $(this).parent("span").siblings("span").find("input").val(str);
+//        });
+
+        $("#list_rule").on("click", ".fw_rule", function(){
+            //console.log($(this).data('sport'));
+            var d = $(this).data('sport');
+            delone(d);
+        });
+
+        $(".addTr").click(function(){
+            
+            var sname = $("#smb-name").val();
+            var spath = $("#smb-path").val();
+            var sdesc = $("#smb-desc").val();
+            if (sname == "") {
+                T_alert.show("名称不能为空！",2000);
+                setTimeout(function () {$("#smb-name").focus();}, 0);
+                return false;
+            }
+            var patt = new RegExp(/\s+/g);
+            if(patt.test(sname)){
+                T_alert.show('名称不能含有空格！',2000);
+                setTimeout(function(){$("#smb-name").focus();},0);
+                return false;
+            }
+            if(spath == ''){
+                T_alert.show('路径不能为空！',2000);
+                return false;
+            }
+            
+            var readOnly = "no";
+            var guest = "no";
+            
+            if ($("#smb-readonly").prop("checked")) {
+                readOnly = "yes";
+            }
+            
+            if ($("#smb-guest").prop("checked")) {
+                guest = "yes";
+            }
+            
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "setSambaShare")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>', path:spath, name: sname, readOnly: readOnly, guest: guest, description: sdesc},
+                timeout:2000,
+                type: "POST",
+                success: function(rsp){
+                    if(rsp.code == 0){
+                            var strTr = '<tr class="addedtr" name="rule_'+ sname +'">'+
+                                '<td class="portname-css">'+ sname +'</td>'+
+                                '<td>'+ spath +'</td>'+
+                                '<td>'+ readOnly +'</td>'+
+                                '<td>'+ guest +'</td>'+
+                                '<td class="portname-css">'+ sdesc +'</td>'+
+                                '<td>'+
+                                '<a class="fw_rule" href="javascript:;" data-sport="'+ sname +'">删除</a>'+
+                                '</td>'+
+                                '</tr>';
+                            $(".tr").before(strTr);
+                            $("#smb-name").val("");
+                            $("#smb-desc").val("");
+                            $("#smb-path").val("");
+
+                           //$("#sel-hide option[value='']").attr("selected", true);
+                        T_alert.show("添加成功",2000);
+                    }else if(rsp.code == 2){
+                        T_alert.show("名称有重复！",2000);
+                        setTimeout(function () {$("#smb-name").focus();}, 0);
+                    }
+                },
+                error: function(x){
+                    T_alert.show("添加失败, 请重试")
+                },
+                ontimeout:function(){
+                    T_alert.show("添加失败, 请重试")
+                }
+            });
+            
+            //$("#sel-hide").find("option[value='']").attr("selected",true);
+        })
+        
+    });
+
+</script>
+
+
+<%include("bottom")%>

@@ -1,0 +1,273 @@
+<%
+    local mounts = luci.sys.mounts()
+    include("top")
+%>
+
+<div class="box">
+    <div class="main">
+        <%include("application/menuer")%>
+
+        <div class="content">
+            <div class="title">
+                <h3>FTP 服务器(vsftpd)</h3>
+            </div>
+            <div class="article">
+                <div class="set-content">
+                    <div class="input-info">
+                        <label style="float: left;margin-top: 22px;">启用</label>
+                        <div id="on-off" class="switch open1" style="margin:17px 0 2px 36px">
+                            <div class="slide open2"></div>
+                        </div>
+                        <span class="loadImg"><img src="<%=resource%>/images/loading.gif" alt=""/></span>
+                        <div class="clean"></div>
+                    </div>
+
+                    <div class="input-info">
+                        <label>服务端口</label>
+                        <input class="wid140" type="text"  id="ftp_port" value="21"/>
+                    </div>
+                    <style>
+                        .mb15{margin-bottom:15px;}
+                        .selcontent{position:relative;height:40px;margin-left:32px;}
+                        .selcontent .selc_span1{position: absolute;border: 1px solid #ddd;border-right:none;width: 200px;height: 40px;top: 16px}
+                        .selc_span1 input.sel_inp{width: 200px;height: 40px;margin:0;border: none;outline: none;padding-left: 16px;color: #0b0b0b;}
+                        .selcontent .selc_span2 {position: absolute;border: 1pt solid #ddd;width: 234px;height: 40px;clip: rect(0 260px 260px 200px);top: 16px;}
+                        .selc_span2 .selc_select {width: 236px;height: 42px;border: 1px solid #ddd;margin-top: -1px;margin-left: -1px;margin-right:0;outline: none;padding-left:0;}
+                        @media screen and (max-width: 767px) {
+                            .selcontent{margin-left:10px;}
+                            .selcontent .selc_span1{width:125px;}
+                            .selc_span1 input.sel_inp{width:125px;}
+                            .selcontent .selc_span2{width:156px;clip: rect(0 180px 180px 110px);}
+                            .selc_span2 .selc_select{width:158px;}
+                        }
+
+                    </style>
+                    <div class="input-info mb15">
+                        <label>本地目录</label>
+                        <!--<input id="local_root" class="wid140" type="text" value="">-->
+                        <div class="selcontent" style="display:inline-block">
+                            <span class="selc_span1" style="">
+                                <input id="local_root" class="sel_inp ip" type="text" name="ip" value="">
+                            </span>
+                            <span class="selc_span2" style="">
+                                <select class="selc_select aabb" name="aabb">
+                                    <option value="">自定义</option>
+                                    <%for _, z in ipairs(mounts) do%>
+                                        <option value="<%=z.mountpoint%>"><%=z.mountpoint%></option>
+                                    <%end%>
+                                </select>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="input-info">
+                        <label>匿名登录</label>
+                        <select class="opt" id="anon_enable">
+                            <option value="1">允许</option>
+                            <option value="0">拒绝</option>
+                        </select>
+                    </div>
+
+                    <div id="anon-lab">
+                        <div class="input-info">
+                            <label>匿名目录</label>
+                            <!-- <input class="wid140" type="text"  id="anon_dir" value="/tmp"/> -->
+                            <div class="selcontent" style="display:inline-block">
+                                <span class="selc_span1" style="">
+                                    <input id="anon_dir" class="sel_inp ip" type="text" value="">
+                                </span>
+                                <span class="selc_span2" style="">
+                                    <select class="selc_select aabb">
+                                        <option value="">自定义</option>
+                                        <%for _, z in ipairs(mounts) do%>
+                                            <option value="<%=z.mountpoint%>"><%=z.mountpoint%></option>
+                                        <%end%>
+                                    </select>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="input-info" style="margin-top:30px;">
+                            <label>匿名权限</label>
+                            <input class="inp-checkbox ml32" type="checkbox" id="anon_write"/>
+                            <label for="anon_write" style="width:auto;"><span>允许在anonymous文件夹上传和修改文件</span></label>
+                        </div>
+                    </div>
+
+                    <hr id="hr2" style="padding-top:30px;margin-bottom:30px;border-bottom:1px solid #eee;width:610px;">
+                    <div class="operate-btn">
+                        <input type="button" value="保 存" class="s off" id="save"/>
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+        T_alert._css.lineHeight = "40px";
+    var RequestData = {};
+
+    function showOptionValue(opt) {
+        $("#local_root").val($(opt).val());
+    }
+
+    function checkRequestData() {
+        RequestData.port = $("#ftp_port").val();
+        if (RequestData.port.length < 1 || !validators.port(RequestData.port)) {
+            T_alert.show("服务端口不正确",2000);
+            $("#ftp_port").focus();
+            return false;
+        }
+
+        RequestData.localRoot = $("#local_root").val();
+        if (RequestData.localRoot.length < 1) {
+            T_alert.show("本地目录不能为空",2000);
+            $("#local_root").focus();
+            return false;
+        }
+
+        RequestData.anony = $("#anon_enable").val();
+        RequestData.anonRoot = $("#anon_dir").val();
+        RequestData.anonyWrite = 0;
+
+        if (RequestData.anony == 1) {
+            if (RequestData.anonRoot.length < 1 ) {
+                T_alert.show("匿名目录不能为空",2000);
+                $("#anon_dir").focus();
+                return false;
+            }
+
+            if ($("#anon_write").prop("checked")) {
+                RequestData.anonyWrite = 1;
+            }
+        }
+
+        return true;
+    }
+
+    function turnOffWifiDog() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "vsftpd", "turnOffService")%>", null, function(rsp) {
+            $(".loadImg").css("display","none");
+            if (rsp.code == 0) {
+                T_alert.show("FTP服务已关闭",2000);
+            } else {
+                T_alert.show("操作失败，请重试",2000);
+            }
+        });
+    }
+
+    function switchButton(action) {
+        if (action == "off") {
+            $("#on-off").removeClass('open1');
+            $("#on-off").addClass('close1');
+            $("#on-off").children().removeClass('open2');
+            $("#on-off").children().addClass('close2');
+
+            // 页面表单禁用
+            $(".set-content").find(":input").attr("disabled","disabled");
+            $("#save").css("display", "none")
+        } else {
+            $("#on-off").removeClass('close1');
+            $("#on-off").addClass('open1');
+            $("#on-off").children().removeClass('close2');
+            $("#on-off").children().addClass('open2');
+
+            // 页面表单激活
+            $(".set-content").find(":input").removeAttr("disabled");
+            $("#save").css("display", "inline-block")
+        }
+    }
+
+    function getVsftpdStatus() {
+        var status = "1";
+
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "application", "vsftpd", "getVsftpdStatus")%>", null, function(rsp) {
+            if (rsp) {
+                status = rsp.enable;
+                switchButton((status == "1") ? "on" : "off");
+
+                $("#anon_enable").val(rsp.anony);
+
+                if (rsp.anony == 0) {
+                    $("#anon-lab").css("display", "none");
+                }
+
+                if (rsp.anonyWrite == 1) {
+                    $("#anon_write").attr("checked",true);
+                }
+
+                $("#ftp_port").val(rsp.port);
+                $("#local_root").val(rsp.localRoot);
+                $("#anon_dir").val(rsp.anonRoot);
+            }
+        });
+    }
+
+    $(function(){
+        getVsftpdStatus();
+
+        $(".aabb").bind("change",function(){
+            var str = $(this).val();
+            $(this).parent("span").siblings("span").find("input").val(str);
+        });
+
+        $("#on-off").click(function() {
+            if ($(this).hasClass('open1')) {
+                $(".loadImg").css("display","inline-block");
+                switchButton("off");
+                // 提交关闭
+                turnOffWifiDog();
+            } else {
+                switchButton("on");
+            }
+        });
+
+        $("#anon_enable").click(function() {
+            if ($(this).val() == "1") {
+                $("#anon-lab").css("display", "block");
+            } else {
+                $("#anon-lab").css("display", "none");
+            }
+        });
+
+        $("#save").click(function () {
+            if (!checkRequestData()){
+                return false;
+            }
+
+            loadSave("before", "save");
+
+            $.ajax({
+                url: '<%=luci.dispatcher.build_url("admin", "application", "vsftpd", "setVsftpd")%>',
+                cache: false,
+                dataType: "json",
+                data: {token: '<%=token%>',  reqdata: JSON.stringify(RequestData)},
+                timeout:20000,
+                type: "POST",
+                success: function(rsp) {
+                    if (rsp.code == 0) {
+                        T_alert.show("保存成功！",2000);
+                    } else {
+                        T_alert.show("保存失败！",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function(x){
+                    T_alert.show("保存错误！",2000);
+                    loadSave("after", "save");
+                },
+                ontimeout:function(){
+                    T_alert.show("保存超时！",2000);
+                    loadSave("after", "save");
+                }
+            });
+
+        });
+    })
+</script>
+
+<%include("bottom")%>

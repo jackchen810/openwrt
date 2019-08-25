@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# Author: zhangzf
+# Created Time: 2016.11.06
+#
+
+. /lib/functions.sh
+
+LOGFILE="/var/run/service-reload.log"
+
+foreach_affects() {
+	config_load servicetrack
+	config_foreach apply_config $1 $1
+	# echo "Look for the $1 service dependency ..." >> "$LOGFILE"
+}
+
+apply_config() {
+	config_get init "$1" init
+	config_get exec "$1" exec
+	# [ -n "$2" ] && echo "Start reload $2 service..." >> "$LOGFILE"
+
+	[ -n "$init" ] && reload_init "$2" "$init"
+	[ -n "$exec" ] && reload_exec "$2" "$exec"
+	
+	config_list_foreach "$1" affects foreach_affects
+}
+
+reload_exec() {
+	local service="$1"
+	set -- $2
+	local cmd="$1"; shift
+
+	[ -x "$cmd" ] && {
+		sleep 1;echo "Exec reloading $service... commond: $cmd $@" >> "$LOGFILE"
+		( eval $cmd "$@" ) 2>/dev/null 1>&2
+		[  "$?" != "0" ] && echo '!!! Failed to reload' $service '!!!'
+	}
+}
+
+reload_init() {
+	local service="$1"
+
+	[ -x /etc/init.d/$2 ] && {
+		sleep 1;echo "Reloading $service... " >> "$LOGFILE"
+		/etc/init.d/$2 restart >/dev/null 2>&1
+		[  "$?" != "0" ] && echo '!!! Failed to reload' $2 '!!!'
+	}
+}
+
+lock "/var/run/service-reload"
+rm -f "/var/run/service-reload-status"
+
+config_load servicetrack
+
+for i in $*; do
+	config_foreach apply_config $i $i
+done
+
+lock -u "/var/run/service-reload"

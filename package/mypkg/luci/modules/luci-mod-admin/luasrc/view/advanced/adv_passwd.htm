@@ -1,0 +1,126 @@
+<%
+	
+%>
+
+<%+header%>
+
+<script type="text/javascript">
+	
+	$(function () {
+		set_header_icon_lighted("pic_fun_gj");
+		   
+		$("#pwdsave").click(function () {
+			passwd_save();
+		});
+	});
+	function sys_passwd_check() {
+		var npwd = document.getElementById("newpwd");
+		var newpwd = npwd.value;
+		var rpwd = document.getElementById("repwd");
+		var repwd = rpwd.value;
+		var reg = new RegExp("[\\u4E00-\\u9FFF]+","g");
+		var reg2 = /^[0-9a-zA-Z]*$/g;
+		
+		if (newpwd.indexOf(" ") >= 0) {
+			tip_dialog({msg:"<%:password cannot contain spaces.%>", id:"newpwd"});
+			return false;
+		} else if (newpwd.length < 1) {
+			tip_dialog({msg:"<%:Password cannot be empty!%>", id:"newpwd"});
+			return false;
+		} else if (newpwd.length < 3 || newpwd.length > 32) {
+			tip_dialog({msg:"<%:Invalid value. Password size for 3 ~ 32.%>", id:"newpwd"});
+			return false;
+		}else if(reg.test(newpwd)){
+			tip_dialog({msg:"<%:Character is not allowed in Password.%>", id:"newpwd"});
+			return false;
+		}else if(!reg2.test(newpwd)) {
+			tip_dialog({msg:"<%:Character is not allowed in Password.%>", id:"newpwd"});
+			return false;
+		} else if (repwd.length < 1) {
+			tip_dialog({msg:"<%:The password you typed does not match . Please enter it again.%>", id:"newpwd"});
+			return false;
+		} else if (repwd != newpwd) {
+			tip_dialog({msg:"<%:The password you typed does not match . Please enter it again.%>", id:"newpwd"});
+			return false;
+		}
+		
+		return true;
+	};
+	
+	function passwd_save() {
+		var newpwd = document.getElementById("newpwd").value;
+		if (!sys_passwd_check()) {
+			return false;
+		}
+		
+		$("#pwdsave").prop("disabled" , true);
+		$(".pwdsave").show();
+		sys_passwd = newpwd;
+
+		$.ajax({
+			url: '/cgi-bin/luci/admin/system/sys_passwd_set',
+			cache: false,
+			dataType: "json",
+			data: {token: '<%=token%>', sys_passwd: newpwd},
+			timeout:2000,
+			type: "POST",
+			success: function(rsp){
+				if(rsp.result == true){
+				success_prop("pwdsave");
+				}else{
+				failed_prop(rsp.result,"pwdsave");
+				}
+			},
+			error: function(x){
+				error_prop(x.statusText,"pwdsave");
+			},
+			ontimeout:function(){
+			timeout_prop();
+			}
+		});
+
+	}
+</script>
+	
+</script>	
+<div class="soft_con">
+	<div class="soft_con2">
+		<div class="banben gaoji_box">
+			<div class="gaoji_left">
+				<ul>
+					<% include("themes/" .. theme .. "/menuer") %>
+				</ul>
+			</div>
+			
+			<div id="xpwd" class="function1 gaoji_right" >
+				<div class="pwd_kuai">
+					<table class="pwdtable" border="0" cellpadding="0" cellspacing="0">
+						<tr>
+							<td class="pleft"><%:New Password%></td>
+							<td>
+								<input type="password" maxlength="32" class="pin" id="newpwd"/>
+							</td>
+							<td></td>
+						</tr>
+						<tr>
+							<td class="pleft"><%:Repeat New Password%></td>
+							<td>
+								<input type="password" class="pin" id="repwd"/>
+							</td>
+							<td></td>
+						</tr>
+						<tr>
+							<td class="pleft"></td>
+							<td>
+								<input id="pwdsave" class="pbtn" type="button" value="<%:Save%>"/>
+							</td>
+							<td><img class="pwdsave" style="padding-top:24px;display: none;" src="<%=resource%>/icons/images/loading.gif"/></td>
+						</tr>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<%+footer%>

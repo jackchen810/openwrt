@@ -1,0 +1,13 @@
+#platform mtk 7628 7620 
+config info   wireless 
+    option    device_option_2G    'band'
+    option    device_option_value_2G    '2.4G'
+    option    iface_option_2G    'ifname'
+    option    iface_option_value_2G    'ra0'
+    option    device_option_5G    'band'
+    option    device_option_value_5G    '5G'
+    option    iface_option_5G    'ifname'
+    option    iface_option_value_5G    'rai0'
+config	info    dhcp
+    option    dnsmasq    'domain'
+		

@@ -1,0 +1,87 @@
+<%
+local uci = require "luci.model.uci".cursor()
+local proto = uci:get("network", "wan", "proto")
+
+include("top")
+%>
+<style>
+    textarea{
+        /*margin-left:20px;*/
+        padding:10px;
+		line-height: 1.5;
+		border-color: #e8e8e8;
+		border-radius: 6px;
+		outline:none;
+		width:85%;
+    }
+	
+	.box{
+		padding:60px 20px;
+		text-align: center;
+
+		
+	}
+</style>
+
+<div class="box">
+	<div class="main">
+
+        <div class="aside">
+            <ul>
+                <%include("settings/menuer")%>
+            </ul>
+        </div>
+		
+		<div class="">
+			<!--<div class="title">-->
+				<!--<h3>拨号日志</h3>-->
+			<!--</div>-->
+			<div class="article">
+				<div class="box">
+					<textarea id="pppoe_log_view" rows="30" cols="" readonly="readonly"><%:正在获取拨号日志……%></textarea>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var wan_proto = "<%=proto%>"
+	$(function() {
+		if (wan_proto == "pppoe") {
+			get_pppoe_log();
+		} else {
+			$("#pppoe_log_view").text("<%:当前上网类型非拨号模式.%>");
+		}
+		
+	});
+
+
+	function get_pppoe_log() {
+	$.ajax({
+		url: '<%=luci.dispatcher.build_url("admin", "network", "get_pppoe_log")%>',
+		cache: false,
+		dataType: "json",
+		data: {token: '<%=token%>'},
+		timeout: 10000,
+		type: "post",
+		success: function(rsp){
+			//console.log(rsp.log);
+			var log = rsp.log;
+			$("#pppoe_log_view").text(log);
+			var textarea = $("#pppoe_log_view").append(" ");
+			textarea.scrollTop(textarea[0].scrollHeight - textarea.height());
+		},
+		error: function(rsp){
+			$("#pppoe_log_view").text("<%:获取拨号日志失败.%>");
+		},
+		ontimeout:function(rsp){
+			$("#pppoe_log_view").text("<%:获取拨号日志超时.%>");
+		}
+	})
+	
+	setTimeout("get_pppoe_log();", 3000);
+}
+</script>
+
+<%include("bottom")%>

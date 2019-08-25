@@ -1,0 +1,88 @@
+<%
+    local uci = require "luci.model.uci".cursor()
+    lanIpaddr = uci:get("network", "lan", "ipaddr")
+
+    include("top")
+%>
+<style type="text/css">
+    .input-info .file-file{ position:absolute;height:40px;margin:0;margin-top:10px;padding:0; filter:alpha(opacity:0);opacity: 0;width:50px;cursor: pointer; }
+    .input-info .lab-right{width:50px;text-align:left;cursor: pointer;}
+
+    /*lightbox图片画廊样式*/
+    #G-lightbox-popup .lightbox-pic-view{position: relative;overflow: hidden;text-align: center;width:50px;height:50px;margin:0 auto;background:url("<%=resource%>/images/loading2.gif") no-repeat;background-size:50px 50px;}
+</style>
+
+<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("application/menuer")%>
+        </ul>
+    </div>
+    <div class="content">
+        <div class="title">
+            <h3>固件自助升级</h3>
+        </div>
+        <div class="article">
+            <div class="set-content">
+                <form name="upfile" target="iframeUpload" action="<%=luci.dispatcher.build_url("admin", "application", "upgrade", "doUpgrade")%>" method="post" enctype="multipart/form-data" >
+                    <iframe name="iframeUpload" src="" frameborder="0" SCROLLING="no" style="display:NONE"></iframe>
+                    <input type="hidden" name="act" value="upload" />
+                    <div class="input-info">
+                        <label >选择固件</label>
+                        <input class="wid140" type='text' id='textfield' />
+
+                        <input type='file' name="upload" id='srcFile' class="file-file" size="28" onchange="setFilePath()"/>
+                        <label class="lab-right" style="color:#0abcdf;width:50px;">浏览...</label>
+                    </div>
+                    <div class="input-info" style="margin-top:10px;">
+                        <label></label>
+                        <input class="inp-checkbox upgrade-checkbox" type="checkbox" name="saveconf" id="saveconf" value="1" checked="checked">
+                        <label class="checkbox-txt" for="saveconf" style="width:80px;margin-right:5px;">保留配置</label>
+                    </div>
+                    <div class="input-info save-msg" style="margin-top:10px;display: none;">
+                        <label></label>
+                        <p style="color:red;"></p>
+                    </div>
+                    <div class="operate-btn">
+                        <input type="submit" class="off" value="安装固件" style="display: none;" />
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="<%=resource%>/js/lightbox.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    function setFilePath(){
+        $("#textfield").val($("#srcFile").val());
+        $(".off").css("display", "block");
+    }
+
+    function rspMessage(flag){
+        var ip = "192.168.199.1";
+        if ( $("[name='saveconf']").attr("checked") == "checked" ) {
+            ip = "<%=lanIpaddr%>";
+            if (ip == "")
+                ip = window.location.host;
+        }
+
+        switch (flag){
+            case 0:
+                alert(1);
+                break;
+            case 1:
+                T_alert.show("固件校验失败, 请重新选择正确的固件!",3000);
+                break;
+            case 2:
+                var lightbox = new LightBox('正在升级路由器固件 <span style="color:red">请勿切断路由器电源!</span>','固件升级');
+                setTimeout("cRoute(0, '" + ip + "');", 30000);
+            break;
+        }
+    }
+
+</script>
+
+<%include("bottom")%>

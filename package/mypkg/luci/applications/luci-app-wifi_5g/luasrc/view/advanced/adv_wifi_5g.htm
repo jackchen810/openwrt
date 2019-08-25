@@ -1,0 +1,251 @@
+<%
+	local ktUci = require "luci.kt_uci_api"
+	local uci  = require "luci.model.uci".cursor()
+	local ssid, key, enc
+
+	local wifiNet = ktUci.get_wifi_iface_cfg_id("5G")	
+	if wifiNet then
+		ssid = uci:get("wireless", wifiNet, "ssid")
+		enc = uci:get("wireless", wifiNet, "encryption")
+		key = uci:get("wireless", wifiNet, "key")
+	end
+%>
+
+<%+header%>
+
+<script type="text/javascript">
+
+	var global_data =
+	{
+		"ssid": "<%=ssid%>",
+		"encryption": "<%=enc%>",
+		"password": "<%=key%>",
+		"iface": "all"
+	}
+	
+	$(function () {
+		set_header_icon_lighted("pic_fun_gj");
+		
+		$("#ssid").val(global_data.ssid);
+		if (global_data.encryption != "none") {
+			$("#encryption").val(global_data.encryption);
+			$("#password").val(global_data.password);
+			show_password_table();
+		}
+	});
+	
+	function check_ssid() {
+		var obj = document.getElementById("ssid");
+		var str = obj.value;
+		if (str.indexOf(" ") >= 0) {
+			tip_dialog({msg:"SSID中不能包含空格", id:"ssid"});
+			return false;
+		}
+		var myreg = new RegExp("[`~!@#$%^&*()=+|{}':;',\\[\\]<>/?~！￥……（）【】‘；：”“'。，、？§№☆★○●◎◇◆℃‰€°¤〓↓↑←→※▲△■＃＆＠＼︿♂♀]");
+		var realLength = 0;
+		var len = str.length;
+		var charCode = -1;
+		
+		for (var i = 0; i < len; i++) {
+			charCode = str.charCodeAt(i);
+			if (charCode >= 0 && charCode <= 128) {
+				realLength += 1;
+			} else {
+				realLength += 3;
+			}
+		}
+		
+		if (realLength < 1) {
+			tip_dialog({msg:"SSID不能为空！", id:"ssid"});
+			return false;
+		} else if (myreg.test(str)) {
+			tip_dialog({msg:"输入的SSID含有特殊字符！", id:"ssid"});
+			return false;
+		} else if (realLength > 30) {
+			tip_dialog({msg:"SSID长度不合法！", id:"ssid"});
+			return false;
+		}
+		
+		return true;
+	}
+	
+	function check_Password() {
+		var obj = document.getElementById("password");
+		var str = obj.value;
+		var reg = /^[0-9a-zA-Z]*$/g;
+		
+		if (reg.test(str) != true) {
+			tip_dialog({msg:"您输入的密码不合法！", id:"password"});
+			return false;
+		}
+		if (str.indexOf(" ") >= 0) {
+			tip_dialog({msg:"密码不能有空格！", id:"password"});
+			return false;
+		}
+		var password = obj;
+		if (str.length == 0) {
+			tip_dialog({msg:"密码不能为空！", id:"password"});
+			return false;
+		} else if (str.length < 8) {
+			tip_dialog({msg:"密码长度小于8位！", id:"password"});			
+			return false;
+		} else if (str.length > 63) {
+			tip_dialog({msg:"密码长度不能大于63位！", id:"password"});			
+			return false;
+		} else {
+			return true;
+		}
+	}
+	
+	function check_input_data() {
+		if (!check_ssid()) return false;
+		
+		if ($('#encryption').val() != "none") {
+			if (!check_Password()) return false;
+		}
+		
+		$("#save").prop("disabled", true);
+		$(".loading").show();
+		
+		submit_data();	
+	}
+	
+	function set_global_cache(iface) {
+		global_data.iface = iface;
+		global_data.ssid = document.getElementById('ssid').value;
+		global_data.encryption = document.getElementById('encryption').value;
+		
+		if (global_data.encryption == "psk-mixed+tkip+ccmp") {
+			global_data.password = document.getElementById('password').value;
+		}
+	}
+	
+	function submit_data(){
+        set_global_cache("5G");
+        var set = JSON.stringify(global_data);
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "wireless", "set_iface")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', data: set},
+            timeout:10000,
+            type: "POST",
+            success: function(rsp){
+                if(rsp.result == true){
+                    success_prop("save");
+                }else{
+                    failed_prop(rsp.result,"save");
+                }
+            },
+            error: function(x){
+                error_prop(x.statusText,"save");
+            },
+            ontimeout:function(){
+                timeout_prop();
+            }
+        });
+    }
+</script>	
+
+<div class="soft_con">
+	<div class="soft_con2">
+		<div class="banben gaoji_box">
+			<div class="gaoji_left">
+				<ul>
+					<% include("themes/" .. theme .. "/menuer") %>
+				</ul>
+			</div>
+			
+			<div class="function1" style="border: none">
+				<section>
+					<div style="">
+						<table class="tr">
+
+							<tr >
+								<td><span class="function1_left1">SSID</span></td>
+								<td>
+									<span class="function1_m2">:</span>							
+									<input type="text" id="ssid" class="shurukuan" maxlength="35" />
+									</td>
+								<td></td>
+							</tr>
+							
+							<tr>
+								<td><span class="function1_left1">加密类型</span></td>
+								<td><span class="function1_m2">:</span>
+									<select class="shurukuan" id="encryption">
+										<option value="none">无密码</option>
+										<option value="psk-mixed+tkip+ccmp">WPA/WPA2</option>
+									</select>
+									</td>
+								<td></td>
+							</tr>
+							
+							<tr id="password_tr" style="display: none">
+								<td><span class="function1_left1">密码</span></td>
+
+								<td><span class="function1_m2">:</span>
+									<input type="password" style="ime-mode:disabled;"
+									class="shurukuan" id="password"
+									onpaste="return false"
+									onselectstart="return false"
+									maxlength="68"
+									onkeyup="this.value=this.value.replace(/[\u4e00-\u9fa5]/g,'')"/>
+									</td>
+								<td>
+									<input type="checkbox" autocomplete="off" id="togglePassword2"/>
+									<label for="togglePassword2">显示密码</label>
+									</td>
+							</tr>
+							
+							<script >
+								$(function () {
+									
+									$('#password').togglePassword({
+										el: '#togglePassword2'
+									});
+									
+									$("#encryption").click(function () {
+										show_password_table();
+									});
+								})
+								
+								function show_password_table() {
+									var type = $('#encryption option:selected').val();
+									if (type == "psk-mixed+tkip+ccmp") {
+										document.getElementById("password_tr").style.display = "table-row";
+									} else if (type == "none" || type == "") {
+										document.getElementById("password_tr").style.display = "none";
+									}
+								}
+							</script>
+							
+							<tr>
+								<td></td>
+								<td>
+									<span class="function1_m2">&nbsp;</span>
+									</td>
+								<td></td>
+							</tr>
+							
+							<tr>
+								<td></td>
+								<td>
+									<div>
+										<button id="save" style="margin-left:7px;outline:none;border:none;" onclick="check_input_data();" class="hold">保存</button>
+										<img class="save" style="display: none;" src="<%=resource%>/icons/images/loading.gif"/>
+									</div>
+									</td>
+								<td></td>
+							</tr>
+						</table>
+					</div>
+				</section>
+			</div>
+			</div>
+		
+		</div>
+	</div>
+</div>
+
+<%+footer%>

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Reload all service when changed lan ip address.
+#
+
+HAS_WIFIDOG=$(ps | grep [w]ifidog | wc -l)
+
+[ "$HAS_WIFIDOG" -ge 1 ] && {
+	/etc/init.d/wifidog stop
+	sleep 1
+}
+
+/etc/init.d/network restart; sleep 1
+/etc/init.d/dnsmasq restart; sleep 1
+
+[ "$HAS_WIFIDOG" -ge 1 ] && {
+	/etc/init.d/wifidog start
+	sleep 1
+}
+
+/etc/init.d/apfreeqos restart

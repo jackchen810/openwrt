@@ -1,0 +1,311 @@
+<%
+local uci = require "luci.model.uci".cursor()
+local Disabled = uci:get("adbyby", "proxy", "disabled") or 1
+
+%>
+<!DOCTYPE html>
+<html lang="<%=luci.i18n.context.lang%>">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+    <meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+    <!--[if lt IE 9]
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+    <![endif]>-->
+
+    <title>无线环境检测</title>
+    <link rel="shortcut icon" href="<%=media%>/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/style.css">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/set.css">
+    <link rel="stylesheet" type="text/css" href="<%=resource%>/css/use.css">
+    <script type="text/javascript" src="<%=resource%>/js/jquery-1.9.1.min.js"></script>
+    <script type="text/javascript" src="<%=resource%>/js/toast.js"></script>
+
+    <style>
+        #G-lightbox-popup .lightbox-pic-view{background:url("<%=resource%>/images/loading2.gif") no-repeat;background-size:50px 50px;}
+        .wireless-env{width: 600px;height:400px;margin:50px auto 20px;}
+        .wireless-ch{width: 600px;height:400px;margin:0 auto;}
+        .chart-cont{display:none;width:100%;}
+        .btn-cont{padding-bottom:50px;}
+        .btn-cont .btn-scan{outline:none;margin-left:0;}
+        .loadingscan-img{display:none;}
+        @media screen and (max-width: 599px) and (min-width: 450px) {
+            .wireless-env{width:450px;}
+            .wireless-ch{width:450px;}
+        }
+        @media screen and (max-width:449px){
+            .wireless-env{width:350px;}
+            .wireless-ch{width:350px;}
+        }
+    </style>
+</head>
+<div class="box">
+    <div class="main">
+        <div class="content">
+            <div class="title">
+                <h3>无线环境扫描</h3>
+            </div>
+            <div class="article">
+                <p class="btn-cont">
+                    <button class="btn btn-scan"><img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>点击扫描</button>
+                </p>
+                <div class="chart-cont">
+                    <div id="wireless_env" class="wireless-env"></div>
+                    <div id="wireless_ch" class="wireless-ch"></div>
+                    <div class="input-info">
+                        <p class="adbyby-p">仅扫描2.4G 无线.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="<%=resource%>/js/echarts.min.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+    T_alert._css.position = "fixed";
+    T_alert._css.left = "170px";
+
+    function generateData(ch, sigal) {
+        var start = (ch - 1) * 5 + 1;
+
+        var data = [];
+        for (var i = 0; i < 86; i++) {
+            //var x = (x1 - x0) * i / 200 + x0;
+            data.push(-1);
+        }
+
+        for (var i = 0; i <= 22; i++) {
+            data[start+i] = sigal;
+        }
+
+        //console.log(data);
+        return data;
+    }
+
+    function xdata() {
+        var data = [];
+/*        for (var i = 0; i < 86; i++) {
+            //var x = (x1 - x0) * i / 200 + x0;
+            data.push(i);
+        }
+*/
+        for (var i = 1; i <= 13; i++) {
+            //var x = (x1 - x0) * i / 200 + x0;
+            data[i * 5 + 7] = i;
+        }
+
+        data[85] = "";
+
+        //console.log(data);
+        return data;
+    }
+
+
+    function scan_wireless_env() {
+        $.ajax({
+            url:"<%=luci.dispatcher.build_url("aisino", "scan_wireless_env")%>",
+            success: function(data){
+                if (data.code == 0) {
+                    $(".btn-scan").css("display",'none');
+                    $(".chart-cont").css("display",'block');
+
+                    var list = data.apList;
+                    var series = [];
+
+                    for (var i = 0; i < list.length; i++) {
+                        series.push({
+                            name: list[i].ssid,
+                            type: 'line',
+                            symbol:'none',
+                            animation: false,
+                            lineStyle: {
+                                normal: {
+                                    width: 1
+                                }
+                            },
+                            //areaStyle: {normal: {}},
+                            data: generateData(list[i].channel, list[i].quality)
+                        })
+                    }
+
+                    wifiChart.setOption({
+                        title : {
+                            subtext: '本次共扫描到 ' + list.length + " 个2.4G无线热点.",
+                        },
+                        series: series
+                    });
+
+                    chChart.setOption({
+                        title : {
+                            subtext: '当前最优信道为 ' + data.chEnv[0].channel,
+                        },
+                        visualMap: [{
+                            min: data.chEnv[0].factor,
+                            max: data.chEnv[10].factor,
+                        }],
+                        yAxis: {
+                            data: data.chEnv.map(function(ele) {
+                                return ele.channel + " 信道"
+                            })
+                        },
+                        series: [
+                            {
+                                data: data.chEnv.map(function(ele) {
+                                    return {value: ele.factor, count: ele.count}
+                                })
+                            }
+                        ]
+                    });
+                } else {
+                    T_alert.show("扫描失败,请确认2.4G wifi功能是否正常开启！",3000);
+                    $(".btn-scan").html('重新扫描');
+                    $(".loadingscan-img").css("display",'none');
+                }
+            },
+            ontimeout:function(){
+                T_alert.show("获取失败,请重试！",2000);
+                $(".loadingscan-img").css("display","none");
+            },
+            error: function(){
+                T_alert.show("获取失败,请重试",2000);
+                $(".btn-scan").html('<img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>重新扫描');
+                $(".loadingscan-img").css("display","none");
+            }
+        })
+    }
+
+    $(function () {
+        //scan_wireless_env();
+        $(".btn-scan").click(function(){
+            $(this).html('<img class="loadingscan-img" src="<%=resource%>/images/loading.gif" alt=""/>正在扫描');
+            $(".loadingscan-img").css("display","inline-block");
+            scan_wireless_env();
+        })
+
+        wifiChart = echarts.init(document.getElementById("wireless_env"));
+        wifiChart.setOption({
+            title : {
+                text: '周边热点分布情况',
+                x:'center'
+            },
+            xAxis: {
+                data : xdata(),
+                axisLine: {
+                    show: true,
+                    lineStyle: {
+                        color: '#999',
+                        type: 'dashed'
+                    }
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    interval: 0
+                },
+                //axisLine: {onZero: false}
+            },
+            yAxis: {
+                name: '信号强度',
+                min: 0,
+                max: 100,
+                interval: 20,
+                axisLine: {
+                    lineStyle: {
+                        color: '#999'
+                    }
+                },
+                axisLabel:{
+                    formatter: function (value, index) {
+                        return (value - 100) + " dbm";
+                    }
+                }
+            },
+            tooltip : {
+                trigger: 'axis',
+                formatter: function (params) {
+                    var str = "";
+                    for (var i = 0; i < params.length; i++) {
+                        if (params[i].value > -1)
+                        str = str + params[i].seriesName + '<br/>';
+                    }
+                    return str;
+                },
+                axisPointer: {
+                    animation: false
+                }
+            },
+            series: []
+        });             
+
+        chChart = echarts.init(document.getElementById("wireless_ch"));
+        chChart.setOption({
+            title : {
+                text: '无线信道干扰情况',
+                x:'center'
+            },
+            grid: {
+                left: '10%',
+                right: '4%',
+                top: '15%',
+                bottom: 5
+            },
+            visualMap: [{
+                dimension: 0,
+                right: 20,
+                itemWidth: 12,
+                text: ['拥挤', ''],
+                inRange: {
+                    color: ['lightskyblue', 'yellow', 'orangered', 'red']
+                }
+            }],
+            xAxis: {
+                type: 'value',
+                boundaryGap: [0, 0.1],
+                axisLabel: {
+                    show: false,
+                }
+            },
+            yAxis: {
+                type: 'category',
+                data: []
+            },
+            tooltip : {
+                trigger: 'axis',
+                formatter: function(params) {
+                       // console.log(params);
+                        return params[0].name + "<br/> 当前有" + params[0].data.count + "个热点使用";
+                },
+                axisPointer : {
+                    type : 'shadow'
+                }
+            },
+            series: [
+                {
+                    type: 'bar',
+                    tooltip: {
+                        show: false
+                    },
+                    label: {
+                        normal: {
+                            show: true,
+                            position: 'right',
+                            formatter: function(params) {
+                                if ('count' in params.data) {
+                                    return params.data.count + " 个";
+                                }
+                            }
+                        }
+                    },
+                    data: []
+                }
+            ]
+        });
+    })
+</script>
+
+<%include("bottom")%>

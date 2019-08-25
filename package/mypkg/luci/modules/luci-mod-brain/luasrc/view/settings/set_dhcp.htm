@@ -1,0 +1,679 @@
+<%
+    local uci = require "luci.model.uci".cursor()
+    local ntm = require "luci.model.network".init()
+    local lanIpAddr = uci:get("network", "lan", "ipaddr")
+    local start = uci:get("dhcp", "lan", "start")%256
+    local limit = uci:get("dhcp", "lan", "limit")
+    local leaseTime   = uci:get("dhcp", "lan", "leasetime")
+
+    local primaryDns  = uci:get("dhcp", "lan", "domainserver")
+    local secondDns
+
+    if primaryDns and primaryDns:match(",") then
+        primaryDns, secondDns = primaryDns:match("(%S+),(%S+)")
+    end
+
+    local wanInfo = ntm:get_wannet()
+    if wanInfo then
+        wanIpAddr  = wanInfo:ipaddr() or "0.0.0.0"
+    end
+
+    local status    = require "luci.tools.status"
+    local client    = require "ktapi.ktClient"
+
+    if luci.http.formvalue("list") == "1" then
+        local dhcp = {}
+        dhcp.leases    = status.dhcp_leases()
+        dhcp.ethers = client.getEthersInfo()
+        
+        luci.http.prepare_content("application/json")
+        luci.http.write_json(dhcp)
+    return
+    end
+
+    include("top")
+%>
+<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+
+    <div class="article">
+        <div class="set-content" style="padding-bottom:0;">
+            <form>
+                <div class="input-info" style="margin-bottom: 30px;">
+                    <label>LAN口地址</label>
+                    <input type="text" id="lan-ipaddr" value="<%=lanIpAddr%>"/>
+                </div>
+
+                <div class="input-info">
+                    <label>IP分配范围</label>
+                    <span class="dhcp-ip"><%=lanIpAddr:gsub("%d+$", "")%></span>
+                    <input type="number" id="range1" name="range1"/>
+                    <span class="drangespan">到</span>
+                    <span class="drangespan2"><%=lanIpAddr:gsub("%d+$", "")%></span>
+                    <input type="number" id="range2" style="margin-left:14px;" name="range2"/>
+                </div>
+
+                <div class="input-info drangediv">
+                    <label>租用时间</label>
+                    <input type="text" name="range3" id="range3"/>
+                    <div class="select-div select-div-dhcp" style="width:96px;">
+                        <select id="sel-time" name="sel-time">
+                            <option value="h">小时</option>
+                            <option value="m">分钟</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="input-info" style="margin-top:30px;overflow: hidden;">
+                    <label style="float: left;height:10px;">DNS服务器</label>
+                    <!--<input class="inp-checkbox ml10 dhcp-checkbox" type="checkbox" id="dhcpdns-switch" <%if primaryDns then%>checked="checked"<%end%>/>-->
+                    <!--<label class="dhcp-ser">正常网络环境下,不建议开启本功能.</label>-->
+                    <div style="float: left;">
+                        <input class="magic-checkbox" type="checkbox" name="layout" id="dhcpdns-switch" <%if primaryDns then%>checked="checked"<%end%>/>
+                        <label for="dhcpdns-switch" class="checkbox-txt" style="margin-left: 40px;line-height:22px;width:250px;">正常网络环境下,不建议开启本功能.</label>
+                    </div>
+                </div>
+
+                <div id="dhcpdns" <%if not primaryDns then%>style="display:none;"<%end%>>
+                    <div class="input-info">
+                        <label>首选DNS</label>
+                        <input class="inpsmall" type="text" id="dhcp-dns1" <%if primaryDns then%>value="<%=primaryDns%>"<%end%>/>
+                    </div>
+
+                    <div class="input-info">
+                        <label>备用DNS</label>
+                        <input class="inpsmall" type="text" id="dhcp-dns2" <%if secondDns then%>value="<%=secondDns%>"<%end%>/>
+                        <span style="color:#999;">(选填)</span>
+                    </div>
+                </div>
+            </form>
+
+            <div class="operate-btn" style="margin:43px 0 32px 190px">
+                <input type="submit" value="保 存" class="off" id="save"/>
+                <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+            </div>
+        </div>
+        <hr class="hr-new"/>
+        <div id="connect-content" class="d_cont">
+            <p class="d_tit">DHCP静态绑定</p>
+                <div class="section top">
+                    <div class="scrollcont">
+                        <table class="tab-list">
+                            <thead>
+                            <tr>
+                                <th width="25%">IP地址</th>
+                                <th width="25%">Mac地址</th>
+                                <th width="32%">设备名称(备注)</th>
+                                <th width="18%">操作</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr class="tr" style="display: none;">
+                                <td style="position:relative;width:190px;height:50px;">
+                                    <span class="sel_span1" style="">
+                                        <input class="sel_inp ip" type="text" name="ip" value="">
+                                    </span>
+                                    <span class="sel_span2" style="">
+                                        <div class="select-div">
+                                            <select class="sel_select aabb2" name="aabb2">
+                                                <option value="0"></option>
+                                            </select>
+                                        </div>
+                                    </span>
+                                </td>
+                                <td style="position:absolute;width:190px;height:50px;">
+                                    <span class="sel_span1">
+                                        <input class="sel_inp mac" type="text" name="mac" value="">
+                                    </span>
+                                    <span class="sel_span2">
+                                        <div class="select-div">
+                                            <select class="sel_select aabb" name="aabb">
+                                                <option value="0"></option>
+                                            </select>
+                                        </div>
+                                    </span>
+                                </td>
+                                <td><input class="remark" type="text" value=""/></td>
+                                <td><a class="a" href="javascript:;" onclick="delone(this)">删除</a></td>
+                                <!--<td class="addTdnew" style="padding-left:20px;">-->
+                                    <!--<span class="save-new" id="bind_save1">保存</span>-->
+                                    <!--<span class="del-new" onclick="delone(this)">删除</span>-->
+                                <!--</td>-->
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <style>
+                        .tab-list tr td.addTdnew{
+                            color:#666;
+                        }
+                        div.select-div{
+                            width:150px;
+                            height:36px;
+                            padding:0;
+                            margin:0;
+                            border:1px solid #ddd;
+                        }
+                        div.select-div:after{
+                            right:0;
+                        }
+                        div.select-div select{
+                            height:35px;
+                            padding:0;
+                        }
+                        .sel_span1{
+                            /*height:36px;*/
+                        }
+                        .sel_span2{
+                            border:none;
+                        }
+
+
+
+                        .operate-btn .btn-new1{
+                            width:90px;
+                            height:30px;
+                            line-height:30px;
+                            border-radius: 2px;
+                            font-size:14px;
+                        }
+                        .tab-list .tr td{
+                            padding-left:30px;
+                        }
+                        .tab-list tr  td .a{
+                            width:90px;
+                        }
+                        .remark{
+                            height:34px;
+                            line-height:34px;
+                        }
+                        .save-new, .del-new{
+                            display: inline-block;
+                            padding:0 15px;
+                            cursor: pointer;
+                        }
+                        .save-new{
+                            border-right:1px solid #ccc;
+                        }
+                    </style>
+                    <div class="operate-btn" style="margin:43px 0 32px 0;">
+                        <input type="button" value="添 加 " class="off addtr btn-new1" style="margin-right:40px; "/>
+                        <input type="button" value="保 存" class="off btn-new1" id="bind_save"/>
+                        <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+                    <!--<ul class="operate">
+                        <li class="addtr">
+                            <span><img src="<%=resource%>/images/plus.png"></span>
+                            <a href="javascript:;">添加</a>
+                        </li>
+                        <div class="clean"></div>
+                    </ul>-->
+                </div>
+        </div>
+    </div>
+</div>
+
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    var LAN_ADDR = "<%=lanIpAddr%>" ;
+    var WAN_ADDR = "<%=wanIpAddr%>";
+
+    var oldConfigData = {};
+
+    var dhcpInfo = {
+        "start" : "<%=start%>",
+        "limit" : "<%=limit%>",
+        "leasetime" : "<%=leaseTime%>",
+        "primaryDns" : "<%=primaryDns%>",
+        "secondDns" : "<%=secondDns%>",
+    };
+
+    $(function () {
+        var height = $(document).height()-90>1386+60?$(document).height()-90:1386+60;
+        var width = window.innerWidth;
+        if(width>1350){
+            $('.nav').css('height','100%');
+        }else{
+            $('.nav').css('height',height);
+        }
+
+        $("#range1").val(dhcpInfo.start);
+        $("#range2").val(parseInt(dhcpInfo.start) + parseInt(dhcpInfo.limit));
+//        $("#range3").val(dhcpInfo.leasetime);
+
+        if (dhcpInfo.leasetime.indexOf("h") > 0) {
+            $("#range3").val(parseInt(dhcpInfo.leasetime));
+            $("#sel-time").val("h");
+        } else if(dhcpInfo.leasetime.indexOf("m") > 0) {
+            $("#range3").val(parseInt(dhcpInfo.leasetime));
+            $("#sel-time").val("m");
+        }
+
+        oldConfigData = objCopy(dhcpInfo);
+    });
+
+    $("#dhcpdns-switch").click(function(){
+        $("#save-btn").css("display","block");
+        showDnsBox("dhcpdns-switch","dhcpdns");
+    });
+
+    function showDnsBox(dnsswitch,ele) {
+        var dns_switch = document.getElementById(dnsswitch);
+        if (dns_switch.checked == true) {
+            $("#" + ele).css("display", "block");
+        } else {
+            $("#" + ele).css("display", "none");
+        }
+    }
+
+    function checkInputData() {
+        var lanaddr = $("#lan-ipaddr").val();
+        var start = $("#range1").val();
+        var end = $("#range2").val();
+        var time_number = $("#range3").val();
+        var time_select = $("#sel-time").val();
+        var pos_of_lan_addr = parseInt(lanaddr.lastIndexOf("."));
+        var pos_of_wan_addr = parseInt(WAN_ADDR.lastIndexOf("."));
+
+        var reg = /^[0-9]+$/;
+        if (lanaddr.length < 1) {
+            T_alert.show("LAN口地址不能为空.",2000);
+            return false;
+        } else if (!validators.ipaddr(lanaddr)) {
+            T_alert.show("LAN口地址格式不正确.",2000);
+            return false;
+        } else if (lanaddr.substring(0, pos_of_lan_addr) == WAN_ADDR.substring(0, pos_of_wan_addr)) {
+            T_alert.show("IP地址与外网IP处于同一网段.",2000);
+            return false;
+        } else if (start == "" || end == "") {
+            T_alert.show("起始地址或结束地址不能为空",2000);
+            return false;
+        } else if (!reg.test(start) || !reg.test(end)) {
+            T_alert.show("起始地址或结束地址数据无效",2000);
+            return false;
+        } else if (parseInt(start) < 1 || parseInt(start) > 254 || parseInt(end) < 1 || parseInt(end) > 254) {
+            T_alert.show("起始地址或结束地址数据无效",2000);
+            return false;
+        } else if (parseInt(start) >= parseInt(end)) {
+            T_alert.show("起始地址或结束地址数据无效",2000);
+            return false;
+        } else if(time_number == ""){
+            T_alert.show("租约不能为空",2000);
+            return false;
+        } else if (!reg.exec(time_number) || time_number == 0) {
+            T_alert.show("租约无效",2000);
+            return false;
+        } else if (time_select == "h") {
+            if (parseInt(time_number) > 24) {
+                T_alert.show("租约不能超过24小时",2000);
+                return false;
+            }
+        } else if (time_select == "m") {
+            if (parseInt(time_number) > 1440) {
+                T_alert.show("租约不能超过24小时",2000);
+                return false;
+            }
+
+            if (parseInt(time_number) <= 1) {
+                T_alert.show("DHCP最小租约为2分钟",2000);
+                return false;
+            }
+        }
+
+        dhcpInfo.lanaddr = lanaddr;
+        dhcpInfo.start = start;
+        dhcpInfo.limit = (parseInt(end) - parseInt(start)).toString();
+        dhcpInfo.leasetime = time_number + time_select;
+        dhcpInfo.primaryDns = "";
+        dhcpInfo.secondDns = "";
+
+        // dns
+        if ($("#dhcpdns-switch").length > 0 && $("#dhcpdns-switch").prop("checked")) {
+            dhcpInfo.primaryDns = $("#dhcp-dns1").val();
+            dhcpInfo.secondDns = $("#dhcp-dns2").val();
+
+            if (dhcpInfo.primaryDns == "") {
+                T_alert.show("首选DNS格式不能为空",2000);
+                $("#dhcp-dns1").focus();
+                return false;
+            }
+
+            if (!validators.ipaddr(dhcpInfo.primaryDns)) {
+                T_alert.show("首选DNS格式不正确",2000);
+                $("#dhcp-dns1").focus();
+                return false;
+            }
+
+            if (dhcpInfo.secondDns != "") {
+                if (!validators.ipaddr(dhcpInfo.secondDns)) {
+                    T_alert.show("备用DNS格式不正确",2000);
+                    $("#dhcp-dns2").focus();
+                    return false;
+                }
+            }
+        }
+
+        if (validators.equal(oldConfigData, dhcpInfo)) {
+            T_alert.show("配置未改变",2000);
+            return false;
+        }
+
+        return true;
+    }
+
+    $("#save").click(function () {
+        if (!checkInputData()){return false;}
+
+        var request_data = JSON.stringify(dhcpInfo);
+        loadSave("before", "save");
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "system", "dhcp_setup")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>',  reqdata: request_data},
+            timeout:20000,
+            type: "POST",
+            success: function(rsp){
+                if (rsp.result == true) {
+                    T_alert.show("保存成功！",2000);
+                    oldConfigData = objCopy(dhcpInfo);
+                } else {
+                    T_alert.show("保存失败！",2000);
+                }
+                loadSave("after", "save");
+            },
+            error: function(x){
+                loadSave("after", "save");
+                T_alert.show("保存错误！",2000);
+            },
+            ontimeout:function(){
+                loadSave("after", "save");
+                T_alert.show("保存超时！",2000);
+            }
+        });
+
+    });
+
+</script>
+<script type="text/javascript" src="<%=resource%>/js/xhr.js"></script>
+<script type="text/javascript">
+    function get_dhcp_info() {
+        xhr = new XHR();
+        xhr.get('<%=REQUEST_URI%>', {list: 1}, function (x, data) {
+            if (data) {
+                //console.log(data);
+                defaulBindedData(data);
+                defaultUnbindData(data);
+            }
+        })
+    }
+    //渲染已绑定数据
+    function defaulBindedData(data){
+        var bindedList = data.ethers;
+        $(".tab-list tbody").find(".bindedtr").remove();
+        $.each(bindedList,function(i,ele){
+            if(ele.mask == ""){
+                ele.mask = "无";
+            }
+            var $tr = $('<tr class="bindedtr"></tr>');
+            var strTds = '<td class="dip">'+ ele.ipaddr +'</td>'+
+                    '<td class="dmac">'+ ele.macaddr +'</td>'+
+                    '<td class="dmask">'+ ele.mask +'</td>'+
+                    '<td><a class="a" href="javascript:;" onclick="delone(this)">删除</a></td>';
+            $tr.append(strTds);
+            $(".tab-list tbody").append($tr);
+        });
+    }
+
+    //渲染未绑定数据
+    function defaultUnbindData(data){
+        var dataList = data.leases;
+        var tr = $(".tab-list tbody").find("tr").eq(0);
+        var selip = tr.find(".aabb2");
+        var selmac = tr.find(".aabb");
+        selip.empty();
+        selmac.empty();
+        if(dataList.length == 1){
+            tr.find(".ip").val(dataList[0].ipaddr);
+            tr.find(".mac").val(dataList[0].macaddr);
+            tr.find(".remark").val(dataList[0].hostname);
+        }
+        var opt = '<option value="">请选择</option>';
+        selip.append(opt);
+        selmac.append(opt);
+        $.each(dataList,function(i,ele){
+            var optip = '<option value="'+ ele.ipaddr+'" data-mac="'+ ele.macaddr +'" data-mask="'+ ele.hostname +'">'+ ele.ipaddr +'</option>';
+            var optmac = '<option value="'+ ele.macaddr+'">'+ ele.macaddr +'</option>';
+            selip.append(optip);
+            selmac.append(optmac);
+        });
+    }
+
+    //删除行
+    function delone(otr){
+        var a=otr.parentNode.parentNode;
+        a.parentNode.removeChild(a);
+    }
+
+    function check_bind_data(){
+        var tr = $(".tab-list").find("tbody").find(".tr:visible");
+        var myflag = true;
+        tr.each(function(){
+            var inp_ip = $(this).find("td:eq(0)").find("input");
+            var ip_val = inp_ip.val();
+            var inp_mac = $(this).find("td:eq(1)").find("input");
+            var mac_val = inp_mac.val();
+            var reg_name=/^[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}$/;
+            if(ip_val != ""){
+                var maclength = mac_val.length;
+                var strlength = ip_val.length;
+                var patrn = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;//正则表达式，\d为数字,{1,3}一位或为三位.
+                var laststr;
+                laststr = ip_val.split(".");     //用.把字符串str分开
+                var last_patrn = /^\d{1,3}$/;
+                if (strlength > 15 || strlength < 7){          //IP的字段长度的限制
+                    T_alert.show("IP地址长度错误",2000);
+                    setTimeout(function () {inp_ip.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }else if (!patrn.exec(ip_val)) {
+                    T_alert.show("IP地址格式错误",2000);
+                    setTimeout(function () {inp_ip.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }else if (parseInt(laststr[0]) > 255 || parseInt(laststr[1]) > 255 || parseInt(laststr[2]) > 255 || parseInt(laststr[3]) > 255){ //判断IP每位的大小
+                    T_alert.show("IP地址格式错误",2000);
+                    setTimeout(function () {inp_ip.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }else if (!last_patrn.exec(laststr[3])) {
+                    T_alert.show("IP地址格式错误",2000);
+                    setTimeout(function () {inp_ip.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }else if (parseInt(laststr[0]) == 223 && parseInt(laststr[1]) == 255 && parseInt(laststr[2]) == 255 && parseInt(laststr[3]) == 255) {
+                    T_alert.show("IP地址格式错误",2000);
+                    setTimeout(function () {inp_ip.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }else if (parseInt(laststr[0]) > 223) {
+                    T_alert.show("IP地址格式错误",2000);
+                    setTimeout(function () {inp_ip.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }else if(maclength < 1){
+                    T_alert.show("MAC地址不能为空",2000);
+                    setTimeout(function () {inp_mac.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }else{
+                    if(!reg_name.test(mac_val)){
+                        T_alert.show("MAC地址格式错误",2000);
+                        setTimeout(function () {inp_mac.focus();}, 0);
+                        myflag = false;
+                        return false;
+                    }
+                }
+            } else if (mac_val != "") {
+                if (!reg_name.test(mac_val)) {
+                    T_alert.show("MAC地址格式错误",2000);
+                    setTimeout(function () {inp_mac.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }
+                if (ip_val.length < 1) {
+                    T_alert.show("IP地址不能为空",2000);
+                    setTimeout(function () {inp_ip.focus();}, 0);
+                    myflag = false;
+                    return false;
+                }
+            }
+        });
+        return myflag;
+    }
+
+    function check_repeat_data(data, msg,pos) {
+        var tr = $(".tab-list").find("tbody").find(".tr:visible");
+        var ips = tr.find(data).find("input");
+        var iparr = [];
+        var iphash = {};
+        var count = 1;
+
+        ips.each(function() {
+            if($(this).val() != ""){
+                iparr.push($(this).val());
+            }
+        });
+
+        var dtr = $(".tab-list").find("tbody").find(".bindedtr");
+        dtr.find("."+pos).each(function(){
+            iparr.push(this.innerHTML);
+        });
+
+        for (var i=0; i < iparr.length; i++) {
+            if (!iphash[iparr[i]]) {
+                iphash[iparr[i]] = count;
+            } else {
+                iphash[iparr[i]] = count + 1;
+                T_alert.show(msg + "地址有重复！", 2000);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function bind_save() {
+        var check = false;
+        check = (check_bind_data() == true && check_repeat_data("td:eq(0)", "IP","dip") && check_repeat_data("td:eq(1)", "MAC","dmac"));
+
+        if (check == true) {
+            var banding_list = [];
+            var tr = $(".tab-list").find("tbody").find(".tr:visible");
+
+            tr.each(function() {
+                var inp_ip = $(this).find("td:eq(0)").find("input");
+                var ip = inp_ip.val();
+                var inp_mac = $(this).find("td:eq(1)").find("input");
+                var mask = $(this).find("td:eq(2)").find(".remark").val();
+                var mac = inp_mac.val();
+                if(inp_ip.val() != ""){
+                    banding_list.push({"ip": ip,"mac": mac,"mask": mask});
+                }
+            });
+
+            var tr2 = $(".tab-list").find("tbody").find(".bindedtr");
+            tr2.each(function(){
+                var txt_ip = $(this).find("td:eq(0)").html();
+                var txt_mac = $(this).find("td:eq(1)").html();
+                var txt_mask = $(this).find("td:eq(2)").html();
+                banding_list.push({"ip" : txt_ip,"mac" : txt_mac,"mask": txt_mask});
+            });
+
+            loadSave("before", "save");
+            submit_data(banding_list);
+        }
+    }
+
+    function submit_data(obj){
+        var setting = JSON.stringify(obj);
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "application", "macBind", "setData")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', data:setting},
+            timeout:20000,
+            type: "POST",
+            success: function(rsp){
+                if(rsp.code == 0){
+                    T_alert.show("保存成功！",2000);
+                    $(".trClone").remove();
+                }
+                else{
+                    T_alert.show("保存失败, 请重试",2000);
+                }
+                loadSave("after", "save");
+                get_dhcp_info();
+            },
+            error: function(x){
+                alert("保存失败, 请重试")
+                loadSave("after", "save");
+            },
+            ontimeout:function(){
+                alert("保存失败, 请重试")
+                loadSave("after", "save");
+        }
+        });
+    }
+
+    $(function () {
+        get_dhcp_info();
+
+        //添加行
+        $(".addtr").click(function(){
+            var tr = $(".tab-list tbody").find("tr").eq(0);
+            tr.clone(true).appendTo($(".tab-list tbody")).css("display","table-row").addClass("trClone");
+            //renderTrDom();
+        });
+
+        $("#lan-ipaddr").bind("change",function(){
+            var str = $(this).val();
+            $(".dhcp-ip").text(str.replace(/(\d$)/g,""));
+            $(".drangespan2").text(str.replace(/(\d$)/g,""));
+        });
+
+        $(".aabb").bind("change",function(){
+            var str = $(this).val();
+            // console.log(str);
+            // $(this).parent("span").siblings("span").find("input").val(str);
+            $(this).parent('div.select-div').parent("span.sel_span2").siblings("span").find("input").val(str);
+        });
+
+        $(".aabb2").bind("change",function(){
+            var strip = $(this).val();
+            var strmac = $(this).find("option:selected").attr("data-mac");
+            var strmask = $(this).find("option:selected").attr("data-mask");
+            var $inpmac = $(this).parent('div.select-div').parent("span").parent("td").next("td").find(".mac");
+            var $inpmask = $(this).parent('div.select-div').parent("span").parent("td").next("td").next("td").find(".remark");
+            $inpmac.val(strmac);
+            $inpmask.val(strmask);
+            $(this).parent('div.select-div').parent("span").siblings("span").find("input").val(strip);
+        });
+
+        //保存
+        $("#bind_save").click(function(){
+            bind_save();
+        })
+    });
+
+</script>
+
+<%include("bottom")%>

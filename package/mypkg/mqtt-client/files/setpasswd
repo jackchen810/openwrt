@@ -1,0 +1,25 @@
+#!/usr/bin/lua
+
+local system = require "ktapi.system"
+local defusrname = system.defusrname
+local ret = false
+function setpasswd(username,pwdnew,pwdold)
+    local ret  = system.setpasswd(username, pwdnew,pwdold)                                        
+    return ret
+end
+
+--input param type 1:arg[1] ==>username ,arg[2]==> passwd old ,arg[3] ==> new passwd
+--input parma type 2:arg[1]==> passwd old ,arg[2] ==> new passwd
+
+if #arg >= 3 then
+    local username = arg[1] or defusrname
+    ret = setpasswd(username,arg[2],arg[3])
+elseif #arg == 2 then
+    ret = setpasswd(defusrname,arg[1],arg[2])
+end
+
+if ret == true then
+    print(1)
+else
+    print(0)    
+end

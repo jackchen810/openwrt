@@ -1,0 +1,100 @@
+<%include("top")%>
+<!--<div class="main">-->
+    <div class="content">
+        <div class="article disabledev">
+            <div class="apple-info">
+                <p id="sum"></p>
+
+                <ul id="connect-dev">
+                    <!--<li class="">
+                        <div class='apply-icon'>
+                                <div class="a-icon-img"><img src='<%=resource%>/images/organiz/disable.png'></div>
+                                <h5>ekjfeijfe ojwofij</h5>
+                        </div>
+                        <h5 class='apply-con'>eeeeeeeeeeee</h5>
+                        <p class="apply-btn">
+                            <input type='submit' name='eeeeeeeeeeee' value='解禁' class='enter' />
+                        </p>
+                    </li>-->
+                    <div class="clean"></div>
+                </ul>
+
+                <div class="clean"></div>
+            </div>
+        </div>
+    </div>
+<!--</div>-->
+
+<script type="text/javascript" src="<%=resource%>/js/organization.js"></script>
+<script type="text/javascript">
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    function getBlackList() {
+        $.ajax({
+            url: "<%=luci.dispatcher.build_url("admin", "connect", "getBlackList")%>",
+            data: {"CMD": "disableDeviceListSelect"},
+            success: function (data) {
+                var arrayData = data;
+                var sum = arrayData.length;
+
+                $("#sum").html("禁用设备 <span>（共" + sum + "台）</span>");
+                $("#connect-dev").empty();
+
+                for (var i = 0; i < sum; i++) {
+                    var mac = arrayData[i].macaddr;
+                    var vendor = arrayData[i].vendor;
+
+                    var imageName = Organizations[vendor];
+                    if (!imageName) {
+                        imageName = "disable-new.png";
+                    }
+
+                    $("#connect-dev").append("<li>" +
+                                                    "<div class='apply-icon'>" +
+                                                        "<div class='a-icon-img'><img src='<%=resource%>/images/organiz/" + imageName + "'></div>" +
+                                                        "<h5>"+ vendor +"</h5>" +
+                                                    "</div>" +
+                                                    "<h5 class='apply-con'>"+ mac +"</h5>" +
+                                                    "<p class='apply-btn'>" +
+                                                        "<input type='submit' name='"+ mac +"' value='解禁' class='enter' />" +
+                                                    "</p>" +
+                                                "</li>");
+                }
+            }
+        });
+    }
+
+    $(function () {
+
+        getBlackList();
+
+        //解禁设备
+        $("body").on("click",".enter",function() {
+           // var mac = $(this).siblings(".apply-con h5").text();
+            var mac = $(this).attr("name");
+
+            $.ajax({
+                url: "<%=luci.dispatcher.build_url("admin", "connect", "delFromBlackList")%>",
+                data: {
+                    mac: mac,
+                },
+                success: function (data) {
+                    var datastr = data;
+                    var status = datastr.status;
+                    if (status == "0") {
+                        T_alert.show('成功！',2000);
+                        getBlackList();
+                    } else {
+                        T_alert.show("失败",2000);
+                    }
+                },
+                error: function (xhr, errText, errType) {
+                    T_alert.show(xhr.status + errType,2000);
+                }
+            })
+        })
+    })
+
+</script>
+<%include("bottom")%>

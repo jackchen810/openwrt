@@ -1,0 +1,5 @@
+#!/usr/bin/env lua
+local M = require "ktapi.ktSpeedTest"
+local T = M.speedTest()
+
+print("upload=%q\ndownload=%q" % {T.upload, T.download})

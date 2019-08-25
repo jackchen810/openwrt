@@ -1,0 +1,415 @@
+.section-head1 h5 {
+	margin: 0;
+	float: left;
+	padding: 59px 0 28px 0;
+	/*font: 16px/20px 'Adobe 黑体 Std';*/
+	font: 16px/20px 'Microsoft YaHei';
+}
+.fresh {
+	float: right;
+	width: 98px;
+    text-align: center;
+    height: 28px;
+    line-height: 28px;
+    border: 1px solid #2bbcdd;
+    border-radius: 4px;
+    margin: 50px 0 20px 0;
+}
+.fresh img { vertical-align: middle;}
+.fresh a,.re-fresh a { color: #2bbcdd; }
+.clean { clear: both;}
+.top { 
+	margin-top: 67px;
+	margin-bottom: 96px;
+}
+.section-head2 h5  {
+	margin: 0;
+	font: 16px/20px 'Microsoft YaHei';
+}
+.top ul li {
+	float: left;
+	width: 98px;
+    height: 30px;
+    text-align: center;
+    line-height: 30px;
+    border: 1px solid #999;
+    border-radius: 4px;
+    margin-right: 30px;
+}
+.operate {
+	margin: 33px 0 20px 0;
+	padding: 0;
+}
+.operate img { vertical-align: text-top;}
+.operate a {
+	color: #666;
+	font: 16px/20px 'Microsoft YaHei';
+}
+.case {
+	width: 12px;
+	height: 12px;
+}
+/*内存使用情况*/
+.storage-con { margin: 29px 94px 0 139px;}
+.time {
+	/*width: 238px;*/
+	width:160px;
+	height: 38px;
+	border: 1px solid #ebebeb;
+	border-radius: 4px;
+	padding-left: 15px;
+	background-image: url(../images/time.png);
+	background-repeat: no-repeat;
+	background-position: 95% 50%;
+	line-height: 38px;
+}
+input::-ms-clear,input::-ms-reveal{display:none;}
+.storage-head label { margin: 0 16px;}
+.search {
+    /*margin-left: 41px;*/
+	margin-left:32px;
+	width:114px;
+    /*width: 150px;*/
+    height: 40px;
+    border-radius: 4px;
+    background-color: #2cbae3;
+    border: none;
+    color: #fff;
+    font: 18px/20px 'Microsoft YaHei';
+   	cursor: pointer;
+}
+.storage-chart h2 {
+	margin: 58px 0 77px 0;
+	font: 16px/20px 'Microsoft YaHei';
+	color: #666;
+}
+.chart {
+	height: 340px;
+	margin-top: 58px;
+}
+.chart-head h3 {margin: 0;}
+.chart-head p {
+	margin-top: 30px;
+	float: right;
+}
+#storage-chart {		
+	height: 230px;
+}
+/*无线中继下一步*/
+.trunk-next {
+	margin: 87px 0 0 160px;
+    height: 523px;
+}
+.trunk-next p {
+    /*margin: 37px 0 0 0;*/
+   	/*font: 16px/20px 'Adobe 黑体 Std';*/
+	margin:18px 0 0 0;
+	font: 16px/20px  'Microsoft YaHei';
+	color:#333;
+   	/*color: #0b0b0b;*/
+}
+.input-name,.input-pwd {
+    width: 218px;
+    height: 38px;
+    border-radius: 4px;
+    border: 1px solid #e8e8e8;
+    margin-left: 33px;
+}
+.wireless-name {margin-top: 53px;}
+.wireless-name label,.wireless-pwd label { color: #666;}
+.wireless-pwd { margin-top: 15px;}
+.btn {
+    margin-top: 43px;
+    margin-left: 96px;
+}
+.previous,.next {
+    width: 160px;
+    height: 40px;
+    border-radius: 4px;
+    border: none;
+    background: #ebebeb;
+    color: #666;
+    /*font-family: Adobe 黑体 Std;*/
+    font-size: 20px;
+   	cursor: pointer;
+   	line-height: 40px;
+   	vertical-align: middle;
+}
+.next {
+	background: #2bbcdd;
+	color: #fff;
+}
+/*.btn input:hover { background: #ccc;}*/
+.next { margin-left: 35px;}
+.active {
+	background: #2bbcdd;
+	color: #fff;
+}
+/*应用页*/
+/*.apple-info {margin: 0 0 80px 40px;}*/
+.apple-info ul {
+	margin: 0;
+	padding: 0;
+}
+.disabledev .apple-info ul li {
+	height:80px;
+	border-bottom:1px solid #f3f3f3;
+}
+.disabledev  .apply-icon,.apply-con {
+	/*display: inline-block;*/
+    /*vertical-align: top;*/
+	float:left;
+}
+.disabledev .apply-icon {float: left;overflow:hidden;width:45%;height:100%;line-height:80px;padding-left:55px;font-size:16px;color:#333;border-right:1px solid #f3f3f3;}
+.a-icon-img{float:left;}
+.apply-icon h5{
+	float:left;
+	font-weight:normal;
+}
+.disabledev .apply-icon img{
+	width:50px;
+	height:50px;
+	margin:15px;
+}
+.disabledev .apply-icon span{
+	display:inline-block;
+	height:80px;
+	line-height:80px;
+}
+
+.disabledev .apply-con {margin-left: 30px;width:25%;height:80px;line-height:80px;color:#333;font-size:16px;font-weight:normal;}
+.disabledev .apply-btn{float:left;}
+.enter {
+	border:1px solid #d4dfe8;
+	border-radius:2px;
+	width:88px;
+	height:28px;
+	line-height:28px;
+	color:#666;
+	font-size:14px;
+	cursor: pointer;
+	background-color:#fff;
+	margin-top:26px;
+	outline:none;
+}
+.apple-info ul li:hover{
+	background-color:#f8f8f8;
+}
+.apple-info ul li:hover .apply-icon{
+	padding-left:52px;
+	border-left:3px solid #2a5cff;
+}
+.apple-info ul li:hover .enter{
+	background-color:#2a5cff;
+	color:#fff;
+}
+.section-apply { margin: 0 115px;}
+.apply-head h5 {
+	margin-top:56px; 
+	font: 16px/20px 'Microsoft YaHei';
+}
+.section-apply2 {
+	margin: 98px 115px 58px 115px;
+}
+.apply-btn { text-align: center;}
+/*域名黑名单页*/
+.operate-list { margin: 49px 97px 110px 97px; }
+.domain { 
+	/*width: 592px;*/
+	width:433px;
+	height: 36px;
+	padding-left: 21px;
+	border: 1px solid #f5f5f5;
+	border-radius: 4px;
+	line-height: 36px;
+}
+.add-list {
+	width: 130px;
+	height: 40px;
+	color: #fff;
+	background: #2bbcdd;
+	border-radius: 4px;
+	border: 1px solid #2bbcdd;
+	margin-left: 15px;
+	background-image: url(../images/addList.png);
+	background-repeat: no-repeat;
+	background-position: 34% 50%;
+	padding-left: 36px;
+}
+.table-info {
+	width: 100%;
+	margin-top: 35px;
+}
+.table-info thead { background: #f5f5f5;}
+.table-info tr {
+	width: 766px;
+	height: 48px;
+}
+.table-info tr th { width: 360px;}
+.table-info tbody tr {
+	border: 1px solid #f5f5f5;
+	border-radius: 0 0 4px 4px;
+}
+.table-info tr td { text-align: center;}
+
+/*弹出遮罩层*/
+.loading {
+	display: none;
+	position: absolute;
+    z-index: 1002;
+    top: 47%;
+    left: 33%;
+    background-color: #fff;
+    width: 750px;
+    height: 268px;
+    border-radius: 20px;
+}
+.loading-msg { margin-left: 142px;}
+.loading-msg p {
+	margin-bottom: 40px;
+	color: #0b0b0b;
+	font-size: 16px;
+	font-family: 'Microsoft YaHei';
+}
+.loading-msg em {margin-left: 22px;}
+.loading-img {
+    text-align: center;
+    margin: 38px 0 27px 0;
+}
+
+.tab-list tbody tr{
+	height:66px;
+}
+.sel_span1 {
+	position: absolute;
+	border-top: 1pt solid #ddd;
+	border-left: 1pt solid #ddd;
+	border-bottom: 1pt solid #ddd;
+	width: 130px;
+	height: 35px;
+	top: 13px;
+	left:10px;
+}
+.sel_span2{
+	position:absolute;
+	border:1pt solid #ddd;
+	width:130px;
+	height:35px;
+	clip:rect(0 190px 190px 130px);
+	top: 13px;
+	left:10px;
+}
+.sel_inp{
+	width:130px;
+	height:35px;
+	border:none;
+	outline:none;
+	padding-left:5px;
+	color:#666;
+	line-height: 35px;
+}
+.sel_select{
+	width:150px;
+	height:38px;
+	border:1px solid #ddd;
+	margin-top:-1px;
+	margin-left:-1px;
+	outline:none;
+	vertical-align: middle;
+	padding:4px 0;
+	color:#333;
+}
+.remark{
+	width:150px;
+	height:30px;
+	border:1px solid #ddd;
+	outline:none;
+	padding-left:4px;
+	color:#666;
+}
+.btn{
+	width:160px;
+	height:40px;
+	color:#fff;
+	border-radius:4px;
+	border:none;
+	font-size:20px;
+	cursor: pointer;
+	background-color: #0abcdf;
+}
+.dmask{
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 120px;
+}
+.tab-list tr td .fw_rule{
+	display: inline-block;
+	width: 90px;
+	height: 30px;
+	border: 1px solid #d4dfe8;
+	line-height: 30px;
+	color: #666;
+	font-size: 14px;
+	border-radius: 2px;
+	text-align: center;
+}
+.tab-list tr td .fw_rule:hover{
+	background-color:#2a5cff;
+	color:#fff;
+}
+.tab-list tr:hover .fw_rule{
+	background-color:#2a5cff;
+	color:#fff;
+}
+.tab-list tr td .addTr{
+	background-color: #2a5cff;
+	color: #fff;
+	display: inline-block;
+	width: 90px;
+	height: 30px;
+	border: 1px solid #d4dfe8;
+	line-height: 30px;
+	font-size: 14px;
+	border-radius: 2px;
+	text-align: center;
+}
+.tab-list tr td .addTr:hover{
+	background-color:#1443dd;
+	color:#fff;
+}
+.wd-tab.xfrp-tab{
+	margin-top:50px;
+	background-color:#f8f9fd;
+}
+.wd-tab.xfrp-tab li{
+	height:60px;
+	line-height: 60px;
+}
+.wd-tab.xfrp-tab .current {
+	border-bottom: none;
+	/*border-bottom: 3px solid #2a5cff;*/
+	/*height: 57px;*/
+}
+.wd-tab.xfrp-tab .current:after {
+	font-weight: normal;
+	content: '';
+	width: 22px;
+	height: 3px;
+	display: block;
+	background: #2a5cff;
+	z-index: 35;
+	position: relative;
+	bottom:3px;
+}
+.xfrp-cont{
+	border-radius: 8px;
+	border:1px solid #ececec;
+	border-bottom:none;
+}
+.xfrp-cont .tab-list .portname-css{
+	text-align: left;
+}
+.tab-list .tr td{
+	padding-left:10px;
+}

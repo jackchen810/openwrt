@@ -1,0 +1,1321 @@
+<%
+    local uci = require "luci.model.uci".cursor()
+    local ktNetwork = require "ktapi.ktNetwork"
+
+    local hasWifi = ((fs.stat("/etc/config/wireless", "size") or 0) > 0)
+    local lanAddr = uci:get("network", "lan", "ipaddr") or "0.0.0.0"
+
+    local remoteAddr = luci.http.getenv("REMOTE_ADDR")
+    local curHostMac = ktNetwork.getMacByIP(remoteAddr) or "FF:FF:FF:FF:FF:FF"
+    local wanMacAddr = uci:get("network", "wan", "macaddr") or ktNetwork.getWanInfo().macaddr or "FF:FF:FF:FF:FF:FF"
+
+    local defMacAddr = uci:get("network", "wan", "defmacaddr")
+    if not defMacAddr and wanMacAddr then
+        uci:set("network", "wan", "defmacaddr", wanMacAddr)
+        uci:commit("network")
+
+        defMacAddr = wanMacAddr
+    end
+
+    if luci.http.formvalue("config") == "1" then
+        local rv = {
+            proto        = uci:get("network", "wan", "proto") or "dhcp",
+            password    = uci:get("network", "wan", "password"),
+            username    = uci:get("network", "wan", "username"),
+            ipaddr        = uci:get("network", "wan", "ipaddr"),
+            gateway        = uci:get("network", "wan", "gateway"),
+            netmask        = uci:get("network", "wan", "netmask"),
+            dns            = uci:get("network", "wan", "dns"),
+
+            --中继状态
+            apClientSet = uci:get("network", "wan", "apclient"),
+        }
+
+        luci.http.prepare_content("application/json")
+        luci.http.write_json(rv)
+        return
+    elseif luci.http.formvalue("status") == "1" then
+        local wanInfo = ktNetwork.getWanInfo()
+
+        wanInfo.proto = wanInfo.proto or uci:get("network", "wan", "proto")
+        wanInfo.ipaddr = wanInfo.ipaddr or "0.0.0.0"
+        wanInfo.netmask = wanInfo.netmask or "0.0.0.0"
+        wanInfo.gateway = wanInfo.gateway or "0.0.0.0"
+        wanInfo.dns = wanInfo.dns or "0.0.0.0"
+
+        luci.http.prepare_content("application/json")
+        luci.http.write_json(wanInfo)
+        return
+    end
+
+    include("top")
+%>
+
+<div id="findlayer" class="layer" style="display: none;">
+    <div class="bglayer"></div>
+
+    <div class="white_content">
+        <div class="findclose">
+            <span class="findclose" id="findclose"><img src="<%=resource%>/images/i_close.png" alt=""/></span>
+        </div>
+
+        <div class="cont_inner">
+            <i class="loading_img"><img src="<%=resource%>/images/tu.png" alt=""/></i>
+            <p class="find_tit" style="display:block;"><em>提示：</em>请将原路由器的WAN口连接到 当前路由器的任意一个LAN口,然后在原路由器开机后, 点击开始找回</p>
+            <p class="find_msg">
+                恭喜您，账号已找回，去 <a href='javascript:;' onclick='closeLayer();' style="color:#0abcdf;">设置拨号</a>
+            </p>
+            <p class="qx_tip"><button class="findbtn">开始找回</button></p>
+            <p class="qx_tip">
+                <input type="checkbox" id="specialppoe"/>
+                <label for="specialppoe">特殊拨号模式</label>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    var dnsList = [
+        {ipaddr:'114.114.114.114',sp:'114 DNS',time:''},
+        {ipaddr:'114.114.115.115',sp:'114 DNS',time:''},
+        {ipaddr:'1.2.4.8',sp:'CNNIC SDNS',time:''},
+        {ipaddr:'210.2.4.8',sp:'CNNIC SDNS',time:''},
+        {ipaddr:'223.5.5.5 ',sp:'阿里 AliDNS',time:''},
+        {ipaddr:'223.6.6.6',sp:'阿里 AliDNS',time:''},
+        {ipaddr:'180.76.76.76',sp:'百度 BaiduDNS',time:''},
+        {ipaddr:'119.29.29.29',sp:'DNSPod DNS+',time:''},
+        {ipaddr:'182.254.116.116',sp:'DNSPod DNS+',time:''},
+        {ipaddr:'101.226.4.6 ',sp:'DNS 派(非联通)',time:''},
+        {ipaddr:'218.30.118.6',sp:'DNS 派(非联通)',time:''},
+        {ipaddr:'123.125.81.6',sp:' DNS派(联通)',time:''},
+        {ipaddr:'140.207.198.6',sp:' DNS派(联通)',time:''},
+        {ipaddr:'8.8.8.8',sp:'谷歌DNS',time:''}
+    ];
+    var ProtoDNS = '';
+    //渲染dns列表弹出层
+    function requestDnsListData(data){
+        $("#listArea").html("");
+        $.each(data,function(i,ele){
+            var ipaddr = ele.ipaddr;
+            var sp = ele.sp;
+            var time = ele.time;
+            var tr;
+            if(time == ""){
+                tr = '<tr class="t1-tr" onclick=addPrimayDns("'+ ipaddr +'")><td><span>'+ ipaddr +'</span></td><td><span>'+ sp + '</span></td><td class="orderid"><span>'+ time + '</span></td></tr>';
+            }else{
+                tr = '<tr class="t1-tr" onclick=addPrimayDns("'+ ipaddr +'")><td><span>'+ ipaddr +'</span></td><td><span>'+ sp + '</span></td><td class="orderid"><span>'+ time + ' ms</span></td></tr>';
+            }
+            $("#listArea").append(tr);
+        });
+    }
+    function addPrimayDns(ipaddr){
+        $("#" + ProtoDNS + "-dns2").val(ipaddr);
+        $("#dnsLayer").css("display","none");
+    }
+
+    $(function(){
+        // requestDnsListData(dnsList);
+
+        $(".showDnsList").click(function() {
+            //$("#dnsLayer").css("display","block");
+            var loadimg = $(this).siblings('img');
+            loadimg.css('display','inline-block');
+            $(this).css('display','none');
+
+            $.ajax({
+                url:"<%=luci.dispatcher.build_url("admin", "network", "publicDns")%>",
+                success:function(rsp){
+                    loadimg.css('display','none');
+                    if(rsp.length == 0){
+                        T_alert.show("获取失败,当前网络不可用！",2000);
+                    }else{
+                        $("#" + ProtoDNS + "-dns1").val(rsp[0].ipaddr);
+                        $("#" + ProtoDNS + '-dns2').val(rsp[1].ipaddr);
+                        $("#save-btn").css("display","block");
+                    }
+
+                    $(".showDnsList").css('display','inline-block');
+                },
+                error:function(){
+                    loadimg.css('display','none');
+                    $(".showDnsList").css('display','inline-block');
+                    T_alert.show("获取失败,当前网络不可用！",2000);
+                }
+            })
+
+        });
+
+        $("#dnsclose").click(function(){
+            $("#dnsLayer").css("display","none");
+        });
+
+        $(".refreshDnsList").click(function(){
+            $(".refreshloading").css("display","inline-block");
+            $.ajax({
+                url:"<%=luci.dispatcher.build_url("admin", "network", "publicDns")%>",
+                success:function(rsp){
+                    //console.log(rsp);
+                    requestDnsListData(rsp);
+                    $(".refreshloading").css("display","none");
+                },
+                error:function(){
+                    T_alert.show("获取失败！",2000);
+                    $(".refreshloading").css("display","none");
+                }
+            })
+        })
+    })
+</script>
+
+<div id="dnsLayer" class="layer">
+    <div class="bglayer"></div>
+
+    <div class="white_content" style="top:10%;">
+        <div class="findclose">
+            <span class="findclose" id="dnsclose"><img src="<%=resource%>/images/i_close.png" alt=""/></span>
+        </div>
+
+        <div class="cont_inner">
+            <h4 class="layertitle">常用公共 DNS 服务器 IP 地址</h4>
+
+            <p class="layerrefresh">
+                <img class="refreshloading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                <a href="javascript:;" class="refreshDnsList">速度测试</a>
+            </p>
+
+            <table width="90%" class="t1" id="listArea" border="0" align="center" cellpadding="0" cellspacing="0">
+                <tr></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+
+    <div class="">
+        <div class="article">
+            <div class="set-content">
+                <div class="input-info">
+                    <div class="selcont">
+                        <label class="settit2">连接类型</label>
+                        <div id="choseLink" style="display:none;">
+                            <div id="ulcblabel"><span id="ulcbabeltxt"></span><span class="yy-icon yy-soi"></span></div>
+                            <div id="ulcbcontent" class="">
+                                <ul>
+                                    <li data-value="pppoe"><a href="javascript:;">宽带拨号(PPPOE)</a></li>
+                                    <li data-value="dhcp"><a href="javascript:;">自动获取(DHCP)</a></li>
+                                    <li data-value="static"><a href="javascript:;">手动设置(静态IP)</a></li>
+                                    <li data-value="relay"><a href="javascript:;">无线中继模式</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <em id="loading-tip">获取中...</em>
+                    </div>
+                </div>
+
+                <!-- PPPOE设置 -->
+                <div id="pppoe" style="display:none;" class="chosebox" >
+                    <div class="input-info" style="position:relative;">
+                        <label>宽带账号</label>
+                        <input type="text" id="pppoe-account" value=""/>
+                        <span id="finduser"  class="finduser" style="color:#0abcdf;">找回宽带账号</span>
+                        <div id="userList" class="userList"></div>
+                    </div>
+
+                    <div class="input-info">
+                        <label>宽带密码</label>
+                        <input type="password" id="pppoe-passwd" value=""/>
+                        <!--<span style="color:#999;">-->
+                            <!--<input type="checkbox" class="inp-checkbox" id="pppoepwd"/>-->
+                            <!--<label class="checkbox-txt" for="pppoepwd">显示密码</label>-->
+                        <!--</span>-->
+                        <span>
+                            <input class="magic-checkbox" type="checkbox" name="layout" id="pppoepwd">
+                            <label for="pppoepwd" class="checkbox-txt" style="line-height:22px;">显示密码</label>
+                        </span>
+                    </div>
+
+                    <div class="input-info" style="margin-top:30px;">
+                        <label style="float: left;height:10px;"></label>
+                        <!--<input class="inp-checkbox ml32" type="checkbox" id="pppoedns-switch"/>-->
+                        <!--<label class="checkbox-txt" for="pppoedns-switch" style="width:80px;margin-right:5px;">自定义DNS</label>-->
+                        <div style="float: left;width:160px;">
+                            <input class="magic-checkbox" type="checkbox" name="layout" id="pppoedns-switch">
+                            <label for="pppoedns-switch" class="checkbox-txt" style="margin-left: 40px;line-height:22px;">自定义DNS</label>
+                        </div>
+                        <a class="checkbox-txt" style="line-height:22px;" href="<%=luci.dispatcher.build_url("admin", "system", "pppoe_log")%>" >查看拨号日志</a>
+                    </div>
+
+                    <div id="pppoedns" style="display:none;">
+                        <div class="input-info">
+                            <label>首选DNS</label>
+                            <input type="text" id="pppoe-dns1"/>
+                            <a href="javascript:;" class="showDnsList" style="color:#999;">智能DNS推荐</a>
+                            <img style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>备用DNS</label>
+                            <input type="text" id="pppoe-dns2"/>
+                            <span style="color:#999;">(选填)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <script type="text/javascript">
+                    $(function(){
+                        $("#finduser").click(function(){
+                            $("#findlayer").css("display","block");
+                            $(".find_msg").css("display","none");
+                        });
+                        $("#findclose").click(function(){
+                            closeLayer();
+                        })
+                    })
+
+                    function closeLayer(){
+                        $("#findlayer").css("display","none");
+                    }
+
+                    function getPPPoeStatus() {
+                        $.getJSON("<%=luci.dispatcher.build_url("admin", "network", "get_pppoe_status")%>", {}, function(rsp)
+                        {
+                            if (rsp.code == 0) {
+                                $("#status-msg").css("color", "#2573bf");
+                                $("#status-msg").html("<%:已连接%>");
+                            } else if (rsp.code == 1) {
+                                if (rsp.msg) {
+                                    $("#status-msg").html(rsp.msg);
+                                    $("#status-msg").css("color", "red");
+                                } else {
+                                    $("#status-msg").html("<%:连接中...%>");
+                                    $("#status-msg").css("color", "#2573bf");
+                                }
+                            } else {
+                                $("#status-msg").html("<%:未连接%>");
+                                $("#status-msg").css("color", "red");
+                            }
+                        })
+                    }
+                </script>
+
+                <!-- 静态ip设置 -->
+                <div id="static" style="display:none;" class="chosebox">
+                    <div class="input-info">
+                        <label>IP  地址</label>
+                        <input type="text" id="static-ipaddr"/>
+                    </div>
+
+                    <div class="input-info">
+                        <label>子网掩码</label>
+                        <input type="text" id="static-netmask"/>
+                    </div>
+
+                    <div class="input-info">
+                        <label>默认网关</label>
+                        <input type="text" id="static-gateway"/>
+                    </div>
+
+                    <div class="input-info">
+                        <label>首选DNS</label>
+                        <input type="text" id="static-dns1"/>
+                        <a href="javascript:;" class="showDnsList" style="color:#999;">智能DNS推荐</a>
+                        <img style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                    </div>
+
+                    <div class="input-info">
+                        <label>备用DNS</label>
+                        <input type="text" id="static-dns2"/>
+                        <span style="color:#999;">(选填)</span>
+                    </div>
+                </div>
+
+                <script type="text/javascript">
+                    $(function(){
+                        // 静态IP设置
+                        $("#static-netmask").focus(function() {
+                            if($(this).val() == "") {
+                                $(this).val("255.255.255.0");
+                            }
+                        });
+
+                        $("#static-gateway").focus(function() {
+                            var ipaddr = $("#static-ipaddr").val();
+                            var gwaddr = $("#static-gateway").val();
+
+                            if (ipaddr.length < 1 || !validators.ipaddr(ipaddr)) {
+                                T_alert.show("请填写正确的IP地址",2000);
+                                $("#static-ipaddr").focus();
+                                return false;
+                            }
+
+                            if (gwaddr.length > 1 && validators.ipaddr(gwaddr)) {
+                                return true;
+                            }
+
+                            var arry = ipaddr.split(".");
+                            var arry1 = "";
+
+                            for (var i = 0; i < arry.length - 1; i++) {
+                                arry[i] = arry[i] + ".";
+                                arry1 += arry[i];
+                            }
+
+                            arry1 += "1";
+
+                            $(this).val(arry1);
+                        })
+                    })
+                </script>
+
+                <!-- DHCP设置 -->
+                <div id="dhcp" style="display:none;" class="chosebox">
+                    <div class="input-info">
+                        <label></label>
+                        <em style="margin-left:32px;">由上级路由自动分配IP，无需设置</em>
+                    </div>
+                    <div class="input-info" style="margin-top:30px;height:30px;overflow: hidden;">
+                        <label style="float: left;height:10px;"></label>
+                        <!--<input class="inp-checkbox ml32" type="checkbox" id="dhcpdns-switch"/>-->
+                        <!--<label class="checkbox-txt" for="dhcpdns-switch" style="width:80px;margin-left:5px;">自定义DNS</label>-->
+                        <div style="float: left;">
+                            <input class="magic-checkbox" type="checkbox" name="layout" id="dhcpdns-switch">
+                            <label for="dhcpdns-switch" class="checkbox-txt" style="margin-left: 40px;line-height:22px;">自定义DNS</label>
+                        </div>
+
+                    </div>
+
+                    <div id="dhcpdns" style="display:none;">
+                        <div class="input-info">
+                            <label>首选DNS</label>
+                            <input type="text" id="dhcp-dns1"/>
+                            <a href="javascript:;" class="showDnsList" style="color:#999;">智能DNS推荐</a>
+                            <img style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                        </div>
+
+                        <div class="input-info">
+                            <label>备用DNS</label>
+                            <input type="text" id="dhcp-dns2"/>
+                            <span style="color:#999;">(选填)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 无线中继 -->
+                <div id="relay" style="display:none;" class="chosebox">
+                    <div class="input-info" style="overflow:hidden;">
+                        <label style="float:left;height:56px;line-height:56px;">无线名称</label>
+
+                        <div style="float:left;margin-left:2px;">
+                            <div class="scan-now" style="display: block;margin-top:10px;">
+                                <div class="wire-name">
+                                    <input class="wn" style="margin:0;border-right:1px solid #ccc;border-radius:0;" type="text" placeholder="正在搜索无线网络...">
+                                    <button class="choose_wire">选择网络</button>
+                                 </div>
+
+                                <img class="imgload" src="<%=resource%>/images/loading.gif" alt="">
+                            </div>
+
+                            <div class="wname" style="display: block;margin-top:10px;">
+                                <div class="wire-name">
+                                    <input id="wifi_net_name" class="wn" type="text" placeholder="请输入网络名称">
+                                    <p id="relay_data" style="display: none;"></p>
+                                    <button id="chose_wifi" class="choose_wire">选择网络</button>
+                                </div>
+
+                                <div id="wifi_net_list" class="wn_list" style="display: none;"></div>
+
+                                <a id="rescan" onclick="scanApList();" href="javascript:;" style="color: rgb(37, 115, 191); font-size: 14px; display: inline;">重新扫描</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-info" id="showlock" style="display:none;">
+                        <label>无线密码</label>
+                        <input type="password" id="apclient_pwd"/>
+                        <span style="color:#999;"><input type="checkbox" class="inp-checkbox" id="relaypwd"/><label class="checkbox-txt" for="relaypwd">显示密码</label></span>
+                    </div>
+                </div>
+
+                <script type="text/javascript">
+                    function ctrl_apclient(x) {
+                        $.getJSON("<%=luci.dispatcher.build_url("admin", "wireless","ctrl_apclient")%>",{cmd : x},function(rsp) {
+                            if (x == "1") {
+                                getApclientStatus(0);
+                            } else {
+                                $("#apclient_break").css("display","none");
+                                $("#status-msg").html("<%:未连接%>");
+                                $("#apclient_reconn").css("display","inline");
+                            }
+                        });
+                    }
+
+                    function scanApList(x) {
+                        $(".wname").css("display","none");
+                        $(".scan-now").css("display","block");
+                        $("#rescan").hide();
+
+                        if (x == "init") getApclientStatus(0);
+
+                        $.ajax({
+                            url: '<%=luci.dispatcher.build_url("admin", "wireless","scan_ap_list")%>',
+                            cache: false,
+                            dataType: "json",
+                            timeout: 50000,
+                            success: function(rsp) {
+                                if (rsp.code == 0) {
+                                    setApListData(rsp.aplist);
+                                } else {
+                                    T_alert.show("扫描失败, 请确认2.4G wifi功能是否正常开启!",2000);
+                                }
+
+                                $(".scan-now").css("display","none");
+                                $(".wname").css("display","block");
+                                if($(window).width() > 370){
+                                    $("#rescan").show();
+                                }
+
+                            },
+                            error: function(x){
+                                $(".scan-now").css("display","none");
+                                $(".wname").css("display","block");
+                                $("#rescan").show();
+                            },
+                            ontimeout:function(){
+                                $(".scan-now").css("display","none");
+                                $(".wname").css("display","block");
+                                $("#rescan").show();
+                            }
+                        });
+                    }
+
+                    function getApclientStatus(x) {
+                        var request_data = {};
+
+                        $.getJSON("<%=luci.dispatcher.build_url("admin", "wireless","getApclientStatus")%>",request_data,function(rsp)
+                        {
+                            if (rsp.result) {
+                                //记录已配置的ssid和密码, 当在SSID列表里切换到已设置的SSID时显示
+                                apclientRequestData.rsp_ssid = rsp.apcliSsid;
+                                apclientRequestData.ssid = rsp.apcliSsid;
+
+                                $("#wifi_net_name").val(rsp.apcliSsid);
+                                apclientRequestData.bssid = rsp.apcliBssid;
+                                apclientRequestData.authmode = rsp.apcliAuthmode;
+
+                                if (rsp.apcliAuthmode == "NONE" || rsp.apcliAuthmode == "none") {
+                                    $("#showlock").css("display","none");
+                                } else {
+                                    apclientRequestData.key = rsp.apcliWpapsk;
+                                    $("#apclient_pwd").val(rsp.apcliWpapsk);
+                                    $("#showlock").css("display","block");
+                                }
+                            }
+                        })
+                    }
+
+                    function setDefaultApclientInfo() {
+                        $("#apclient_break").css("display","none");
+                        $("#apclient_reconn").css("display","none");
+
+                        if ($("#wifi_net_list").children("a").length < 2 ) {
+                            scanApList("init");
+                        }
+                    }
+
+                    function setApListData(list) {
+                        $("#wifi_net_list").empty();
+
+                        for(var i = 0; i<list.length; i++) {
+                            var $a = $('<a></a>');
+                            var img;
+                            var span;
+                            var p;
+
+                            if(list[i].security.toLowerCase() == "none") {
+                                img = '<i><img src="<%=resource%>/images/signal_png/signal'+ list[i].signal + '.png"/></i>'
+                            } else {
+                                img = '<i><img src="<%=resource%>/images/signal_png/signal'+ list[i].signal + 'lock.png"/></i>'
+                            }
+
+                            span = '<span>'+ list[i].ssid +'</span>';
+                            p = '<p style="display:none">'+ list[i].ssid + '?' + list[i].channel + '?' + list[i].bssid + '?'+ list[i].security +'</p>';
+                            $a.append(span).append(p).append(img);
+                            $("#wifi_net_list").append($a);
+
+                            //同步当前设置的中继网络的信道, 防止上级网络重新设置信道, 可以直接保存
+                            if(list[i].ssid == apclientRequestData.rsp_ssid) {
+                                apclientRequestData.channel = list[i].channel;
+                            }
+                        }
+                    }
+
+                    function stopPropagation(e) {
+                        if (e.stopPropagation)
+                            e.stopPropagation();
+                        else
+                            e.cancelBubble = true;
+                    }
+
+                    $(function () {
+                        $("#chose_wifi").click(function (e) {
+                            if ($("#wifi_net_list").css("display") == "none") {
+                                $("#wifi_net_list").css({"display": "block"});
+                                stopPropagation(e);
+                                $("#wifi_net_list").find("a").bind("click",function(){
+                                    $("#save-btn").css("display","block");
+                                    var value = $(this).find("span").html();
+                                    var lock = $(this).find("img").attr("src");
+
+                                    //设置中继数据
+                                    $("#relay_data").html($(this).find("p").html());
+                                    var str = $("#relay_data").html();
+                                    var str2 = str.split("?");
+                                    apclientRequestData.ssid = str2[0];
+                                    apclientRequestData.channel = str2[1];
+                                    apclientRequestData.bssid = str2[2];
+                                    apclientRequestData.authmode = str2[3];
+
+                                    if(lock.indexOf("lock") > 0){
+                                        if (apclientRequestData.ssid != apclientRequestData.rsp_ssid) {
+                                            $("#apclient_pwd").val("");
+                                        } else {
+                                            $("#apclient_pwd").val(apclientRequestData.rsp_key);
+                                        }
+                                        $("#showlock").css("display","block");
+                                    }else{
+                                        $("#showlock").css("display","none");
+                                    }
+                                    $("#wifi_net_name").val(value);
+                                    $("#wifi_net_list").css("display","none");
+                                });
+                            } else {
+                                $("#wifi_net_list").css({"display": "none"});
+                            }
+
+                        });
+
+                        $(document).bind('click',function(){
+                            $('#wifi_net_list').css('display','none');
+                        });
+                    })
+
+                    function saveApclient(){
+                        apclientRequestData.key = document.getElementById('apclient_pwd').value;
+
+                        if (typeof(apclientRequestData.ssid) == "undefined") {
+                            T_alert.show("请选择一个无线网络",2000);
+                            return false;
+                        }
+                        //console.log(oldConfigData.ssid, apclientRequestData.ssid);
+                        if (validators.equal(oldConfigData, apclientRequestData)) {
+                            T_alert.show("配置未改变",2000);
+                            return false;
+                        }
+
+                        oldConfigData = objCopy(apclientRequestData);
+
+                        $("#status-msg").html("<%:连接中...%>");
+
+                        loadSave("before", "save");
+                        $.ajax({
+                            url: "<%=luci.dispatcher.build_url("admin", "wireless", "set_apclient")%>",
+                            cache: false,
+                            dataType: "json",
+                            data: apclientRequestData,
+                            success: function(rsp){
+                                loadSave("after", "save");
+                                if(rsp.result == true){
+                                    T_alert.show("保存成功",2000);
+                                }else{
+                                    T_alert.show("保存失败",2000);
+                                }
+                            },
+                            error: function(x){
+                                loadSave("after", "save");
+                                T_alert.show("保存超时",2000);
+                            },
+                        });
+                    }
+                </script>
+
+                <!-- 提交按钮 -->
+                <div class="operate-btn ml190" id="save-btn" style="display:none">
+                    <input type="submit" id="save" value="保 存" class="on" style="margin-left:0;"/>
+                    <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                </div>
+
+                <!-- 连接状态 -->
+                <div id="conncet_status" style="display:block;">
+                    <hr class="hr-new"/>
+
+                    <div class="input-info">
+                        <label class="settit">连接状态</label>
+                        <span class="msgspan" id="status-msg">获取中...</span>
+                        <span id="pppoe-msg"></span>
+                        <em id="break-btn" style="display:none">断开</em>
+                    </div>
+
+                    <div class="input-info" id="status-time-box" style="display:none">
+                        <label>连接时间</label>
+                        <em id="status-time"></em>
+                    </div>
+
+                    <div class="input-info">
+                        <label>IPV4地址</label>
+                        <em id="status-ipaddr">0.0.0.0 / 0.0.0.0</em>
+                    </div>
+
+                    <div class="input-info">
+                        <label>网关地址</label>
+                        <em id="status-gateway">0.0.0.0</em>
+                    </div>
+
+                    <div class="input-info">
+                        <label>DNS地址</label>
+                        <em id="status-dns">0.0.0.0</em>
+                    </div> 
+                </div>
+
+                <!-- mac地址克隆 -->
+                <div id="" style="display:block;">
+                    <hr class="hr-new"/>
+
+                    <div class="input-info-clone" style="position:relative;">
+                        <label class="settit">MAC地址克隆</label>
+                        <input type="text" id="mac-clone" class="mac-clone" value="<%=wanMacAddr:upper()%>"/>
+
+                        <div id="mactip" class="mactip">
+                            <span>aa:bb:cc:dd:ee:ff</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="operate-btn" id="save-clone-btn" style="display:block;">
+                    <input type="submit" id="save-clone" value="保 存" class="on" style="margin-left:0;"/>
+                    <img class="save-clone-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="loading-layer"></div>
+
+<script type="text/javascript" src="<%=resource%>/js/jquery.toggle-password.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript" src="<%=resource%>/js/xhr.js"></script>
+<script type="text/javascript">
+
+    var wanConfigInfo = {}; // 获取的当前配置
+    var requestData = {};  // 请求的数据
+    var oldConfigData = {};  // 请求的数据
+    var apclientRequestData = {};
+
+    var lanIpAddr = "<%=lanAddr%>";
+
+    XHR.poll(10, '<%=REQUEST_URI%>', {status: 1}, function (x, data) {
+        //console.log(x.status);
+        if (x.status != 200) return false;
+
+        if (data.ipaddr) {
+            $("#status-ipaddr").html(data.ipaddr + " / " + data.netmask)
+        }
+
+        if (data.gateway) {
+            $("#status-gateway").html(data.gateway)
+        }
+
+        if (data.dns) {
+            switch (typeof data.dns) {
+                case "object":
+                    //var str = "";
+                    //for (var i = 0; i < data.dns.length; i++) str = str + data.dns[i] + " ";
+                    $("#status-dns").html(data.dns[0] + "  " + (data.dns[1] ? data.dns[1] : ""));
+                    break;
+                case "string":
+                    $("#status-dns").html(data.dns);
+                    break;
+            }
+        }
+
+        if (data.uptime) {
+            var runTime = data.uptime;
+            var day = Math.floor(runTime / (60 * 60 * 24));
+            var hours = Math.floor(runTime % (60 * 60 * 24) / (60 * 60));
+            var minutes = Math.floor(runTime % (60 * 60) / 60);
+            var seconds = Math.floor(runTime % 60);
+            
+            $("#status-time-box").css("display", "block");
+            $("#status-time").html(day + "d " + hours + "h " + minutes + "m " + seconds + "s");
+        } else {
+            $("#status-time-box").css("display", "none");
+        }
+
+        if (data.proto == "pppoe") {
+            getPPPoeStatus();
+            return true;
+        }
+
+        if (data.is_up) {
+            $("#status-msg").css("color", "#2a5cff");
+            $("#status-msg").html("<%:已连接%>");
+        } else {
+            $("#status-msg").css("color", "red");
+            $.getJSON("<%=luci.dispatcher.build_url("guest", "netStatus")%>",null,function(rsp) {
+                if (rsp.code != 0) {
+                     $("#status-msg").html(rsp.msg);
+                }
+            });
+        }
+    });
+
+    function getWanConfig() {
+        xhr = new XHR();
+        xhr.get('<%=REQUEST_URI%>', {config: 1}, function (x, data) {
+            wanConfigInfo = data;
+
+            // 获取中继状态
+            wanConfigInfo.apClientSet = data.apClientSet;
+            if (wanConfigInfo.apClientSet == '1') {
+                wanConfigInfo.proto = "relay";
+            }
+
+            switch (typeof data.dns) {
+                case "object":
+                    wanConfigInfo.primayDns =  data.dns[0];
+                    wanConfigInfo.secondDns = data.dns[1];
+                    break;
+                case "string":
+                    wanConfigInfo.primayDns = data.dns;
+                    break;
+                default:
+                    ;
+            }
+            // 加载数据到配置页面
+            setDefaultWanInfo();
+        });
+    }
+
+    function setDefaultWanInfo() {
+        //console.log(wanConfigInfo);
+
+        proto = wanConfigInfo.proto;
+
+        switch (proto) {
+            case "pppoe":
+                $("#pppoe-account").val(wanConfigInfo.username);
+                $("#pppoe-passwd").val(wanConfigInfo.password);
+                break;
+            case "static":
+                $("#static-ipaddr").val(wanConfigInfo.ipaddr);
+                $("#static-netmask").val(wanConfigInfo.netmask);
+                $("#static-gateway").val(wanConfigInfo.gateway);
+                break;
+            default:
+                break;
+        }
+
+        // 主DNS
+        if (wanConfigInfo.primayDns && $("#" + proto + "-dns1").length > 0) {
+           $("#" + proto + "-dns1").val(wanConfigInfo.primayDns);
+
+           // 勾选自定义DNS
+           if ($("#" + proto + "dns-switch").length > 0) {
+                $("#" + proto + "dns-switch").prop("checked", "checked");
+                showDnsBox(proto + "dns-switch", proto + "dns");
+           }
+        }
+
+        // 次DNS
+        if (wanConfigInfo.secondDns && $("#" + proto + "-dns2").length > 0) {
+           $("#" + proto + "-dns2").val(wanConfigInfo.secondDns);
+        }
+
+//        $("#choseLink").val(wanConfigInfo.proto);
+//
+//        ProtoDNS = wanConfigInfo.proto;
+//        $("#choseLink").css("display", "inline");
+//        $("#loading-tip").css("display", "none");
+//        switchBox(wanConfigInfo.proto);
+
+
+        ProtoDNS = wanConfigInfo.proto;
+        $("#choseLink").css("display", "inline-block");
+        //console.log(wanConfigInfo);
+        var $protoLi = $("#ulcbcontent li[data-value='"+ wanConfigInfo.proto +"']");
+        $("#ulcbabeltxt").html($protoLi.find('a').html());
+        $("#loading-tip").css("display", "none");
+        switchBox(wanConfigInfo.proto);
+    }
+
+    function checkDnsSettings(type) {
+        if ($("#" + type + "dns-switch").length > 0 && !$("#" + type + "dns-switch").prop("checked")) return true;
+
+        requestData.primayDns = $("#" + type + "-dns1").val();
+        requestData.secondDns = $("#" + type + "-dns2").val();
+
+
+        if (requestData.primayDns == "") {
+            T_alert.show("首选DNS格式不能为空",2000);
+            $("#" + type + "-dns1").focus();
+            return false;
+        }
+
+        if (!validators.ipaddr(requestData.primayDns)) {
+            T_alert.show("首选DNS格式不正确",2000);
+            $("#" + type + "-dns1").focus();
+            return false;
+        }
+
+        if (requestData.secondDns != "") {
+            if (!validators.ipaddr(requestData.secondDns)) {
+                T_alert.show("备用DNS格式不正确",2000);
+                $("#" + type + "-dns2").focus();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function checkPPPoeSettings() {
+        requestData.username = $("#pppoe-account").val();
+        requestData.password = $("#pppoe-passwd").val();
+
+        if (requestData.username.length < 1) {
+            T_alert.show("用户名不能为空",2000);
+            $("#pppoe-account").focus();
+            return false;
+        }
+
+        if (requestData.password.length < 1) {
+            T_alert.show("密码不能为空",2000);
+            return false;
+        }
+
+        return true;
+    }
+
+    function checkStaticSettings() {
+        requestData.ipaddr = $("#static-ipaddr").val();
+        requestData.netmask = $("#static-netmask").val();
+        requestData.gateway = $("#static-gateway").val();
+        requestData.primayDns = $("#static-dns1").val();
+        requestData.secondDns = $("#static-dns2").val();
+
+        if (requestData.ipaddr.length < 1) {
+            T_alert.show("IP地址不能为空",2000);
+            $("#static-ipaddr").focus();
+            return false;
+        }
+
+        if (!validators.ipaddr(requestData.ipaddr)) {
+            T_alert.show("IP地址格式不正确",2000);
+            $("#static-ipaddr").focus();
+            return false;
+        }
+
+
+        var pos_of_lan_addr = parseInt(requestData.ipaddr.lastIndexOf("."));
+        var pos_of_wan_addr = parseInt(lanIpAddr.lastIndexOf("."));
+        if (requestData.ipaddr.substring(0, pos_of_lan_addr) == lanIpAddr.substring(0, pos_of_wan_addr)) {
+            T_alert.show("IP地址与内网IP处于同一网段.",2000);
+            return false;
+        }
+
+        if (requestData.netmask.length < 1) {
+            T_alert.show("子网掩码不能为空",2000);
+            $("#static-netmask").focus();
+            return false;
+        }
+
+        if (!validators.netmask(requestData.netmask)) {
+            T_alert.show("子网掩码格式不正确",2000);
+            $("#static-netmask").focus();
+            return false;
+        }
+
+        if (requestData.gateway.length < 1) {
+            T_alert.show("网关地址不能为空",2000);
+            $("#static-gateway").focus();
+            return false;
+        }
+
+        if (!validators.ipaddr(requestData.gateway)) {
+            T_alert.show("网关地址格式不正确",2000);
+            $("#static-gateway").focus();
+            return false;
+        }
+
+        if (requestData.gateway == requestData.ipaddr) {
+            T_alert.show("IP地址格式与网关地址相同",2000);
+            $("#static-ipaddr").focus();
+            return false;
+        }
+
+        if (!checkDnsSettings("static")) return false;
+
+        return true;
+    }
+
+    // 检测数据并设置请求数据
+    function checkInputData() {
+        switch (requestData.proto) {
+        case "pppoe":
+                if (!checkPPPoeSettings() || !checkDnsSettings("pppoe")) return false;
+            break;
+        case "static":
+                if (!checkStaticSettings("dhcp")) return false;
+            break;
+        case "dhcp":
+                if (!checkDnsSettings("dhcp")) return false;
+            break;
+        case "relay":
+                if (!checkDnsSettings("relay")) return false;
+            break;
+        default:
+            break;
+        }
+
+        if (validators.equal(requestData, oldConfigData)) {
+            T_alert.show("配置未改变",2000);
+            return false;
+        }
+
+        oldConfigData = objCopy(requestData);
+        //console.log(requestData);
+        return true;
+    }
+
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+//    T_alert._css.top = "780px";
+
+    $(function () {
+        var height = $(document).height()-90>1124+60?$(document).height()-90:1124+60;
+        var width = window.innerWidth;
+        if(width>1350){
+            $('.nav').css('height','100%');
+        }else{
+            $('.nav').css('height',height);
+        }
+
+        getWanConfig();
+        //getWanConnectStatus();
+
+        $('#pppoe-passwd').togglePassword({
+            el: '#pppoepwd'
+        });
+        $('#apclient_pwd').togglePassword({
+            el: '#relaypwd'
+        });
+    });
+
+    $(".input-info").on('input', function() {
+        $("#save-btn").css("display","block");
+    });
+
+    $("#choseLink").change(function(){
+        $("#save-btn").css("display","block");
+        var str = $(this).val();
+        ProtoDNS = str;
+        switchBox(str);
+    });
+
+
+    $("#choseLink").bind('mouseover',function(){
+        $("#ulcbcontent").show();
+        $('.yy-soi').css({
+            'transform': 'rotate(180deg)',
+            '-webkit-transform': 'rotate(180deg)'
+        })
+    })
+    $("#choseLink").bind('mouseout',function(){
+        $("#ulcbcontent").hide();
+        $('.yy-soi').css({
+            'transform': 'rotate(0deg)',
+            '-webkit-transform': 'rotate(0deg)'
+        })
+    })
+
+    $('#ulcbcontent ul li').click(function(){
+        //console.log($(this).attr('data-value'));
+        var str = $(this).attr('data-value');
+        ProtoDNS = str;
+        switchBox(str);
+        var protomsg = $("li[data-value='"+ str +"']").find('a').html();
+        $("#ulcbabeltxt").html(protomsg);
+        //$("#ulcbcontent").hide();
+//        $("#choseLink #ulcbcontent").addClass('ulcbcontent');
+//        setTimeout(function(){
+//            $("#choseLink #ulcbcontent").removeClass('ulcbcontent');
+//        },700)
+        $("#ulcbcontent").hide();
+        $('.yy-soi').css({
+            'transform': 'rotate(0deg)',
+            '-webkit-transform': 'rotate(0deg)'
+        })
+        requestData.proto = str;
+        $("#save-btn").css("display","block");
+    });
+
+
+    $("#pppoedns-switch").click(function(){
+        $("#save-btn").css("display","block");
+        showDnsBox("pppoedns-switch","pppoedns");
+    });
+    $("#dhcpdns-switch").click(function(){
+        $("#save-btn").css("display","block");
+        showDnsBox("dhcpdns-switch","dhcpdns");
+    });
+
+    function switchBox(type) {
+        $(".chosebox").css("display","none");
+        $("#conncet_status").css("display","block");
+
+        if (type == "pppoe") {
+            $("#pppoe").css("display","block");
+        } else if (type == "static") {
+            $("#static").css("display","block");
+            $("#conncet_status").css("display","none");
+        } else if(type == "relay") {
+            if ($(window).width() < 370) {
+                $('.imgload').css('display','none');
+            }
+            $("#relay").css("display","block");
+            setDefaultApclientInfo();
+        } else {
+            $("#dhcp").css("display","block");
+        }
+    }
+
+    //自定义DNS
+    function showDnsBox(dnsswitch,ele) {
+        var dns_switch = document.getElementById(dnsswitch);
+        if (dns_switch.checked == true) {
+            $("#" + ele).css("display", "block");
+        } else {
+            $("#" + ele).css("display", "none");
+        }
+    }
+
+    $("#save").click(function() {
+        requestData = {};
+        //requestData.proto = $("#choseLink").val();
+        requestData.proto = ProtoDNS;
+        if (requestData.proto == "relay") {
+            saveApclient();
+            return;
+        }
+
+        if (!checkInputData()) return false;
+
+        loadSave("before", "save");
+        $("#status-msg").html('<%:连接中...%>');
+
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "network", "set_wan_info")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', wanset :JSON.stringify(requestData)},
+            timeout:10000,
+            type: "POST",
+            success: function(rsp) {
+                if (rsp.result == true) {
+                    T_alert.show("保存成功",2000);
+                } else {
+
+                    T_alert.show("保存失败",2000);
+                }
+                loadSave("after", "save");
+            },
+            error: function(x) {
+                loadSave("after", "save");
+                T_alert.show("保存错误",2000);
+            },
+            ontimeout:function() {
+                loadSave("after", "save");
+                T_alert.show("保存超时",2000);
+            }
+        });
+    });
+
+    var sniffTimer;
+    $(".findbtn").click(function(){
+        $(".find_msg").css("display","none");
+        $(".findclose").css("display","none");
+        $(".cont_inner").css("top","30px");
+
+        var timer;
+        var count; //间隔函数，1s执行
+        if($("#specialppoe").prop("checked")){
+            count = 100; spec = 1;
+        }else{
+            count = 60; spec = 0;
+        }
+        var curCount; //当前剩余秒数
+        curCount = count;
+        $(this).attr("disabled", "true");
+        $(this).css("backgroundColor","#bbb");
+        $(this).html("剩余(" + curCount + ")s");
+        var that = $(this);
+        timer = setInterval(function () {
+            if (curCount == 1) {
+                that.removeAttr("disabled");
+                that.css("backgroundColor","#0abcdf");
+                clearInterval(timer);
+                clearInterval(sniffTimer);
+                that.html("重新检测");
+                T_alert.show("检测失败，请检查网络!",2000);
+                $(".findclose").css("display","block");
+                $(".cont_inner").css("top","0");
+            } else {
+                curCount--;
+                that.html("剩余(" + curCount + ")s");
+                if(sniffTimer == 0){
+                    clearInterval(timer);
+                    that.html("重新检测");
+                    that.removeAttr("disabled");
+                    that.css("backgroundColor","#0abcdf");
+                }
+            }
+        }, 1000);
+
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "network","pppoeSniffer")%>",{cmd : "start", mode:spec},function(rsp) {
+            if (rsp.code == 0) {
+                sniffTimer = setInterval(function(){
+                    $.getJSON("<%=luci.dispatcher.build_url("admin", "network","pppoeSniffer")%>",{cmd : "sniffing", mode:spec},function(rsp) {
+                        //console.log(rsp);
+                        if(rsp.code == "0") {
+                            clearInterval(sniffTimer);
+                            sniffTimer = 0;
+                            console.log(rsp.msg);
+                            var msg = rsp.msg;
+                            $("#userList").empty();
+                            var userStr = "";
+                            $("#pppoe-account").val(rsp.msg[0].user);
+                            $("#pppoe-passwd").val(rsp.msg[0].passwd);
+                            if(msg.length == 1){
+                                //$(".find_msg").html("宽带账号为：" + rsp.msg[0].user).css("display","block");
+                            }else{
+                                $.each(msg,function(i,v){
+                                    if(i == msg.length-1){
+                                        userStr += v.user;
+                                    }else{
+                                        userStr += v.user + "/";
+                                    }
+                                    //$(".find_msg").html("宽带账号为：" + userStr).css("display","block");
+
+                                    var $span = $('<span class="userspan" data-pwd = "'+ v.passwd +'" onclick=spanClick(this)>'+ v.user +'</span>');
+                                    $("#userList").append($span);
+                                });
+                            }
+
+                            clearInterval(timer);
+                            $(".find_msg").css("display","block");
+                            $(".findbtn").html("重新检测");
+                            $(".findbtn").css("backgroundColor","#0abcdf");
+                            $(".findbtn").attr("disabled",false);
+                            $(".findclose").css("display","block");
+                            $(".cont_inner").css("top","0");
+                        }
+                    })
+                }, 3000)
+            }
+        });
+    });
+
+    $("#pppoe-account").focus(function(){
+        $("#userList").css("display","block");
+    });
+
+    function spanClick(ele){
+        //console.log($(ele).html());
+        var u = $(ele).html();
+        var p = $(ele).attr("data-pwd");
+        $("#pppoe-account").val(u);
+        $("#pppoe-passwd").val(p);
+        $("#userList").css("display","none");
+    }
+
+    $(document).click(function (e) {
+        if(!$(e.target).hasClass("userspan") && !$("#pppoe-account").is(":focus")){
+            $("#userList").css("display","none");
+        }
+        if(!$(e.target).hasClass("macspan") && !$("#mac-clone").is(":focus")){
+            $("#mactip").css("display","none");
+        }
+    });
+
+    $("#mac-clone").click(function(){
+        $("#mactip").html('<span class="macspan"><%=curHostMac:upper()%>|当前主机地址</span><span class="macspan"><%=defMacAddr:upper()%>|默认出厂地址</span><span class="macspan macspan2">自定义</span>').css("display","block");
+        $("#mactip").find("span").bind("click",function(){
+            if($(this).hasClass("macspan2")){
+                $("#mac-clone").val("");
+                $("#mac-clone").focus();
+            }else{
+                $("#mac-clone").val($(this).html().match(/[^|]+/));
+            }
+            $("#mactip").css("display","none");
+        })
+    });
+
+    var checkMac = function(ele){
+        var mac_val = $("#"+ele).val();
+        //var reg_name=/^[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}:[A-Fa-f\d]{2}$/;
+        if(mac_val == ""){
+            T_alert.show("MAC地址不能为空",2000);
+            setTimeout(function () {$("#"+ele).focus();}, 0);
+            return false;
+        }else if(!validators.macaddr(mac_val)){
+            T_alert.show("MAC地址格式错误!",2000);
+            setTimeout(function () {$("#"+ele).focus();}, 0);
+            return false;
+        }
+
+        return true;
+    }
+
+    $("#save-clone").click(function() {
+        if (!checkMac("mac-clone")){
+            return false;
+        }
+
+        var data = $.trim($("#mac-clone").val());
+        //console.log(data);
+
+        loadSave("before", "save-clone");
+
+        $.ajax({
+            url: '<%=luci.dispatcher.build_url("admin", "network", "set_wan_mac")%>',
+            cache: false,
+            dataType: "json",
+            data: {token: '<%=token%>', macaddr:data, defmac:"<%=defMacAddr%>"},
+            timeout:10000,
+            type: "POST",
+            success: function(rsp) {
+                if (rsp.result == true) {
+                    T_alert.show("保存成功",2000);
+                } else {
+                    T_alert.show("保存失败",2000);
+                }
+                loadSave("after",  "save-clone");
+            },
+            error: function(x) {
+                loadSave("after",  "save-clone");
+                T_alert.show("保存错误",2000);
+            },
+            ontimeout:function() {
+                loadSave("after",  "save-clone");
+                T_alert.show("保存超时",2000);
+            }
+        });
+    });
+</script>
+
+<%include("bottom")%>

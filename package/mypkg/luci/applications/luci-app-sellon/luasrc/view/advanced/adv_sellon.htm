@@ -1,0 +1,696 @@
+<%
+local uci = require "luci.model.uci".cursor()
+local fs  = require "nixio.fs"
+local ap_mac, username
+local USER = "/etc/openvpn/user_pass.txt"
+
+ap_mac = uci:get("network", "lan", "macaddr")
+
+if fs.access(USER) then	
+	local authuser = fs.readfile(USER)
+	username = authuser:match("(%S+)")
+end	
+
+%>
+<%+header%>
+
+<script type="text/javascript">
+	
+	var macaddr = "<%=ap_mac%>"
+	//var macaddr = "D4:EE:07:42:0D:BC"
+	var username = "<%=username%>"
+	var domain = "api.6luyou.com"
+	
+	$(function () {
+		set_header_icon_lighted("pic_fun_gj");
+		queryDeviceStatus();
+		getRunStatus();
+		setQueryUrl("reg");
+		setQueryUrl("pwd");
+		setQueryUrl("pay");
+	});
+
+</script>
+
+<div id="fade_unbound" class="black_overlay"></div>
+
+<div id="MyDiv_unbound" class="white_content" style="">
+    <div class="cont_inner" style="width: 410px;">
+    <div style="text-align: right; cursor: default; height: 30px; ">
+        <div class="Edit_title1"><span class="cont_title" style="padding-left:40px;">账号解绑</span></div>
+        <div class="Edit_title2" onclick="CloseDiv('MyDiv_unbound','fade_unbound')"></div>
+    </div>
+    <table class="wirelessChannel zh_table">
+        <tr>
+            <td class="zht_right">密码</td>
+            <td>:</td>
+            <td>
+                <input id="unbind_passwd" type="password"/>
+            </td>
+        </tr>
+        <tr>
+            <td class="zht_right">验证码</td>
+            <td>:</td>
+            <td>
+                <input id="unbind_code" class="codeinp" type="text"/>
+                <button id="unbind_send_code" class="sendcode">发送验证码</button>
+            </td>
+        </tr>
+		
+		<tr>
+			<td></td>
+			<td></td>
+			<td> 
+				<button class="tc_btn tc_btn_exit" onclick="CloseDiv('MyDiv_unbound','fade_unbound')">取消</button>		
+				<button id="unbind_save" class="tc_btn tc_btn_save">确定</button>
+			 </td>
+		</tr>
+
+    </table>
+
+    </div>
+</div>
+
+<div class="soft_con">
+	<div class="soft_con2">
+		<div class="banben gaoji_box">
+			<div class="gaoji_left">
+				<ul>
+					<% include("themes/" .. theme .. "/menuer") %>
+				</ul>
+			</div>
+			
+			<div id="ipv6" class="function1 gaoji_right">
+                    <!--<iframe id="ipv6Iframe" name="ipv6Iframe" src="ipv6.html" width="656" height="450" frameborder="0" scrolling="hidden" style="overflow-x:none;"></iframe>-->
+  
+				<ul class="ipv6_nav">
+					<li class="ipv_current"><a href="javascript:;">账号管理</a></li>
+					<li><a href="javascript:;">IPV6控制</a></li>
+					<!--<li><a href="javascript:;">DNS设置</a></li>-->
+					<!--<li><a href="javascript:;">IPV6设置</a></li>-->
+				</ul>
+				
+				<div id="zhanghao" class="ipv_cont">
+					<div class="zh_line">
+						<p><span>当前状态：</span><span id="bound_status"></span></p>
+						<p><span>到期时间：</span><span id="endtime"></span></p>
+						<p><a href="#" target="_blank" class="recharge" style="display: none">充值</a></p>
+					</div>
+
+					<div id="bound" style="display:none;">
+						<table class="zh_table">
+							<tbody>
+							<tr>
+								<td class="zht_right">手机号码：</td>
+								<td><input id="tel" type="text"/></td>
+								<td><a id="reg_btn" target="_blank" style="font-size:14px;color: #666;font-weight: bold;" href="javascript:;">注册</a></td>
+							</tr>
+
+							<tr>
+								<td class="zht_right">密码：</td>
+								<td><input id="zh_pwd" type="password"/></td>
+								<td></td>
+							</tr>
+
+							<tr>
+								<td class="zht_right"></td>
+								<td><input id="bind_btn" class="zht_btn" type="button" value="申请绑定"/></td>
+								<td></td>
+							</tr>
+							</tbody>
+						</table>
+					</div>
+
+					<div id="nobound" style="display:none;">
+						<table class="zh_table">
+							<tbody>
+							<tr>
+								<td class="zht_right">手机号码：</td>
+								<td><input id="tel_d" type="text" disabled/></td>
+								<td><a id="relogin" style="display:none;font-size:14px;color: #666;font-weight: bold;" href="javascript:;">重新登录</a></td>
+							</tr>
+							<tr>
+								<td class="zht_right">密码：</td>
+								<td><input id="pwd" type="password" disabled/></td>
+								<td><a id="zh_forget" target="_blank" style="font-size:14px;color: #666;font-weight: bold;" href="#">重置密码</a></td>
+							</tr>
+							<tr>
+								<td class="zht_right"></td>
+								<td id="unbind" style="display:none;" > <button class="zht_btn" onclick="showUnbindWindow()">解绑账号</button></td>
+								<td id="login" style="display:none;" > <button class="zht_btn" onclick="queryBind('tel_d', 'pwd')">登录账号</button></td>
+								<td></td>
+							</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				
+				<div id="vpn" class="ipv_cont" style="display:none">
+					<table class="zh_table">
+						<tbody>
+						<!--<tr>
+							<td class="zht_right">IPV6导航:</td>
+							<td>
+								<b style="float:left;line-height:28px;">启用</b>
+								<span class="icn_onoff" style="float:left;margin-left:10px;margin-right:10px;" onclick="show_box2(this);" title="0"></span>
+								<b style="float:left;line-height:28px;">停用</b>
+							</td>
+							<td></td>
+						</tr>-->
+						<tr>
+							<td class="zht_right">VPN:</td>
+							<td colspan="2"><span id="state"></span></td>
+						</tr>
+						<tr>
+							<td></td>
+							<td>
+								<input type="radio" name="vpn_link" id="vpn_link" onclick="ctrlVpnClient('vpn_start')"/>
+								<label for="vpn_link">启用</label>
+							</td>
+							<td>
+								<input type="radio" name="vpn_link" id="vpn_unlink" onclick="ctrlVpnClient('vpn_stop')"/>
+								<label for="vpn_unlink">停用</label>
+							</td>
+						</tr>
+						</tbody>
+					</table>
+				</div>
+				<!--<div id="dns_control" class="ipv_cont" style="display:none">
+					<table class="zh_table">
+						<tbody>
+						<tr>
+							<td class="zht_right">IPv6 DNS：</td>
+							<td><input type="text"/></td>
+						</tr>
+						<tr>
+							<td class="zht_right">IPv4 DNS：</td>
+							<td><input type="text"/></td>
+						</tr>
+						</tbody>
+					</table>
+					<p style="width:300px;margin:0 auto;">
+						<button class="btn colcc">取消</button>
+						<button class="btn" style="float: right;">保存并启用</button>
+					</p>
+				</div>
+				<div id="ipv6_set" class="ipv_cont" style = "display:none;">
+					<table class="zh_table">
+						<tbody>
+						<tr>
+							<td colspan="2">本页面为IPv6高级设置，无特殊需求请勿设置</td>
+						</tr>
+						<tr>
+							<td class="zht_right">IPv4前缀：</td>
+							<td><input type="text"/></td>
+						</tr>
+						</tbody>
+					</table>
+					<p style="width:300px;margin:0 auto;">
+						<button class="btn colcc">取消</button>
+						<button class="btn" style="float: right;">保存并启用</button>
+					</p>
+				</div>-->
+            </div>		
+		</div>
+	</div>
+<script>
+	
+	//关闭弹出层
+	function CloseDiv(show_div, bg_div) {
+		document.getElementById(show_div).style.display = 'none';
+		document.getElementById(bg_div).style.display = 'none';
+	}
+	
+	//弹出隐藏层
+	function ShowDiv(show_div, bg_div) {
+		document.getElementById(show_div).style.display = 'block';
+		document.getElementById(bg_div).style.display = 'block';
+		var bgdiv = document.getElementById(bg_div);
+		bgdiv.style.width = document.body.scrollWidth;
+		$("#" + bg_div).height($(document).height());
+	}
+	
+	function showUnbindWindow() {
+		
+		var checkNet = true;
+		$.ajax({
+			headers: {"Content-Type": "application/json"},
+			url: 'http://' + domain + '/auth/query/list',
+			type: "POST",
+			dataType: "jsonp",
+			data: {mac:macaddr},
+			timeout:1000,
+			success: function (data) {		
+
+			},
+			error: function (XMLHttpRequest, textStatus, errorThrown){
+				alert('访问网络失败！' + errorThrown);
+				checkNet = false;
+			}
+		});
+		
+		if (!checkNet) return false;
+		
+		$("#unbind_code").val("");
+		$("#unbind_passwd").val("");
+		ShowDiv('MyDiv_unbound','fade_unbound')
+	}
+	
+	//验证手机号
+	function checkPhone(ele) {
+		var phone = $("#"+ele).val();
+		var reg_phone = /^(0|86|17951)?\s*(13[0-9]|15[012356789]|17[678]|18[0-9]|14[57])[0-9]{8}$/;
+		
+		if (phone == "") {
+			dialog({
+				title: '提示',okValue: '确定',content: '手机号码不能为空！',
+				ok: function () {setTimeout(function () {$("#tel").focus();}, 0);}
+			}).showModal();
+			return false;
+		}
+		
+		if (!reg_phone.test(phone)) {
+			dialog({
+				title: '提示',okValue: '确定',content: '请输入正确手机号！',
+				ok: function () {setTimeout(function () {$("#tel").focus();}, 0);}
+			}).showModal();
+			return false;
+		} else {
+			return true;
+		}		
+	}
+		
+	//验证验证码
+	function checkCode(ele) {
+		if ($("#"+ele).val() == "") {
+			dialog({
+				title: '提示',okValue: '确定',content: '验证码不能为空！',
+				ok: function () {setTimeout(function () {$("#"+ele).focus();}, 0);}
+			}).showModal();
+			return false;
+		}
+	}
+
+	//ipv6默认信息
+	function queryDeviceStatus() {
+		$.ajax({
+			headers: {"Content-Type": "application/json"},
+			url: 'http://' + domain + '/auth/query/list',
+			type: "POST",
+			dataType: "jsonp",
+			data: {mac:macaddr},
+			timeout:5000,
+			success: function (data) {
+				console.log(data);
+				var status = data.state;
+				if(status == "0"){
+					$("#bound").css("display","block");
+					$("#nobound").css("display","none");
+					$("#bound_status").html("未绑定");
+				//}else if(status == "1"){
+				} else {
+					$("#bound_status").html("已绑定");
+					$("#endtime").html(data.endtime);
+					$("#bound").css("display","none");
+					$("#nobound").css("display","block");
+					$(".recharge").css("display","block");
+				}
+				//$("#nobound").css("display","block");
+			},
+			error: function (XMLHttpRequest, textStatus, errorThrown){
+				alert('访问网络失败！' + errorThrown);
+			}
+		});
+
+		if (username != "") {
+			$("#tel_d").val(username);
+			$("#pwd").val("***************");
+			$("#unbind").css("display","block");
+			$("#relogin").css("display","block");
+		} else {
+			$("#tel_d").removeAttr("disabled");
+			$("#pwd").removeAttr("disabled");
+			$("#login").css("display","block");
+		}
+	}
+	
+	function testGetCode(tel_id, code_id) {
+		if (checkPhone(tel_id) == false) {
+			return false;
+		}
+		var timer;
+		var count = 60; //间隔函数，1s执行
+		var number = $("#" + tel_id).val();
+
+		function countDown() {
+			if (count == 1) {
+				clearInterval(timer);
+				$("#" + code_id).removeAttr("disabled");
+				$("#" + code_id).html("重新发送");
+			} else {
+				count--;
+				$("#" + code_id).html("重新发送(" + count + ")");
+			}
+		}
+		//设置button效果，计时
+		$("#" + code_id).attr("disabled", "true");
+		$("#" + code_id).html("重新发送(" + count + ")");
+		timer = setInterval(countDown, 1000);
+
+		$.ajax({
+			headers: {
+				"Content-Type": "application/json"
+			},
+			url: 'http://' + domain + '/auth/util/send',
+			type: "POST",
+			dataType: "jsonp",
+			data: {
+				tel: number,
+				mac: macaddr
+			},
+			success: function(data) {
+				console.log(data);
+				var state = data.state;
+				if (state == "0") {
+					dialog({
+						title: '提示',
+						okValue: '确定',
+						content: data.msg,
+						ok: function() {},
+					}).showModal();
+					count = 1;
+				} else if (state == "1") {
+
+				}
+			},
+			error: function() {
+				count = 1;
+			}
+		});
+	}
+	
+	function queryUrl(tp) {
+		$.ajax({
+			headers: {
+				"Content-Type": "application/json"
+			},
+			url: 'http://' + domain + '/auth/getUrl',
+			type: 'GET',
+			dataType: "jsonp",
+			data: {str:tp},
+			timeout: 2000,
+			success: function(data) {
+				if (data.state == "1") {
+					window.open(data.url);
+				} else {
+					dialog({
+						title: '提示',
+						okValue: '确定',
+						height: 40,
+						content: "失败: " + data.msg,
+						ok: function() {},
+					}).showModal();
+				}
+			},
+			error: function(msg) {
+				console.log(msg);
+			}
+		});
+	}
+	
+	function setQueryUrl(type) {
+		$.ajax({
+			headers: {
+				"Content-Type": "application/json"
+			},
+			url: 'http://' + domain + '/auth/getUrl',
+			type: 'GET',
+			dataType: "jsonp",
+			data: {str:type},
+			timeout: 2000,
+			success: function(data) {
+				if (data.state == "1") {
+					if (type == "pay") {
+						$(".recharge").attr('href', data.url);
+					} else if (type == "reg") {
+						$("#reg_btn").attr('href', data.url);
+					} else if (type = pwd) {
+						$("#zh_forget").attr('href', data.url);
+					}
+				} else {
+					dialog({
+						title: '提示',
+						okValue: '确定',
+						height: 40,
+						content: "失败: " + data.msg,
+						ok: function() {},
+					}).showModal();
+				}
+			},
+			error: function(msg) {
+				console.log(msg);
+			}
+		});
+	}
+	
+	function ctrlVpnClient(action) {
+		$.ajax({
+			url: "<%=luci.dispatcher.build_url("admin", "advanced", "sellon", "ctrl_vpn")%>",
+			data: {
+				action: action
+			},
+			success: function(data) {
+				console.log(data);
+				setTimeout('getRunStatus()', 2000);
+			},
+			error: function() {
+
+			}
+		});
+	}
+
+	function getRunStatus() {
+		$.ajax({
+			url: "<%=luci.dispatcher.build_url("admin", "advanced", "sellon", "get_state")%>",
+			success: function(data) {
+				console.log(data);
+				if (data.indexOf("runing") > 0) {
+					$("#vpn_link").prop('checked', true);
+					$("#state").html("运行中");
+				} else {
+					$("#vpn_unlink").prop('checked', true);
+					$("#state").html("未运行");
+				}
+			},
+			error: function() {
+
+			}
+		});
+	}
+
+	function queryBind(tel_id, pwd_id) {
+		if (checkPhone(tel_id) == false) {
+			return false;
+		}
+
+		if ($("#" + pwd_id).val() == "") {
+			dialog({
+				title: '提示',
+				okValue: '确定',
+				content: '密码不能为空！',
+				ok: function() {
+					setTimeout(function() {
+						$("#" + pwd_id).focus();
+					},
+					0);
+				}
+			}).showModal();
+			return false;
+		}
+
+		var obj = {};
+		obj.mac = macaddr;
+		obj.source = 1;
+		obj.username = $("#" + tel_id).val();
+		obj.password = $("#" + pwd_id).val();
+
+		var request_url = "http://" + domain + "/auth/account/bh/bind";
+		$.ajax({
+			headers: {
+				"Content-Type": "application/json"
+			},
+			url: request_url,
+			type: "POST",
+			dataType: "jsonp",
+			data: obj,
+			async: false,
+			success: function(data) {
+				console.log(data);
+				var state = data.state;
+				if (state == "0") {
+					dialog({
+						title: '提示',
+						okValue: '确定',
+						content: data.msg,
+						ok: function() {},
+					}).showModal();
+				} else if (state == "1") {
+					setUserPassword("w", obj.username, obj.password);
+					success_prop("login");
+					setTimeout('window.location.reload();', 2000);
+				}
+			},
+			error: function() {}
+		});
+	}
+
+	function setUserPassword(action, user, passwd) {
+		$.ajax({
+			url: "<%=luci.dispatcher.build_url("admin", "advanced", "sellon", "set_user")%>",
+			data: {
+				action: action,
+				user: user,
+				passwd: passwd
+			},
+			success: function(data) {
+				setTimeout('getRunStatus()', 2000);
+				return 1;
+			},
+			error: function() {
+				return 0;
+			}
+		});
+	}
+
+	//重新登录样式切换
+	$("#relogin").click(function() {
+		$("#tel_d").removeAttr("disabled");
+		$("#pwd").removeAttr("disabled");
+		$("#unbind").css("display", "none");
+		$("#relogin").css("display", "none");
+		$("#login").css("display", "block");
+	});
+	
+	//ipv6管理nav切换
+	$(".ipv6_nav li").click(function() {
+		var i = $(this).index();
+		$(".ipv6_nav li").removeClass("ipv_current");
+		$(this).addClass("ipv_current");
+		if (i == 0) {
+			$(".ipv_cont").css("display", "none");
+			$("#zhanghao").css("display", "block");
+		} else if (i == 1) {
+			$(".ipv_cont").css("display", "none");
+			$("#vpn").css("display", "block");
+			//获取VPN运行状态
+			getRunStatus();
+		} else if (i == 2) {
+			$(".ipv_cont").css("display", "none");
+			$("#dns_control").css("display", "block");
+		} else if (i == 3) {
+			$(".ipv_cont").css("display", "none");
+			$("#ipv6_set").css("display", "block");
+		}
+	});
+
+	//手机号绑定中点击获取验证码
+	$("#bind_send_code").click(function() {
+		testGetCode("tel", "bind_send_code")
+	});
+
+	//请求解除绑定验证码
+	$("#unbind_send_code").click(function() {
+		testGetCode("tel_d", "unbind_send_code")
+	});
+
+	//绑定按钮操作
+	$("#bind_btn").click(function() {
+		queryBind("tel", "zh_pwd");
+	});
+
+	//解绑按钮操作
+	$("#unbind_save").click(function() {
+		var obj = {};
+		obj.mac = macaddr;
+		obj.source = 1;
+		obj.code = $("#unbind_code").val();
+		obj.username = $("#tel_d").val();
+		obj.password = $("#unbind_passwd").val();
+
+		if (obj.code == "") {
+			dialog({
+				title: '提示',
+				okValue: '确定',
+				content: '验证码不能为空！',
+				ok: function() {
+					setTimeout(function() {
+						$("#unbind_code").focus();
+					},
+					0);
+				}
+			}).showModal();
+			return false;
+		} else if (obj.password == "") {
+			dialog({
+				title: '提示',
+				okValue: '确定',
+				content: '密码不能为空！',
+				ok: function() {
+					setTimeout(function() {
+						$("#unbind_passwd").focus();
+					},
+					0);
+				}
+			}).showModal();
+			return false;
+		}
+
+		var request_url = "http://" + domain + "/auth/account/unbind";
+		$.ajax({
+			headers: {
+				"Content-Type": "application/json"
+			},
+			url: request_url,
+			type: "POST",
+			dataType: "jsonp",
+			data: obj,
+			async: false,
+			success: function(data) {
+				console.log(data);
+				var state = data.state;
+				if (state == "0") {
+					dialog({
+						title: '提示',
+						okValue: '确定',
+						content: data.msg,
+						ok: function() {},
+					}).showModal();
+				} else if (state == "1") {
+					setUserPassword("clear", null, null);
+					setTimeout(function() {
+						CloseDiv('MyDiv_unbound', 'fade_unbound');
+						var d = dialog({
+							title: '提示',
+							content: '恭喜您，解绑成功！',
+							cancel: false,
+							height: 40,
+						}).showModal();
+						setTimeout(function() {
+							d.close().remove();
+							$("#" + id).prop("disabled", false);
+						},
+						2000);
+					},
+					100);
+					setTimeout('window.location.reload();', 2000);
+				}
+			},
+			error: function() {}
+		});
+	});
+
+</script>
+
+</div>
+
+<%+footer%>

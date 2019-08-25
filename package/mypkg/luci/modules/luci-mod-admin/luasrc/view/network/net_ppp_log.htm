@@ -1,0 +1,64 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+    <meta http-equiv="X-UA-COMPATIBLE" content="IE=edge,chrome=1"/>
+
+    <script type="text/javascript" src="<%=resource%>/js/jquery-1.9.0.min.js"></script>
+    <script type="text/javascript">
+
+		function get_pppoe_log() {
+		$.ajax({
+			url: '<%=luci.dispatcher.build_url("admin", "network", "get_pppoe_log")%>',
+			cache: false,
+			dataType: "json",
+			data: {token: '<%=token%>'},
+			timeout: 10000,
+			type: "post",
+			success: function(rsp){
+				//console.log(rsp.log);
+				var log = rsp.log;
+				$("#pppoe_log_view").text(log);
+				var textarea = $("#pppoe_log_view").append(" ");
+				textarea.scrollTop(textarea[0].scrollHeight - textarea.height());
+			},
+			error: function(rsp){
+				$("#pppoe_log_view").text("<%:Error getting PPPOE dial-up log.%>");
+			},
+			ontimeout:function(rsp){
+				$("#pppoe_log_view").text("<%:Timeout getting PPPOE dial-up log.%>");
+			}
+		})
+		
+		setTimeout("get_pppoe_log();", 3000);
+	}
+    </script>
+</head>
+<body onload=" get_pppoe_log();" style="background-color: #f7f7f7;">
+<style>
+    .title{
+        width:100%;
+    }
+    .log_title{
+        width:100%;
+        height:40px;
+        line-height:60px;
+        /*background-color: #2573bf;*/
+        margin-bottom:20px;
+        color:#666;
+        font-size:22px;
+        font-family: "Microsoft Yahei";
+        padding-left:20px;
+        font-weight: normal;
+    }
+    textarea{
+        margin-left:20px;
+        padding:10px;
+    }
+</style>
+
+<div class="box">
+	<textarea id="pppoe_log_view" rows="30" cols="120" readonly="readonly"><%:Getting PPPOE dial-up log...%></textarea>
+</div>
+</body>
+</html>

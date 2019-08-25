@@ -1,0 +1,296 @@
+<%
+local uci  = require "luci.model.uci".cursor()
+
+local downSpeed = uci:get("apfreeqos", "bandwidth", "download") or 0
+local upSpeed = uci:get("apfreeqos", "bandwidth", "upload") or 0
+
+include("top")
+%>
+<div class="main">
+    <div class="aside">
+        <ul>
+            <%include("settings/menuer")%>
+        </ul>
+    </div>
+
+    <div class="">
+        <!--<div class="title">-->
+            <!--<h3>限速设置</h3>-->
+        <!--</div>-->
+
+        <div class="article">
+            <div class="limite-con" >
+                <div id="limit-box" style="display:none">
+                    <div class="limite-msg">
+                        <p style="float: left;">全网限速功能</p>
+
+                        <div id="div1" class="switch open1 switch-ml">
+                            <div id="div2" class="slide open2"></div>
+                        </div>
+                        <div class="clean"></div>
+                    </div>
+
+                    <div id="speedBox" style="height:159px;">
+                        <div class="limite-msg">
+                            <p class="upSpeed">最大上行速率</p>
+                            <em id="upSpeed" name="upSpeed">0</em> KB/s
+                        </div>
+                        <div class="limite-msg">
+                            <p class="downSpeed">最大下行速率</p>
+                            <em id="downSpeed" name="downSpeed">0</em> KB/s
+                        </div>
+                    </div>
+
+                    <input type="submit" name="modify" class="modify" value="修 改" />
+                    <input type="submit" class="savedata" value="保 存" id="save" />
+                    <img class="save-loading" style="display:none;" src="<%=resource%>/images/loading.gif" alt=""/>
+                </div>
+            </div>
+            <div class="tiptable">
+                <table border="0" cellspacing="1" cellpadding="0">
+                    <caption>Qos设置限速值参考</caption>
+                    <tr>
+                        <td class="td1">50KB/s</td>
+                        <td>手机端微信、浏览网页较流畅，图片需缓冲3-5秒；PC浏览网页较缓慢。</td>
+                    </tr>
+                    <tr>
+                        <td class="td1">80-100KB/s</td>
+                        <td>可观看标清（270P）视频；PC浏览网页流畅。</td>
+                    </tr>
+                    <tr>
+                        <td class="td1">120-150KB/s</td>
+                        <td>可观看高清（480P）视频。</td>
+                    </tr>
+                    <tr>
+                        <td class="td1">180-200KB/s</td>
+                        <td>可观看超清（720P）视频。</td>
+                    </tr>
+                    <tr>
+                        <td class="td1">200KB/s</td>
+                        <td>高清直播。</td>
+                    </tr>
+                    <tr>
+                        <td class="td1">300KB/s</td>
+                        <td>超清直播。</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="color:#999;">Ps：以上数据值仅供参考。具体设置可根据自身环境调整。</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="wf_tab_cont limitright" style="display: none;" id="tab2">
+                <div class="btncont">
+                    <button class="testbtn" style="margin-top:100px;">点击测速</button>
+                </div>
+
+                <div class="clock-box">
+                    <span class="big-circle"></span>
+                    <span class="small-circle"></span>
+                    <span class="pointer"></span>
+                    <p class="citcletxt">正在测速...</p>
+                </div>
+
+                <div class="cont rescont">
+                    <div class="testresult">
+                        <div class="testlist bord">
+                            <span class="num" id="up-speed"><%=string.format("%0.2f", upSpeed / 100)%></span>
+                            <span class="tip">上行带宽<b>(Mbps)</b></span>
+                        </div>
+
+                        <div class="testlist">
+                            <span class="num" id="down-speed"><%=string.format("%0.2f", downSpeed / 100)%></span>
+                            <span class="tip">下行带宽<b>(Mbps)</b></span>
+                        </div>
+                    </div>
+
+                    <p class="resmsg">
+                        建议限制 下行速率 <span id="suggest"> <%=math.ceil(downSpeed / 25)%>KB/s</span>, 上行速率 <span>50KB/s</span>.
+                    </p>
+
+                    <div class="cont">
+                        <button class="testbtn retest">重新测速</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script type="text/javascript" src="<%=resource%>/js/validators.js"></script>
+<script type="text/javascript">
+
+    var T_alert = new Toast();
+    T_alert._css.lineHeight = "40px";
+
+    function checkInputData() {
+        var upSpeed = $("#upSpeed").val();
+        var downSpeed = $("#downSpeed").val();
+
+        if ($("#div1").hasClass('switch open1')) {
+            if (upSpeed.length < 1) {
+                T_alert.show("上传速率不能为空",2000);
+                return false;
+            }
+
+            if (downSpeed.length < 1) {
+                T_alert.show("上传速率不能为空",2000);
+                return false;
+            }
+
+            if (!validators.limit(upSpeed)) {
+                T_alert.show("上传速率格式不正确.(范围0 ~ 38400)",2000);
+                return false;
+            }
+
+            if (!validators.limit(downSpeed)) {
+                T_alert.show("上传速率格式不正确.(范围0 ~ 38400)",2000);
+                return false;
+            }
+        }
+
+        return true;
+    }
+    
+    function getQosStatus() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "connect", "getQosStatus")%>", null, function(data) {
+            var enable = data.enable;
+            var upSpeed = data.upRate / 1024;
+            var downSpeed = data.downRate / 1024;
+            
+            $("#upSpeed").text(upSpeed);
+            $("#downSpeed").text(downSpeed);
+
+            if (enable == "0") {
+                $("#div1").removeClass("switch open1");
+                $("#div1").addClass("switch close1");
+                $("#div2").removeClass("slide open2");
+                $("#div2").addClass("slide close2");
+
+                $("#speedBox").css("display","none");
+                $(".modify").css("display","none");
+            }
+            
+            $("#limit-box").css("display", "block");
+        });
+    }
+    
+    function doSpeedTest() {
+        $.getJSON("<%=luci.dispatcher.build_url("admin", "connect", "speedTest")%>", null, function(data) {
+            $("#down-speed").html((data.download / 100).toFixed(2));
+            $("#up-speed").html((data.upload / 100).toFixed(2));
+            $("#suggest").html((data.upload / 25).toFixed(0) + "KB/s" );
+            
+            $(".clock-box").hide();
+            $(".rescont").show();
+        });
+    }
+    
+    $(function() {
+        var height = $(document).height()-90>1081+60?$(document).height()-90:1081+60;
+        var width = window.innerWidth;
+        if(width>1350){
+            $('.nav').css('height','100%');
+        }else{
+            $('.nav').css('height',height);
+        }
+
+        getQosStatus();
+        
+        //滑动开关
+        $(".switch").click(function () {
+            if ($(this).hasClass('open1')) {
+                $(this).removeClass('open1');
+                $(this).addClass('close1');
+                $(this).children().removeClass('open2');
+                $(this).children().addClass('close2');
+                $("#speedBox").css("display","none");
+
+                $(".modify").css("display","none");
+                $(".savedata").css("display","inline-block");
+            } else {
+                $(this).removeClass('close1');
+                $(this).addClass('open1');
+                $(this).children().removeClass('close2');
+                $(this).children().addClass('open2');
+                $("#speedBox").css("display","block");
+
+                $(".modify").css("display","none");
+                $(".savedata").css("display","inline-block");
+                var upSpeed = $("#upSpeed").text();
+                var downSpeed = $("#downSpeed").text();
+                $("#upSpeed").remove();
+                $("#downSpeed").remove();
+                $(".upSpeed").append("<input type='text' id='upSpeed' value='"+upSpeed+"' class='modify-input' autofocus/>");
+                $(".downSpeed").append("<input type='text' id='downSpeed' value='"+downSpeed+"' class='modify-input'/>");
+                $(".modify").hide();
+                $(".savedata").show();
+            }
+        });
+
+//      修改页面
+        $(".modify").click(function () {
+            var upSpeed = $("#upSpeed").text();
+            var downSpeed = $("#downSpeed").text();
+            if ($(".modify").is(':visible')) {
+                $("#upSpeed").remove();
+                $("#downSpeed").remove();
+                $(".upSpeed").append("<input type='text' id='upSpeed' value='"+upSpeed+"' class='modify-input'/>");
+                $(".downSpeed").append("<input type='text' id='downSpeed' value='"+downSpeed+"' class='modify-input'/>");
+                $(".modify").hide();
+                $(".savedata").show();
+            }
+        })
+
+        $("body").on("click",".savedata",function() {
+            if (!checkInputData()) return false;
+
+            loadSave("before", "save");
+
+            var upSpeed = $("#upSpeed").val();
+            var downSpeed = $("#downSpeed").val();
+            if($("#div1").hasClass('switch open1')){
+                var enable = "1";
+            }else{
+                var enable = "0";
+            }
+
+            $.ajax({
+                url: "<%=luci.dispatcher.build_url("admin", "connect", "setQosGlobalRule")%>",
+                cache: false,
+                dataType: "json",
+                 timeout:5000,
+                type: "POST",
+                data: {
+                    enable: enable,
+                    upSpeed: upSpeed * 1024,
+                    downSpeed: downSpeed * 1024,
+                },
+                success: function (data) {
+                    var status = data.status;
+                    if (status == "1") {
+                        T_alert.show('保存成功！',2000);
+                        //window.location.href = '/connect/limiting';
+                    } else {
+                        T_alert.show("失败",2000);
+                    }
+                    loadSave("after", "save");
+                },
+                error: function (xhr, errText, errType) {
+                    T_alert.show("保存失败",2000);
+                    loadSave("after", "save");
+                }
+            })
+        })
+        
+        $(".retest").click(function(){
+            $(".clock-box").show();
+            $(".btncont").hide();
+            $(".rescont").hide();
+            
+            doSpeedTest();
+        });
+    });
+
+</script>
+<%include("bottom")%>

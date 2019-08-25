@@ -1,0 +1,106 @@
+#!/bin/sh
+# sta interface daemon for qcawifi/mtk. zhangzf 2017
+#
+
+DISABLED=0
+TIMER=$((2*60))
+LOCK_FILE="/tmp/run/repeat-dog"
+
+[ -f "$LOCK_FILE" ] && {
+	[ -d "/proc/$(cat $LOCK_FILE)/" ] && exit 0
+}
+
+echo "$$" > $LOCK_FILE
+
+. /lib/functions.sh
+. /lib/functions/network.sh
+
+load_wireless() {
+	local cfg=$1
+	local mode
+
+	config_get mode "$cfg" mode
+	[ "$mode" = "sta" ] && {
+		uci set wireless.${cfg}.disabled=$DISABLED
+		uci commit wireless
+		wifi reload
+	}
+}
+
+disable_qcawifi() {
+	local sta_num
+
+	[ "$DISABLED" -eq 1 ] && {
+		network_get_physdev dev wan
+
+		sta_num=$(wlanconfig ${dev:0:4} list | grep -v ADDR | wc -l)
+		[ "$sta_num" -gt 0 ] && return 0
+	}
+
+	DISABLED=$((DISABLED^1))
+
+	config_load wireless
+	config_foreach load_wireless wifi-iface
+}
+
+site_survey_delay() {
+	local ap_list
+
+	for i in $(seq 0 10); do
+		sleep 4
+
+		local survey=$(iwpriv apcli0 get_site_survey)
+
+		[ "$ap_list" = "$survey" ] && break
+
+		ap_list=$survey
+	done
+
+	return 0
+}
+
+mtk_watcher() {
+	local wifi_device wifi_channel apcli_ssid apcli_channel
+
+	for i in $(seq 0 4); do
+		uci -q get wireless.@wifi-iface[${i}].apcli_enable &>/dev/null && {
+			apcli_ssid="$(uci -q get wireless.@wifi-iface[${i}].apcli_ssid)"
+			wifi_device="$(uci -q get wireless.@wifi-iface[${i}].device)"
+			break
+		}
+	done
+
+	[ $i -eq 4 ] && return 1
+
+	wifi_channel="$(uci -q get wireless.${wifi_device}.channel)"
+
+	iwpriv apcli0 set SiteSurvey=0
+	site_survey_delay 10
+
+	apcli_channel=$(iwpriv apcli0 get_site_survey | grep ${apcli_ssid} | awk '{print $1}')
+	[ -z "$apcli_channel" ] && return 1
+
+	[ "$apcli_channel" != "$wifi_channel" ] && {
+		uci -q set wireless.${wifi_device}.channel=$apcli_channel
+		uci -q delete wireless.@wifi-iface[${i}].apcli_bssid
+		uci commit wireless
+		wifi reload
+
+		sleep 2
+		ifup wan
+	}
+}
+
+while : ; do
+	sleep $TIMER
+
+	STA_MODE=$(uci -q get network.wan.apclient)
+
+	[ "${STA_MODE:-0}" -eq 0 ] && break
+
+	network_is_up && continue
+
+	[ -f "/lib/wifi/qcawifi.sh" ] && disable_qcawifi || mtk_watcher
+done
+
+exit 0
