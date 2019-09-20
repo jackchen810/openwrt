@@ -148,15 +148,15 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mqtt-client
 
-PKG_VERSION:=1.3.18
-PKG_RELEASE:=2
+PKG_VERSION:=2.0.0
+PKG_RELEASE:=2.0.0
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=ssh://git@121.194.169.198:8022/kt-package/mqtt-client.git
-PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+#PKG_SOURCE_PROTO:=git
+#PKG_SOURCE_URL:=ssh://git@121.194.169.198:8022/kt-package/mqtt-client.git
+#PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 #PKG_SOURCE_VERSION:=master
-PKG_SOURCE_VERSION:=abdcd07dd106405b5af239a31e9999d4617874e7
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
+#PKG_SOURCE_VERSION:=abdcd07dd106405b5af239a31e9999d4617874e7
+#PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
@@ -166,20 +166,22 @@ TARGET_CFLAGS += -g
 include $(INCLUDE_DIR)/package.mk
 
 define Package/$(PKG_NAME)
-	SECTION:=net
+	SECTION:=utils
 	CATEGORY:=Mypkg
-	TITLE:=mqtt-client -- KT mqtt-client
+	TITLE:=mqtt-client -- mqtt-client
 	DEPENDS:= +libmosquitto +libjson-c +libpthread +libuci +libcurl
 endef
 
 # Uncomment portion below for Kamikaze and delete DESCRIPTION variable above
 define Package/mqtt-client/description
-        kt-mqtt client tools
+        mqtt client tools for IOT
 endef
 
 define Build/Prepare
-	$(PKG_UNPACK)
-	rm -f $(DL_DIR)/$(PKG_SOURCE) 
+	#$(PKG_UNPACK)
+	#rm -f $(DL_DIR)/$(PKG_SOURCE) 
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./src/* $(PKG_BUILD_DIR)/
 endef
 
 
@@ -231,7 +233,7 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_BIN) ./files/mqtt-client.init $(1)/etc/init.d/mqtt-client
 	
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/mqtt-client.conf $(1)/etc/config/mqtt-client
+	$(INSTALL_BIN) ./files/mqtt-client.conf $(1)/etc/config/mqtt-client
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

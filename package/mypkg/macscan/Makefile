@@ -70,7 +70,7 @@ include $(INCLUDE_DIR)/cmake.mk
 # directive for the description below
 define Package/macscan
 	SECTION:=utils
-	CATEGORY:=KunTeng
+	CATEGORY:=Mypkg
 	TITLE:=macscan -- Support to the mac scanning 
 	DEPENDS:= +libpthread +libuci +libubox +libwl
 endef

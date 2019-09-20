@@ -10,8 +10,8 @@ if [ $? -eq 1 ]; then
     USE_UCI_CONFIG=0
 fi
 
-SYNC_WIFIDOG=`/usr/bin/wdctl status|grep WiFiDog`
-CHECKING_WD=`/bin/pidof wifidog`
+#SYNC_WIFIDOG=`/usr/bin/wdctl status|grep WiFiDog`
+#CHECKING_WD=`/bin/pidof wifidog`
 
 SERVICE_DAEMONIZE=1
 SERVICE_WRITE_PID=1
@@ -21,16 +21,8 @@ start() {
         if [ "$USE_UCI_CONFIG" -eq 1 ]; then
             #CONF=/tmp/mosquitto.converted.$$.conf
             #victor@20160224 modify CONF file to the same file not pid file before
-	    if [ -z $CHECKING_WD ]; then
-		echo 'NO WD, start mosquitto anyway'>/dev/ttyS0
-	    else
-	        if [ "WiFiDog status" != "$SYNC_WIFIDOG" ]
-		then
-		    echo "WD is not ready, waiting...">/dev/ttyS0
-		    exit 0
-		fi
-	    fi
-
+			
+			echo "WD is not ready, waiting...">/dev/ttyS0
             CONF=/tmp/mosquitto.conf
             mosquitto.uci.convert -f $CONF
         else

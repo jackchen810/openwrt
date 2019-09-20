@@ -26,7 +26,7 @@ include $(INCLUDE_DIR)/package.mk
 
 define Package/rsyslog
   SECTION:=net
-  CATEGORY:=KunTeng
+  CATEGORY:=Mypkg
   TITLE:=Enhanced system logging and kernel message trapping daemons
   URL:=http://www.rsyslog.com/
   DEPENDS:=+libestr +libjson-c +libuuid +zlib +libpthread +librt

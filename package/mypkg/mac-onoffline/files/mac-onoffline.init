@@ -1,0 +1,27 @@
+#!/bin/sh /etc/rc.common
+
+START=97
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+MACONOFF=/usr/bin/mac-onoffline
+LOG_FLAG=0
+
+prepare_conf(){
+		local cfg=$1
+        config_get LOG_FLAG "$cfg" "publish_record_log" "0"
+}
+
+
+
+start() {
+		config_load mac-onoffline
+        config_foreach prepare_conf mac-onoffline
+        service_start $MACONOFF --publish-log $LOG_FLAG
+}
+
+stop() {
+        service_stop $MACONOFF
+}

@@ -10,7 +10,7 @@ SERVICE_WRITE_PID=1
 SERVICE_DAEMONIZE=1
 
 MQTT_CLIENT=/usr/sbin/mqtt-client
-addr=mqtt.kunteng.org.cn
+addr=emqtt.jdwanxiang.com
 port=1883
 
 prepare_mqtt_client_conf() {

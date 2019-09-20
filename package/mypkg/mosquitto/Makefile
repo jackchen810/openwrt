@@ -8,24 +8,25 @@
 # update log
 # 	1705.1: add preinst and change ca.cert to read only
 # 	1.4.5: add emqtt server
+#  old version 1.4.7  is not compile； update to 1.6.6; but need libwebsockets version 2.1.0
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mosquitto
-PKG_VERSION:=1.4.7
+PKG_VERSION:=1.6.6
 PKG_RELEASE:=1705.1
 PKG_LICENSE:=BSD-3-Clause
 PKG_LICENSE_FILES:=LICENSE.txt
 
 
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://mosquitto.org/files/source/
-PKG_MD5SUM:=4cb978502312bff2dcdaab6a433b1bf2
+#PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+#PKG_SOURCE_URL:=https://mosquitto.org/files/source/
+#PKG_MD5SUM:=529b6de33bac18363c2db46194d8d91c
 #PKG_MD5SUM:=4cb978502312bff2dcdaab6a433b1bf2
 #PKG_SOURCE_PROTO:=git
 #PKG_SOURCE_URL:=ssh://git@121.194.169.198:8022/kt-package/mosquitto.git
-PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+#PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 #PKG_SOURCE_VERSION:=master
 #PKG_SOURCE_VERSION:=89a57f11cdfec140fa21fe3d4493b2ca
 #PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
@@ -172,8 +173,10 @@ endef
 Package/$(PKG_NAME)-nossl/conffiles = $(Package/$(PKG_NAME)/conffiles)
 
 define Build/Prepare
-	$(PKG_UNPACK)
-	rm -f $(DL_DIR)/$(PKG_SOURCE) 
+#	$(PKG_UNPACK)
+#	rm -f $(DL_DIR)/$(PKG_SOURCE) 
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./src/mosquitto-1.6.6/* $(PKG_BUILD_DIR)/
 endef
 
 define Package/$(PKG_NAME)/preinst
@@ -188,12 +191,12 @@ endef
 
 define Package/$(PKG_NAME)/postinst
 	#!/bin/sh
-	[ -e $${IPKG_INSTROOT}/etc/mosquitto/ca.crt ] && {
-		chmod 444 $${IPKG_INSTROOT}/etc/mosquitto/ca.crt
+	[ -e $${IPKG_INSTROOT}/etc/mosquitto/yun-client.crt ] && {
+		chmod 444 $${IPKG_INSTROOT}/etc/mosquitto/yun-client.crt
 	}
 
-	[ -e $${IPKG_INSTROOT}/etc/mosquitto/apfree.ca ] && {
-		chmod 444 $${IPKG_INSTROOT}/etc/mosquitto/apfree.ca
+	[ -e $${IPKG_INSTROOT}/etc/mosquitto/yun-client.ca ] && {
+		chmod 444 $${IPKG_INSTROOT}/etc/mosquitto/yun-client.ca
 	}
 	
 	[ -e $${IPKG_INSTROOT}/etc/init.d/mosquitto ] && {
@@ -214,8 +217,8 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_BIN) ./files/mosquitto.uci.convert $(1)/usr/bin
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/mosquitto.config $(1)/etc/config/mosquitto
-	$(INSTALL_CONF) ./files/ca.crt $(1)/etc/mosquitto/ca.crt
-	$(INSTALL_CONF) ./files/apfree.ca $(1)/etc/mosquitto/apfree.ca
+	$(INSTALL_CONF) ./files/yun-client.crt $(1)/etc/mosquitto/yun-client.crt
+	$(INSTALL_CONF) ./files/yun-client.ca $(1)/etc/mosquitto/yun-client.ca
 endef
 
 Package/$(PKG_NAME)-nossl/install = $(Package/$(PKG_NAME)/install)

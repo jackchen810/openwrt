@@ -30,12 +30,12 @@ PKG_RELEASE:=1
 
 #PKG_SOURCE_PROTO - the protocol to use for fetching the sources (git, svn)
 #PKG_SOURCE_URL   - Where to download the sources from (directory)
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL=http://121.194.169.198:8888/chenzj/libwl.git
-PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=60ebf44cff0eacd865b146a2e5f91f7725c5df63
+#PKG_SOURCE_PROTO:=git
+#PKG_SOURCE_URL=http://121.194.169.198:8888/chenzj/libwl.git
+#PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+#PKG_SOURCE_VERSION:=60ebf44cff0eacd865b146a2e5f91f7725c5df63
 #PKG_SOURCE_VERSION:=master
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
+#PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 
 
 
@@ -95,15 +95,10 @@ endef
 # much easier to do it this way.
 define Build/Prepare
 #	##echo "Here is Package/Prepare"
-	$(PKG_UNPACK)
-	rm -f $(DL_DIR)/$(PKG_SOURCE) 
-#  ##it is convenient to compile and debug
-	if [ -d "./src" ] ; then \
-		$(CP) -frp ./src $(PKG_BUILD_DIR)/; \
-	fi
-	if [ -d "./include" ] ; then \
-		$(CP) -frp ./include $(PKG_BUILD_DIR)/; \
-	fi
+#	$(PKG_UNPACK)
+#	rm -f $(DL_DIR)/$(PKG_SOURCE) 
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./* $(PKG_BUILD_DIR)/
 endef
 
 
