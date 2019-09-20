@@ -1,0 +1,42 @@
+#!/bin/sh /etc/rc.common
+
+
+START=80
+
+
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+
+start() {
+
+#config interface 'wan'
+#        option  device '/dev/cdc-wdm0'
+#        option proto 'qmi'
+#        option apn  'cnnet'
+#        option username 'card'
+#        option password 'card'
+#        option ifname 'wwan0'
+
+	uci set network.wwan0=interface
+	uci set network.wwan0.ifname=wwan0
+	uci set network.wwan0.device=/dev/cdc-wdm0
+	uci set network.wwan0.proto=qmi
+	uci set network.wwan0.apn=cnnet
+	uci set network.wwan0.username=card
+	uci set network.wwan0.password=card
+	# add by chenzejun for dns issue
+	uci add_list network.wwan0.dns=114.114.114.114
+	uci add_list network.wwan0.dns=8.8.8.8
+			
+	#echo "wifi relaod=$lan_ip_1_bype,$lan_ip_2_bype" >/dev/ttyS0
+	echo "reset wan by 4g, restart network" >/dev/ttyS0
+	
+	#####
+	uci commit network
+		
+	##network restart
+	/etc/init.d/network restart
+}

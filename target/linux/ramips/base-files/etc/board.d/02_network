@@ -463,6 +463,9 @@ ramips_setup_interfaces()
 		ucidef_add_switch "switch0" \
 			"4:lan:1" "2:lan:2" "0:wan" "6@eth0"
 		;;
+	zbt-we826-16M)
+		ucidef_set_interfaces_lan_wan "eth0.1" "wwan0"
+		;;
 	zbtlink,zbt-we1226|\
 	y1)
 		ucidef_add_switch "switch0" \

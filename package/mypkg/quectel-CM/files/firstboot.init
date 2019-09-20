@@ -1,0 +1,19 @@
+#!/bin/sh /etc/rc.common
+
+
+START=80
+
+
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+
+start() {
+	if [ -f /etc/firstboot.flag ]; then
+		#echo "jdwx 4g router first startup"
+		echo "jdwx 4g router first startup" >/dev/ttyS0
+		rm -rf /etc/firstboot.flag
+	fi
+}
