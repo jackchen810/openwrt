@@ -44,7 +44,7 @@ PKG_RELEASE:=1
 
 
 
-PKG_MAINTAINER:=chenzejun <chenzejun@kunteng.org>
+PKG_MAINTAINER:=chenzejun <jack_chen_mail@163.com>
 PKG_LICENSE:=GPL-3.0
 PKG_LICENSE_FILES:=COPYING
 

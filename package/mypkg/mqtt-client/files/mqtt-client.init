@@ -1,31 +1,27 @@
 #!/bin/sh /etc/rc.common
 
-#victor@20160702 mv from 75 2 85 to make mqtt-client later then mosquitto double connection mosquitto server.
-START=95
-
-mac_address=`ifconfig br-lan | grep HWaddr | awk '{print $5}' | sed s/://g`
+START=97
 
 SERVICE_USE_PID=1
 SERVICE_WRITE_PID=1
 SERVICE_DAEMONIZE=1
 
-MQTT_CLIENT=/usr/sbin/mqtt-client
-addr=emqtt.jdwanxiang.com
-port=1883
+MQTTCLIENT=/usr/bin/mqtt-client
+LOG_FLAG=0
 
-prepare_mqtt_client_conf() {
-        config_get addr "$1" address
-	port=`echo $addr|cut -d':' -f 2`
-	addr=`echo $addr|cut -d':' -f 1`
+prepare_conf(){
+		local cfg=$1
+        config_get LOG_FLAG "$cfg" "publish_record_log" "0"
 }
 
+
+
 start() {
-	config_load mosquitto
-	config_foreach prepare_mqtt_client_conf bridge
-	#service_start $MQTT_CLIENT -q 2 -t $mac_address/+/+/+/# -h $addr -p $port -i mosub-/$mac_address
-	service_start $MQTT_CLIENT -q 0 -t $mac_address/+/#
-} 
+		config_load mac-onoffline
+        config_foreach prepare_conf mqtt-client
+        service_start $MQTTCLIENT --publish-log $MQTTCLIENT
+}
 
 stop() {
-	service_stop $MQTT_CLIENT
+        service_stop $MQTTCLIENT
 }

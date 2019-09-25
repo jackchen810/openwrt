@@ -83,8 +83,6 @@ define Package/quectel-CM/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/quectel-CM.init $(1)/etc/init.d/quectel-CM
 	$(INSTALL_BIN) ./files/network-wwan.init $(1)/etc/init.d/network-wwan
-	$(INSTALL_BIN) ./files/firstboot.init $(1)/etc/init.d/firstboot
-	$(INSTALL_BIN) ./files/firstboot.flag $(1)/etc/firstboot.flag
 endef
 
 # This line executes the necessary commands to compile our program.

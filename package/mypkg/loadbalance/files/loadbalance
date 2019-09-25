@@ -1,0 +1,5 @@
+config loadbalance
+	   option switch_on  '1'
+	   option disabled  '1'
+	   option base_count  '0'
+	   option local_balance  '0'		

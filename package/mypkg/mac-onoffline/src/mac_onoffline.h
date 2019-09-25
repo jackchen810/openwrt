@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014  <chenzejun@kunteng.org>
+ * Copyright (C) 2011-2014  <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -22,6 +22,34 @@
 
 
 
+
+
+#define LISTEN_MAX_SOCKET_NUM  20
+
+
+// connect info node
+typedef struct  CLIENT_CONN_NODE_INFO
+{
+        int sock_fd;
+        char  look_topic[BUF_LEN_256];
+
+        struct sockaddr_un st_client_addr;
+        int  client_addr_len;
+
+        struct uloop_fd uloop_fd;
+                
+
+
+
+
+}CLIENT_CONN_NODE_INFO;
+
+
+
+
+
+
+
 typedef enum  STA_PUBLISH_STATUS_EN
 {
         STA_PUBLISH_NEW = 0,
@@ -41,8 +69,8 @@ typedef struct  MOSQ_CLINENT_CONFIG_st
         char topic[BUF_LEN_256];
         char host[BUF_LEN_64];
         int port;
-	 char username[BUF_LEN_64];
-	 char password[BUF_LEN_64];
+        char username[BUF_LEN_64];
+        char password[BUF_LEN_64];
         int keepalive;
         char bind_address[BUF_LEN_64];
         char mosquitto_conn_flag;
@@ -50,6 +78,7 @@ typedef struct  MOSQ_CLINENT_CONFIG_st
         char mosquitto_test;     // test flag, it's no use in normal
         unsigned int sequence_number;     // sequence number
 }MOSQ_CLINENT_CONFIG;
+
 
 
 #define MONOFF_MCLIENT_SET_CONN_STATUS(dstatus)   ( g_mosq_config.mosquitto_conn_flag = (dstatus))
@@ -62,6 +91,7 @@ typedef struct  MOSQ_CLINENT_CONFIG_st
 
 struct  MONOFF_GLOBAL_CONFIG
 {
+        char my_name[BUF_LEN_64];
         char version[BUF_LEN_64];
         char buildtime[BUF_LEN_64];
         char channelpath[BUF_LEN_128];
@@ -70,11 +100,12 @@ struct  MONOFF_GLOBAL_CONFIG
         char route_ip[BUF_LEN_64];
         char route_mac[BUF_LEN_64];
         time_t uptime;
+        char localsrv_name[BUF_LEN_128];
 
         unsigned int age_time;
 
         struct uloop_fd uloop_fd_cmd;
-        struct uloop_fd uloop_fd_dhcp_inotify;
+        struct uloop_fd uloop_fd_local_service;
 };
 
 
@@ -113,6 +144,8 @@ enum {
         MONOFF_CMD_INFO,
         MONOFF_CMD_TRACE,
         MONOFF_INOTIFY_INFO,
+        MONOFF_MSGQ_INFO,
+        MONOFF_LOCAL_SERVICE,
 };
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014  <chenzejun@kunteng.org>
+ * Copyright (C) 2011-2014  <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -61,6 +61,7 @@ do{                                   \
 void libwl_printf_currtime(void);
 int libwl_log(const char *name, const char *format, ...);
 int libwl_debug_get_switch(int category);
+int libwl_cmd_create_socket(const struct sockaddr_un *address);
 int libwl_cmd_service_create(char *name);
 int libwl_cmd_service_destroy(void);
 void libwl_cmd_service_callback(int sock_fd, LIBWL_CMD_LIST ast_list[], int size);

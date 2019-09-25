@@ -25,17 +25,17 @@ include $(TOPDIR)/rules.mk
 # 2016.9.12 chenzejun change PKG_VERSION to 1.3.3, macscan support lede and openwrt by one trunk.
 ##############################################
 PKG_NAME:=macscan
-PKG_VERSION:=1.3.4
+PKG_VERSION:=2.0.0
 PKG_RELEASE:=1
 
 
 
 #PKG_SOURCE_PROTO - the protocol to use for fetching the sources (git, svn)
 #PKG_SOURCE_URL   - Where to download the sources from (directory)
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL=http://121.194.169.198:8888/chenzj/macscan.git
-PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=c961d5bf14ec7b84ddbef2be0b5a1de1090a765a
+#PKG_SOURCE_PROTO:=git
+#PKG_SOURCE_URL=http://121.194.169.198:8888/chenzj/macscan.git
+#PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+#PKG_SOURCE_VERSION:=c961d5bf14ec7b84ddbef2be0b5a1de1090a765a
 #PKG_SOURCE_VERSION:=master
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 
@@ -44,7 +44,7 @@ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 
 
 
-PKG_MAINTAINER:=chenzejun <chenzejun@kunteng.org>
+PKG_MAINTAINER:=chenzejun <jack_chen_mail@163.com>
 PKG_LICENSE:=GPL-3.0
 PKG_LICENSE_FILES:=COPYING
 
@@ -96,12 +96,10 @@ endef
 # much easier to do it this way.
 define Build/Prepare
 #	##echo "Here is Package/Prepare"
-	$(PKG_UNPACK)
-	rm -f $(DL_DIR)/$(PKG_SOURCE) 
-#  ##it is convenient to compile and debug
-	if [ -d "./src" ] ; then \
-		$(CP) -frp ./src $(PKG_BUILD_DIR)/; \
-	fi
+#	$(PKG_UNPACK)
+#	rm -f $(DL_DIR)/$(PKG_SOURCE)
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./* $(PKG_BUILD_DIR)/
 endef
 
 

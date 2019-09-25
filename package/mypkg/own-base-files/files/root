@@ -1,0 +1,2 @@
+*/10 * * * * /usr/sbin/procwatchdog.sh
+* */1 * * * /usr/sbin/checkwan.sh
