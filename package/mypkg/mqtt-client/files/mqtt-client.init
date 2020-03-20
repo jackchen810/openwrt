@@ -19,7 +19,7 @@ prepare_conf(){
 start() {
 		config_load mac-onoffline
         config_foreach prepare_conf mqtt-client
-        service_start $MQTTCLIENT --publish-log $MQTTCLIENT
+        service_start $MQTTCLIENT
 }
 
 stop() {

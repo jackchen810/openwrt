@@ -124,7 +124,7 @@ define Package/mqtt-client/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/mqtt-client.init $(1)/etc/init.d/mqtt-client
 	$(INSTALL_DIR)	$(1)/etc/config
-	$(CP) ./files/mqtt-client $(1)/etc/config
+	$(INSTALL_CONF) ./files/mqtt-client.conf $(1)/etc/config/mqtt-client
 endef
 
 # This line executes the necessary commands to compile our program.

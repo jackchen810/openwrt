@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014  <jack_chen_mail@163.com>
+ * Copyright (C) 2011-2014  chenzejun <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -75,6 +75,8 @@ void libwl_cmd_output_log(int num);
 void libwl_cmd_output_printf(int num);
 int libwl_cmd_service_init(LIBWL_CMD_LIST *pst_cmdlist, int list_size);
 bool libwl_inst_is_running(char *lock_file);
+int libwl_write_file(const char *name, const char *format, ...);
+int libwl_execuate_shell_command(const char *shellCMD, char *r_buffer, int len) ;
 
 
 #endif

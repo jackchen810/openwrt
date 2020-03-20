@@ -30,6 +30,9 @@ endef
 Build/Compile = $(Build/Compile/Default)
 
 define Package/$(PKG_NAME)/install
+	./files/makeversioninfo.sh
+	$(INSTALL_DIR) $(1)/etc/config
+	$(CP) ./files/firmwareinfo $(1)/etc/config 
 	$(INSTALL_DIR) $(1)/etc/crontabs
 	$(CP) ./files/root  $(1)/etc/crontabs
 	$(INSTALL_DIR) $(1)/usr/sbin

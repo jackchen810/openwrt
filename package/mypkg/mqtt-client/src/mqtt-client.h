@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014  <jack_chen_mail@163.com>
+ * Copyright (C) 2011-2019  chenzejun <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -28,11 +28,16 @@
 
 
 #define MOSQ_CLIENT_PUB 1
-#define MOSQ_CLIENT_SUB 2
+#define MOSQ_CLIENT_PUB_RESP 2
+#define MOSQ_CLIENT_SUB 3
+#define MOSQ_CLIENT_SUB_RESP 4
 
 enum {
         TLV_TYPE_TOPIC = 1,
         TLV_TYPE_PAYLOAD = 2,
+        TLV_TYPE_AF_UNIX_ADDRESS = 3,
+        TLV_TYPE_RESP_CODE = 10,
+        TLV_TYPE_RESP_MSG = 11,
         TLV_TYPE_MAX = 24
 };
 
@@ -48,21 +53,18 @@ typedef struct  CLIENT_TLV_DATA
 
 
 // connect info node
-typedef struct  CLIENT_CONN_NODE_INFO
+typedef struct  MCLIENT_NODE_INFO
 {
-        int sock_fd;
-        char  look_topic[BUF_LEN_256];
-
+        // same to create socket
+        // key
+        char  client_name[BUF_LEN_64];
         struct sockaddr_un st_client_addr;
         int  client_addr_len;
 
-        struct uloop_fd uloop_fd;
-                
+        // data, dispatch by this field
+        char  branch_topic[5][BUF_LEN_128];
 
-
-
-
-}CLIENT_CONN_NODE_INFO;
+}MCLIENT_NODE_INFO;
 
 
 
@@ -78,21 +80,21 @@ typedef enum  STA_PUBLISH_STATUS_EN
 }STA_PUBLISH_STATUS_EN;
 
 
-#define MOSQ_CLIENT_PUB 1
-#define MOSQ_CLIENT_SUB 2
 
 
 typedef struct  MOSQ_CLINENT_CONFIG_st
 {
         int  notice_switch;
         char mosq_id[BUF_LEN_64];
-        char topic[BUF_LEN_256];
+        //char topic[BUF_LEN_256];
         char host[BUF_LEN_64];
         int port;
         char username[BUF_LEN_64];
         char password[BUF_LEN_64];
         int keepalive;
         char bind_address[BUF_LEN_64];
+        //char topic_list[BUF_LEN_256];
+
         char mosquitto_conn_flag;
         char publish_record_log;
         char mosquitto_test;     // test flag, it's no use in normal
@@ -124,7 +126,6 @@ struct  MQTTCLIENT_GLOBAL_CONFIG
         time_t uptime;
         char localsrv_name[UNIX_PATH_MAX];  //UNIX_PATH_MAX
         char lockfile_name[BUF_LEN_128];
-
         unsigned int age_time;
 
         struct uloop_fd uloop_fd_cmd;

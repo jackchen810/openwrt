@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014  <jack_chen_mail@163.com>
+ * Copyright (C) 2011-2014  chenzejun <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -31,6 +31,13 @@
 #define LOG_BUFFER_8192      8192
 
 
+
+typedef void (* PF_UCI_SCAN_CALLBACK)(const char *, const char *, const char *);
+typedef void (* PF_UCI_SCAN_ALL_CALLBACK)(const char *, const char *, int, const char *, const char *);
+typedef void (* PF_UCI_SECTION_CALLBACK)(const char *, const char *);
+
+
+
 int libwl_create_netlink_socket(int protocol);
 int libwl_add_epoll(int epollfd, int sock_fd);
 
@@ -39,6 +46,9 @@ int libwl_uci_load_config(void);
 int libwl_uci_unload_config(void);
 int libwl_uci_get_option(char *pkg_name, char *section_type, char *section_name, char *op_name, char ret_value[], int ret_len);
 int libwl_uci_get_option_fast(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, char *op_name, char ret_value[], int ret_len);
+int libwl_uci_find_element_callback(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, char *op_name, PF_UCI_SCAN_CALLBACK pf_calllback);
+int libwl_uci_scan_element_callback(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, PF_UCI_SCAN_ALL_CALLBACK pf_calllback)  ;
+int libwl_uci_scan_section_callback(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, PF_UCI_SECTION_CALLBACK pf_calllback);
 int libwl_uci_get_wireless_ifname(struct uci_context *uci_ctx, char *band, char ret_value[], int ret_len);
 int libwl_uci_get_wifi_device(struct uci_context *uci_ctx, char *band, char *op_name, char ret_value[], int ret_len) ;
 int libwl_uci_get_wifi_iface(struct uci_context *uci_ctx, char *ifname, char *op_name, char ret_value[], int ret_len);
@@ -55,6 +65,7 @@ int libwl_get_wan_name(char *if_name, int buf_len);
 
 int libwl_get_2g_port_no(char *port_name, int buf_len, int *port_no);
 int libwl_get_5g_port_no(char *port_name, int buf_len, int *port_no);
+int libwl_get_board_name(char *board_name, int buf_len);
 int libwl_get_router_mac(const char *if_name, char *mac, int buf_len);
 int libwl_get_router_hwaddr(const char *if_name, char *hwaddr, int buf_len);
 int libwl_get_router_hwaddr_short(const char *if_name, char *hwaddr, int buf_len);

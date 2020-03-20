@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2011-2014  chenzejun <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -322,16 +322,47 @@ int libwl_safe_write2file(const char *fn, const char *buf, size_t buflen)
 int libwl_printf2serial(const char *format, ...)
 {
         char log[LOG_BUFFER_2048 + BUF_LEN_16] = {0};
-
         va_list args;
+        int len = 0;
+        
         va_start(args, format);
-        vsnprintf(log, LOG_BUFFER_2048, format, args);
+        len = vsnprintf(log, LOG_BUFFER_2048, format, args);
         va_end(args);
 
+        if (len >= LOG_BUFFER_2048)  len = LOG_BUFFER_2048;
+        if (len < 0)       return -1;
+
         //libwl_safe_write2file("/dev/tty", log, LOG_BUFFER_4096);
-        libwl_safe_write2file("/dev/ttyS0", log, LOG_BUFFER_2048);
+        libwl_safe_write2file("/dev/ttyS0", log, len);
         return 0;
 }
+
+
+
+
+/**
+*@Description: wrie file
+*@Input: void
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20160123
+*/
+int libwl_write_file(const char *name, const char *format, ...)
+{
+        char log[LOG_BUFFER_2048 + BUF_LEN_16] = {0};
+        va_list args;
+        int len = 0;
+        
+        va_start(args, format);
+        len = vsnprintf(log, LOG_BUFFER_2048, format, args);
+        va_end(args);
+        
+        if (len >= LOG_BUFFER_2048)  len = LOG_BUFFER_2048;
+        if (len < 0)       return -1;
+
+        //libwl_safe_write2file("/dev/tty", log, LOG_BUFFER_4096);
+        return libwl_safe_write2file(name, log, len);
+}
+
 
 /**
  *@Description: libwl command init
@@ -367,6 +398,129 @@ static void libwl_debug_switch_close(void)
 
 
 
+
+#if FUNCTION_DESC("shell popen")
+int ancestor_pid = -1;
+static pthread_mutex_t cmd_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// get_cmd_timeout read the timeout env from mqtt_config file
+// return: 0: faild, >0 get the timeout secounds
+// ExecuateShellCMD argument len is the length of r_buffer
+// return :
+// 		1: error 0: succeed
+int libwl_execuate_shell_command(const char *shellCMD, char *r_buffer, int len) 
+{
+        fd_set readfd;
+        time_t startTime = time(NULL);
+        struct timeval tv;
+        int sele_ret = 0;
+        int ret = 0;
+        char tmp[1024]={0};
+        FILE *fstream = NULL;
+        int fd_popen = -1;
+        int script_tmout = 240;
+        int blk_count = 0;
+        
+        if (shellCMD == NULL || r_buffer == NULL)
+        {
+                return 1;
+        }
+        
+        pthread_mutex_lock(&cmd_mutex);
+        fstream = popen(shellCMD, "r");
+        if (NULL == fstream) 
+        {
+                perror("ExecuateShellCMD popen");
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "CMD:EXEC:[%s] popen init faild\n", shellCMD);
+                pthread_mutex_unlock(&cmd_mutex);
+                return 1;
+        }
+
+        // get file desc
+        fd_popen = fileno(fstream);
+
+        // close exe
+        ret  = fcntl(fd_popen , F_SETFD, FD_CLOEXEC);
+        if (ret == -1) 
+        {
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "com: fcntl to FD_CLOEXEC faild");
+                pclose(fstream);
+                pthread_mutex_unlock(&cmd_mutex);
+                return 1;
+        }
+
+
+        /** Select Timeout **/
+        tv.tv_sec = 240;
+        tv.tv_usec = 0;
+
+        while(1)
+        {
+                FD_ZERO(&readfd);
+                FD_SET(fd_popen , &readfd);
+
+
+                sele_ret = select(fd_popen +1, &readfd, NULL, NULL, &tv);
+                if (sele_ret < 0) {
+                        LIBWL_DBG_PRINTF(LIBWL_ERROR, "com: [%s] select failed!\n", shellCMD);
+                        ret = 1;
+                        break;
+                } 
+                else if (sele_ret == 0) {
+                        LIBWL_DBG_PRINTF(LIBWL_ERROR, "com: [%s] select Time out!\n", shellCMD);
+                        ret =2;
+                        break;
+                } 
+
+                
+                // read command exec result to r_buffer
+                if(FD_ISSET(fd_popen , &readfd)) 
+                {
+                        memset(r_buffer, 0 , len);
+                       
+                        /* set to file begin */
+                        fseek(fstream, 0, SEEK_SET);
+                        blk_count = fread(r_buffer, len, 1, fstream);
+                        if(blk_count == 1 || feof(fstream))
+                        {
+                                // read ok
+                                //LIBWL_DBG_PRINTF(GSET_ERROR, "blk_count: %d.\n", blk_count);
+                                r_buffer[len -  1] = 0;   //'\0'
+                                //LIBWL_DBG_PRINTF(GSET_ERROR, "blk_count: %d\n", blk_count);
+                                ret = 0;
+                                break;
+                        }
+                        else
+                        {
+                                ret = ferror(fstream);
+                                break;
+                        }
+                } 
+                else 
+                {
+                        ret = 4;
+                        break;
+                }
+
+                // timeout
+                if ((startTime + script_tmout) < time(NULL)) {
+                        LIBWL_DBG_PRINTF(LIBWL_ERROR, "com: script Time out!: %s.\n", shellCMD);
+                        ret = 5;
+                        break;
+                }
+       
+
+        }
+
+        pclose(fstream);
+        LIBWL_DBG_PRINTF(LIBWL_INFO, "CMD:[%s] result = %d\n", shellCMD, ret);
+        pthread_mutex_unlock(&cmd_mutex);
+        return ret;
+}
+
+#endif
+
+
 #if FUNCTION_DESC("command function")
 
 static char cmd_buffer[LOG_BUFFER_2048 + BUF_LEN_128] = {0};
@@ -376,12 +530,12 @@ static int  cmd_client_fd = -1;
 static struct sockaddr_un server_address =
 {
         .sun_family = AF_UNIX,
-        .sun_path = "/var/run/libwl.service",
+        .sun_path = "/var/run/libwl.cmd.serv",
 };  
 static struct sockaddr_un client_address =
 {
         .sun_family = AF_UNIX,
-        .sun_path = "/var/run/libwl.client",
+        .sun_path = "/var/run/libwl.cmd.client",
 }; 
 
 
@@ -461,6 +615,8 @@ int libwl_cmd_service_send_msg(const char *format, ...)
         va_start(args, format);
         log_len = vsnprintf(log, LOG_BUFFER_1024, format, args);
         va_end(args);
+        
+        if (log_len >= LOG_BUFFER_1024)  log_len = LOG_BUFFER_1024;
 
         client_len = strlen(client_address.sun_path) + sizeof(client_address.sun_family);
         bytes = sendto(cmd_client_fd, log, log_len, 0, (struct sockaddr*)&client_address, client_len);
@@ -504,13 +660,14 @@ void libwl_cmd_service_callback(int sock_fd, LIBWL_CMD_LIST ast_list[], int size
         int bytes;
         int slen;
         int i;
+        int rt0_count = 0;
 
         if (ast_list == NULL || size == 0)
         {
                 return;
         }
         
-        LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "handle server ...fd:%d, %d\n", sock_fd, cmd_client_fd);  
+        //LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "handle server ...fd:%d, %d\n", sock_fd, cmd_client_fd);  
         client_len = strlen(client_address.sun_path) + sizeof(client_address.sun_family);
 
         /* found new client, process */
@@ -527,6 +684,18 @@ void libwl_cmd_service_callback(int sock_fd, LIBWL_CMD_LIST ast_list[], int size
                         }
 
                         break;
+                }
+                else if(bytes == 0){
+                        //if peer socket ctrl+c; it return 0; when socktype = SOCK_DGRAM;
+                        // count 5 to exit;
+                        //protect
+                        if (rt0_count > 5){
+                                break;
+                        }
+                        
+                        rt0_count++; 
+                        LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "next receive, count:%d, %d\n", rt0_count, errno);  
+                        continue;
                 }
 
                 LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "handle receive client:%d bytes:%d, type:%d\n", sock_fd, bytes, pst_tlv->us_tlv_type);
@@ -573,7 +742,7 @@ void libwl_cmd_service_callback(int sock_fd, LIBWL_CMD_LIST ast_list[], int size
                 LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "receive command, get bytes:%d\n", bytes);  
         }
 
-        LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "libwl_cmd_service_callback, exit\n");  
+        //LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "libwl_cmd_service_callback, exit\n");  
         return;
 }
 
@@ -593,9 +762,9 @@ int libwl_cmd_service_create(char *name)
         
         //it need init clien and service
         client_address.sun_family = AF_UNIX;
-        snprintf(client_address.sun_path, sizeof(client_address.sun_path), "/var/run/%s.client", name);
+        snprintf(client_address.sun_path, sizeof(client_address.sun_path), "/var/run/%s.cmd.client", name);
         server_address.sun_family = AF_UNIX;
-        snprintf(server_address.sun_path, sizeof(server_address.sun_path), "/var/run/%s.service", name);
+        snprintf(server_address.sun_path, sizeof(server_address.sun_path), "/var/run/%s.cmd.serv", name);
 
         /* command service*/
         sock_fd = libwl_cmd_create_socket(&server_address);
@@ -651,15 +820,15 @@ int libwl_cmd_client_create(char *name)
 
         //it need init clien and service
         client_address.sun_family = AF_UNIX;
-        snprintf(client_address.sun_path, sizeof(client_address.sun_path), "/var/run/%s.client", name);
+        snprintf(client_address.sun_path, sizeof(client_address.sun_path), "/var/run/%s.cmd.client", name);
         server_address.sun_family = AF_UNIX;
-        snprintf(server_address.sun_path, sizeof(server_address.sun_path), "/var/run/%s.service", name);
+        snprintf(server_address.sun_path, sizeof(server_address.sun_path), "/var/run/%s.cmd.serv", name);
 
         /* command service*/
         sock_fd = libwl_cmd_create_socket(&client_address);
 
 
-        LIBWL_DBG_PRINTF(LIBWL_INFO, "libwl client create fd:%d\n", sock_fd);  
+        LIBWL_DBG_PRINTF(LIBWL_INFO, "[#]cmd client start work...\n", sock_fd);  
         return sock_fd;
 }
 

@@ -1,5 +1,0 @@
-config mqtt-client
-	   option publish_record_log  '1'
-	   list subscribe_topic  '/yunAC/CMD_SET/#'
-	   list subscribe_topic  '/yunAC/CMD_GET/#'
-		

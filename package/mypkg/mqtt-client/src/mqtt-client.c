@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2011-2019  chenzejun <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -105,6 +105,7 @@ static struct LIBWL_CMD_LIST_ST  g_function_list[] =
 {
         {"config", mqttclient_show_config},
         {"debug", mqttclient_show_debug_switch},
+        {"connect", mqttclient_show_connect},
 };
 
 
@@ -125,7 +126,7 @@ static void mqttclient_cmd_socket_handle(struct uloop_fd *u, unsigned int ev)
 
 
 /**
- *@Description: monoff command init
+ *@Description: mqttclient command init
  *@Input: void: void
  *@Return: 0: ok;   -1: fail
  *@author: chenzejun 20160323
@@ -138,7 +139,7 @@ static int mqttclient_cmd_init(void)
         if (g_config.uloop_fd_cmd.fd > 0)
         {
                 uloop_fd_add(&g_config.uloop_fd_cmd,  ULOOP_READ | ULOOP_EDGE_TRIGGER);
-                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_INFO, "monoff add cmd fd:%d\n", g_config.uloop_fd_cmd.fd );  
+                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_INFO, "mqttclient add cmd fd:%d\n", g_config.uloop_fd_cmd.fd );  
 
         }
         
@@ -148,7 +149,7 @@ static int mqttclient_cmd_init(void)
 
 
 /**
- *@Description: monoff command destroy
+ *@Description: mqttclient command destroy
  *@Input: void: void
  *@Return: 0: ok;   -1: fail
  *@author: chenzejun 20160323
@@ -183,7 +184,10 @@ static void mqttclient_time_get_config(void)
         time_count++;
         if (time_count%6 == 0)
         {
-                //libwl_uci_get_option_fast(uci_contex, "firmwareinfo", "version", "info", "channel_path", g_config.channelpath, sizeof(g_config.channelpath));
+                //libwl_uci_get_list_fast(uci_contex, "mqtt-client", "subscribe", "yunAC", "subscribe_topic", g_config.topic_list, sizeof(g_config.topic_list));
+                //MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_UCI_INFO, "g_config.topic_list:%s\n", g_config.topic_list);
+                
+                
 
                 /* get wan name */
                 libwl_uci_get_option_fast(uci_contex, "network", "interface", "wan", "ifname", g_config.wan_name, sizeof(g_config.wan_name));
@@ -207,6 +211,9 @@ static void mqttclient_time_get_config(void)
  
         return;
 }  
+
+
+
 
 /*
 *@Description: uci load config
@@ -272,9 +279,9 @@ static ALIST_HEAD connect_info =
 *@Return: 0: ok;   -1: fail
 *@author: chenzejun 20160123
 */
-static int mqttclient_connect_add(CLIENT_CONN_NODE_INFO  *pst_node)
+static int mqttclient_connect_add(MCLIENT_NODE_INFO  *pst_node)
 {
-        return libwl_alist_add(&connect_info, &pst_node->sock_fd, sizeof(int), pst_node, sizeof(CLIENT_CONN_NODE_INFO));
+        return libwl_alist_add(&connect_info, pst_node->client_name, sizeof(pst_node->client_name), pst_node, sizeof(MCLIENT_NODE_INFO));
 }
 /*
 *@Description: delet node by key
@@ -282,9 +289,9 @@ static int mqttclient_connect_add(CLIENT_CONN_NODE_INFO  *pst_node)
 *@return: find id
 *@author: chenzejun 20160123
 */
-static int mqttclient_connect_del(unsigned char  ac_key[])
+static int mqttclient_connect_del(char  *pc_key)
 {
-        return libwl_alist_del(&connect_info, (void *)ac_key, sizeof(int));
+        return libwl_alist_del(&connect_info, (void *)pc_key, BUF_LEN_64);
 }
 
 
@@ -298,7 +305,7 @@ static int mqttclient_connect_del(unsigned char  ac_key[])
 *@return: void
 *@author: chenzejun 20160123
 */
-static int mqttclient_connect_replace_oldest(CLIENT_CONN_NODE_INFO  *pst_add, CLIENT_CONN_NODE_INFO  *pst_del)
+static int mqttclient_connect_replace_oldest(MCLIENT_NODE_INFO  *pst_add, MCLIENT_NODE_INFO  *pst_del)
 {
         return libwl_alist_replace(&connect_info, pst_del, pst_add);
 }
@@ -307,7 +314,7 @@ static int mqttclient_connect_replace_oldest(CLIENT_CONN_NODE_INFO  *pst_add, CL
 
 
 /**
-*@Description: monoff client function init
+*@Description: mqttclient client function init
 *@Input: void: void
 *@return: 0 ok;  1- fail
 *@author: chenzejun 20160123
@@ -320,14 +327,14 @@ static int mqttclient_connect_init(void)
 
 
         //connect info
-        connect_info.pst_node =  malloc(connect_info.cfg_num * sizeof(CLIENT_CONN_NODE_INFO));
+        connect_info.pst_node =  malloc(connect_info.cfg_num * sizeof(MCLIENT_NODE_INFO));
         if (NULL == connect_info.pst_node)
         {
                 MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_ERROR, "malloc connect_info failed\n");
                 return -1;
         }
         
-        memset(connect_info.pst_node, 0, connect_info.cfg_num * sizeof(CLIENT_CONN_NODE_INFO));
+        memset(connect_info.pst_node, 0, connect_info.cfg_num * sizeof(MCLIENT_NODE_INFO));
 
 
 
@@ -339,7 +346,7 @@ static int mqttclient_connect_init(void)
 
 
 /**
-*@Description: monoff client function destroy
+*@Description: mqttclient client function destroy
 *@Input: void: void
 *@return: 0 ok;  1- fail
 *@author: chenzejun 20160123
@@ -371,7 +378,6 @@ static MOSQ_CLINENT_CONFIG g_mosq_config =
 {
         .notice_switch = false,
         .mosq_id =  "jdwx_router",  
-        .topic = "yunJDWX/jdwx_test/post/plc",
         .host = "emqtt.jdwanxiang.com",
         .port = 1883,
         .username = "jdwx",
@@ -386,6 +392,21 @@ static struct mosquitto *p_mosq_client = NULL;
 static char *mqttclient_publish_msg = NULL;
 
 
+
+
+
+/*
+*@Description: uci load config
+*@Input: void: void
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20160123
+*/
+void mqttclient_uci_subscribe_list_callback(const char * s_name, const char * list_name, const char * list_value){
+        if (list_value == NULL)         return;
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "uci get share list, s_name:%s, list:%s, value:%s \n", s_name, list_name, list_value);
+        mosquitto_subscribe(p_mosq_client, NULL, list_value, 2);
+
+}
 
 
 
@@ -414,9 +435,10 @@ static void mqttclient_log_callback(struct mosquitto *mosq, void *obj, int level
 *@author: chenzejun 20160323
 */
 static void mqttclient_connect_callback(struct mosquitto *mosq, void *obj, int result)
-{
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "connect_callback, result: %d\n", result);
-
+{ 
+        //mqttclient_subscribe_by_config(uci_contex, "mqtt-client", "subscribe", "yunAC", "subscribe_topic");        
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "connect_callback-----------, result:%d\n", result);       
+        libwl_uci_find_element_callback(uci_contex, "mqtt-client", "subscribe", "yunAC", "subscribe_topic", mqttclient_uci_subscribe_list_callback);
         return;
 }
 
@@ -459,7 +481,11 @@ static void mqttclient_disconnect_callback(struct mosquitto *mosq, void *obj, in
 */
 static void mqttclient_message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message)
 {
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "message (topic: %s): %s", message->topic, message->payload);
+        if (message == NULL)    return;
+        
+
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[down] topic: %s\n", message->topic);
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[down] message[%d]: %s\n", message->payloadlen, message->payload);
 
         mqttclient_localserv_sendto_client(message->topic, message->payload, message->payloadlen);
 }
@@ -482,174 +508,6 @@ static void mqttclient_subscribe_callback(struct mosquitto *mosq, void *obj, int
         MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "Subscribed (mid: %d): %d", mid, granted_qos[0]);
 
         return;
-}
-
-/**
-*@Description: mqtt client pusblish
-*@Input: pst_connect: the pointer to connection information
-*@Input: pc_event: the pointer to event, support up or down.
-*@Return:  0: ok
-           <0: fail
-*@author: chenzejun 20160323
-*/
-static int mqttclient_publish(char *pc_event)
-{
-        int i_ret = 0;
-        time_t now;
-        unsigned long unixtime; 
-        char data_time_str[BUF_LEN_64] = {0}; 
-        unsigned int publish_msg_len = 0;
-        struct tm *p_tm;
-        struct tm  tm;
-
-        //this is zone set, it's fixed localtime don't update when zone change.
-        //2016.8.11, use tzset(), localtime Is still wrong.
-        //tzset();  
-
-        //time stamp
-        unixtime = time(&now);
-        //p_tm = localtime(&now);
-        p_tm = gmtime(&now);
-
-        memcpy(&tm, p_tm, sizeof(tm));
-        if (tm.tm_hour < 16)
-        {
-                tm.tm_hour = tm.tm_hour + 8;
-        }
-        else
-        {
-                tm.tm_hour = tm.tm_hour - 16;
-        }
-
-        //strftime(data_time_str, sizeof(data_time_str), "%Y %b %d %X", p_tm);  
-        strftime(data_time_str, sizeof(data_time_str), "%Y %b %d %X", &tm);  
-
-        g_mosq_config.sequence_number++;
-        publish_msg_len = snprintf(mqttclient_publish_msg, LOG_BUFFER_4096, 
-                "{\"date\":\"%s\",\"routerip\":\"%s\",\"routermac\":\"%s\",\"channelpath\":\"%s\",\"program\":\"jdwx-router\",\"unixtime\":\"%lu\"}", 
-                data_time_str,
-                g_config.route_ip,
-                g_config.route_mac,
-                g_config.channelpath,
-                unixtime);              
-
-        publish_msg_len = publish_msg_len > LOG_BUFFER_4096 ? LOG_BUFFER_4096 : publish_msg_len;
-                
-        i_ret = mosquitto_publish(p_mosq_client, NULL, g_mosq_config.topic, publish_msg_len, ( const void *)mqttclient_publish_msg, 2, false);
-
-             
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "publish message[%d]: %s\n", i_ret, mqttclient_publish_msg); 
-        if (g_mosq_config.publish_record_log)   libwl_log("/var/log/monoff.log", "publish [%d]: %s\n", i_ret, mqttclient_publish_msg);
-
-
-        return 0;
-}
-
-
-/**
-*@Description: mqtt client pusblist test
-*@Input: void: void
-*@Return:  0: ok
-           <0: fail
-*@author: chenzejun 20160323
-*/
-int mqttclient_publish_test(void)
-{
-        int i_ret = 0;
-        time_t now;
-        unsigned long unixtime; 
-        char data_time_str[BUF_LEN_64] = {0}; 
-        unsigned int publish_msg_len = 0;
-        struct tm *p_tm;
-        struct tm  tm;
-        static int t_count = 0;
-        unsigned int resv_len = 0;
-        int i = 0;
-
-
-        t_count++;
-        if (t_count < 6)	return 0;
-        t_count = 0;
-
-        //this is zone set, it's fixed localtime don't update when zone change.
-        //2016.8.11, use tzset(), localtime Is still wrong.
-        //tzset();  
-
-        //time stamp
-        unixtime = time(&now);
-        p_tm = localtime(&now);
-         strftime(data_time_str, sizeof(data_time_str), "%Y-%m-%d %H:%M:%S", p_tm); 
-        /*
-        p_tm = gmtime(&now);
-        memcpy(&tm, p_tm, sizeof(tm));
-        if (tm.tm_hour < 16)
-        {                
-                tm.tm_hour = tm.tm_hour + 8;
-        }
-        else
-        { 
-                tm.tm_hour = tm.tm_hour - 16;
-        }
-        strftime(data_time_str, sizeof(data_time_str), "%Y-%m-%d %H:%M:%S", &tm); 
-        */
-
-
-
-        g_mosq_config.sequence_number++;
-
-        // 1.0 fill msg
-        //publish_msg_len = snprintf(mqttclient_publish_msg, LOG_BUFFER_4096,
-        //        "{\"devList\":[{\"devId\":%d,\"devName\":\"plc\",\"varList\":[{\"varName\":\"jdwxtest\",\"varValue\":\"0.123\",\"varId\":2}]}],\"cmdId\":103,\"gwSn\":\"WG282LL0718110200211\",\"gwName\":\"WG282LL0718110200211\"}", 
-        //        100);              
-
-
-
-        // 1.0 fill msg
-        publish_msg_len = snprintf(mqttclient_publish_msg, LOG_BUFFER_4096,
-                "{\"devList\":[{\"devId\":%d,\"devName\":\"plc\",\"varList\":[", 
-                2);   
-
-
-        // 2.0 fill var body
-        for(i = 0; i < 6; i++) 
-        {
-                resv_len = LOG_BUFFER_4096 - publish_msg_len;
-                if (resv_len < 100)   //left length is too short
-                {
-                        break;
-                }
-                
-                publish_msg_len += snprintf(&mqttclient_publish_msg[publish_msg_len], resv_len, "{\"varName\":\"testVar%d\",\"varValue\":\"%.3f\",\"varId\":%u},", 
-                        i,
-                        (tm.tm_min+0.21)*(0.317 + i),
-                        i);
-        }
-
-		
-        // 3.0 fill tail msg
-        resv_len = LOG_BUFFER_4096 - publish_msg_len;
-        publish_msg_len += snprintf(&mqttclient_publish_msg[publish_msg_len-1], resv_len,
-                "]}],\"cmdId\":%d,\"gwSn\":\"JDWX%s\",\"time\":\"%s\",\"unixtime\":\"%lu\",\"seqnum\":\"%u\"}", 
-                103,
-                g_config.route_mac,
-                data_time_str,
-                unixtime,
-                g_mosq_config.sequence_number);       
-
-
-
-
-
-        publish_msg_len = publish_msg_len > LOG_BUFFER_4096 ? LOG_BUFFER_4096 : publish_msg_len;
-                
-        i_ret = mosquitto_publish(p_mosq_client, NULL, g_mosq_config.topic, publish_msg_len-1, ( const void *)mqttclient_publish_msg, 2, false);
-
-             
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "publish message[%d]: %s\n", i_ret, mqttclient_publish_msg); 
-        if (g_mosq_config.publish_record_log)   libwl_log("/var/log/monoff.log", "publish [%d]: %s\n", i_ret, mqttclient_publish_msg);
-
-
-        return 0;
 }
 
 
@@ -722,6 +580,7 @@ static void mqttclient_try_connect(void)
 static int mqttclient_mosquitto_init(void)
 {
         int i_ret = 0;
+        char portstr[BUF_LEN_32] = {0};
 
         mqttclient_publish_msg = malloc(LOG_BUFFER_4096 + BUF_LEN_512);
         if(NULL == mqttclient_publish_msg)
@@ -731,14 +590,21 @@ static int mqttclient_mosquitto_init(void)
         }
        
         
-        /* monoff init topic */
-        snprintf(g_mosq_config.mosq_id, BUF_LEN_64, "%s", g_config.route_mac);
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "topic is %s\n", g_mosq_config.topic);
-
 
 
         /* try to connect, if connect failed, then connect by timer */
         mqttclient_try_connect();
+
+
+
+
+        libwl_uci_get_option_fast(uci_contex, "mqtt-client", "subscribe", "yunAC", "host", g_mosq_config.host, sizeof(g_mosq_config.host));
+        libwl_uci_get_option_fast(uci_contex, "mqtt-client", "subscribe", "yunAC", "user", g_mosq_config.username, sizeof(g_mosq_config.username));
+        libwl_uci_get_option_fast(uci_contex, "mqtt-client", "subscribe", "yunAC", "password", g_mosq_config.password, sizeof(g_mosq_config.password));
+        libwl_uci_get_option_fast(uci_contex, "mqtt-client", "subscribe", "yunAC", "port", portstr, sizeof(portstr));
+        
+
+        g_mosq_config.port = atoi(portstr);
 
 
         return 0;
@@ -782,29 +648,165 @@ static int mqttclient_mosquitto_destroy(void)
 
 #if FUNCTION_DESC("local service and client function")
 
-static char msg_buffer[LOG_BUFFER_2048 + BUF_LEN_128] = {0};
+static char msg_buffer[LOG_BUFFER_4096 + BUF_LEN_512] = {0};
 
 
 
-
-/**
- *@Description: the callback function of uloop
- *@Input: u: the file description of uloop
- *@Input: ev: the event of uloop
- *@Return: void
- *@author: chenzejun 20160323
- */
-static void mqttclient_localserv_recvfrom_client_handle(struct uloop_fd *u, unsigned int ev)
+/*
+*@Description: uci load config
+*@Input: void: void
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20160123
+*/
+void mqttclient_localserv_config_callback(const char * s_type, const char * s_name, int type, const char * op_name, const char * op_value)
 {
+        MCLIENT_NODE_INFO st_connect = {0};
+        MCLIENT_NODE_INFO *pst_node = &st_connect;
+        MCLIENT_NODE_INFO *pst_find = NULL;
+        int m = 0;
+
+        if (op_value == NULL)         return;
 
 
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "[monoff] recvfrom handle client\n");  
-        return;
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "uci scan share list, sec_name:%s, op_name:%s, op_value:%s \n", s_name, op_name, op_value);
+
+        // set 0
+        memset(&st_connect, 0, sizeof(st_connect));
+        strncpy(st_connect.client_name, s_name, sizeof(pst_node->client_name));
+
+        pst_find  = libwl_alist_find(&connect_info, (void *)st_connect.client_name);
+        if (pst_find  == NULL)
+        {
+                // redeirect
+                pst_node = &st_connect;
+        }
+        else{
+                pst_node = pst_find;
+        }
+                
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "connect_info found s_name:%s, pst_find:0x%x\n", s_name, pst_find);
+
+        if (0 == strcmp(op_name, "sun_path"))
+        {
+                memset(pst_node->st_client_addr.sun_path, 0, sizeof(pst_node->st_client_addr.sun_path));
+                pst_node->st_client_addr.sun_family = AF_UNIX;
+                strncpy(pst_node->st_client_addr.sun_path, op_value, sizeof(pst_node->st_client_addr.sun_path));
+                pst_node->client_addr_len = strlen(pst_node->st_client_addr.sun_path) + sizeof(pst_node->st_client_addr.sun_family);
+
+        }
+        else if (0 == strcmp(op_name, "branch_topic"))
+        {       
+                // add brandch_topic at blank
+                for(m = 0; m < sizeof(st_connect.branch_topic)/sizeof(st_connect.branch_topic[0]); m++)
+                {
+                        if ('\0' == pst_node->branch_topic[m][0]){
+                                strncpy((char *)pst_node->branch_topic[m], op_value, sizeof(pst_node->branch_topic[m]));
+                                break;
+                        }
+                }
+        }
+
+
+        // not found
+        if (NULL == pst_find)
+        {
+                mqttclient_connect_add(pst_node);
+        }
+
+
+
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "uci scan share list, exit \n");
+        //mosquitto_subscribe(p_mosq_client, NULL, list_value, 2);
+
 }
 
 
 
+/**
+ *@Description: the match function of branch_topic
+ *@Input: topic: the topic
+ *@Input: sub_topic: the branch topic
+ *@Return: void
+ *@author: chenzejun 20160323
+ */
+static int mqttclient_topic_match(char *topic, char * br_topic)
+{
+        int i = 0;
+        int m = 0;
+        char *p_pos = NULL;
 
+
+        if (strlen(topic) < strlen(br_topic))
+        {
+                return -1;
+        }
+
+
+        //
+        for(i = 0; i < 512; i++)
+        {
+                if (topic[i] == '\0')   break;
+
+                //find first char
+                if (topic[i] == br_topic[0] )
+                {
+                        //find first char
+                        p_pos = &topic[i];
+                        break;
+                }
+        }
+
+
+        if (p_pos == NULL)
+        {
+                return -1;
+        }
+
+        // match
+        for(i = 0; i < 512; i++)
+        {
+                // the same end
+                if (topic[i] == '\0' && br_topic[i] == '\0') 
+                {
+                        break;
+                }
+
+                // br_topic end
+                if (topic[i] == '/'  && br_topic[i] == '\0') 
+                {
+                        break;
+                }
+
+
+                // else end
+                if (br_topic[i] == '\0')
+                {
+                        return -1;
+                }
+                
+                if (topic[i] == '\0') 
+                {
+                        return -1;
+                }
+
+
+              
+                if (p_pos[i] != br_topic[i])
+                {
+                        return -1;
+                }
+
+                // # match direct end
+                if (br_topic[i] == '/' && br_topic[i + 1] == '#')
+                {
+                        break;
+                }
+                
+        }
+
+        
+        return 0;
+}
 
 
 /**
@@ -816,25 +818,71 @@ static void mqttclient_localserv_recvfrom_client_handle(struct uloop_fd *u, unsi
  */
 static void mqttclient_localserv_sendto_client(char *topic, char * p_msg,  int msg_len)
 {
-        CLIENT_CONN_NODE_INFO *pst_connect = NULL;
-        int i = 0;
+        MCLIENT_NODE_INFO *pst_connect = NULL;
+        int sock_fd = g_config.uloop_fd_local_service.fd;
+        int i = 1;
         int bytes;
-        int sock_fd = -1;
+        char *p_topic3 = NULL;
+        int index = 0;
+        int m = 0;
+        int count = 0;
+        char* token = NULL;
+
+        // from topic[1], lookup 1
+        while (topic[i])
+        {
+                if (topic[i] == '/'){
+                        count++;
+                        if (count >=2)          break;
+                }
+                i++;
+        }
+
+#if 0
+        // parse topic
+        token = strtok( topic, "/");
+        for(i = 0; i < 10; i++)
+        {
+                if (token == NULL )    break;
+                /* While there are tokens in "string" */
+                printf( "%s ", token );
+                /* Get next token: */
+                token = strtok( NULL, "/");
+        }
+#endif
+
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "[mqttclient] topic[%d]:%s\n", i, &topic[i]);  
+
 
         // if 
         //scan connect info, send msg to service
-        libwl_alist_for_entry(pst_connect, i,  &connect_info) 
+        libwl_alist_for_entry(pst_connect, index,  &connect_info) 
         {
                 if (pst_connect == NULL)  break;
 
-                if (NULL == strstr(topic, pst_connect->look_topic)){
-                        //not found, not match
-                        continue;
 
+                // add brandch_topic at blank
+                for(m = 0; m < sizeof(pst_connect->branch_topic)/sizeof(pst_connect->branch_topic[0]); m++)
+                {
+                        if ('\0' == pst_connect->branch_topic[m][0])       continue;
+
+
+                        if (0 == mqttclient_topic_match(&topic[i], (char *)&pst_connect->branch_topic[m]))
+                        //if (strstr(&topic[i], (char *)&pst_connect->branch_topic[m]))
+                        {
+                                break;  //found
+                        }
                 }
 
-                sock_fd = pst_connect->uloop_fd.fd;
-                bytes = sendto(sock_fd, p_msg, msg_len, 0, (struct sockaddr*)&pst_connect->st_client_addr, pst_connect->client_addr_len);
+                if (m >= sizeof(pst_connect->branch_topic)/sizeof(pst_connect->branch_topic[0]))
+                {
+                        //not found, not match
+                        continue;
+                }
+                
+
+                // (msg_len + 1) in order to send end char  0
+                bytes = sendto(sock_fd, p_msg, (msg_len + 1), 0, (struct sockaddr*)&pst_connect->st_client_addr, pst_connect->client_addr_len);
                 if (bytes < 0)
                 {
                         if(errno == EAGAIN)
@@ -848,98 +896,30 @@ static void mqttclient_localserv_sendto_client(char *topic, char * p_msg,  int m
 
                 }
                 
-                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "sendto client, fd:%d\n", sock_fd);  
+                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "[mqttclient] sendto client, sun_path:%s\n", pst_connect->st_client_addr.sun_path);  
 
         }
 
         
 
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "handle local client  exit\n");  
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "[mqttclient] handle local client  exit\n");  
         return;
 }
 
 
 
 
+
+
+
 /*
-*@Description: parse connect data
+*@Description: receive msg from socket, connect data
 *@Input: pc_msg_data: pointer to the msg
 *@Input: ui_msg_len: msglen
 *@Return: 0: ok;   -1: fail
 *@author: chenzejun 20160123
 */
-static int mqttclient_proc_sub_msg(char *pc_msg_data, unsigned int ui_msg_len)
-{
-        struct cmsghdr *pst_head = (struct cmsghdr *)pc_msg_data;
-        CLIENT_TLV_DATA *pst_tlv_data = (CLIENT_TLV_DATA *)(pst_head + 1);
-        unsigned int ui_temp_len = 0;
-        char *pc_topic = NULL;
-        char *pc_payload = NULL;
-        int i_ret = 0;
-
-        if (pc_msg_data == NULL)
-        {
-                return -1;
-        }
-
-
-
-        while(ui_temp_len < ui_msg_len && pst_tlv_data->us_tlv_len)
-        {
-                //printf("APP  Received ui_msg_len: %d, %d \n", ui_msg_len, pst_tlv_data->us_tlv_type); 
-
-                if (pst_tlv_data->us_tlv_type >= TLV_TYPE_MAX)
-                {
-                        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "break ui_msg_len: %d, %d \n", ui_msg_len, pst_tlv_data->us_tlv_type); 
-                        break;
-                }
-                
-                switch (pst_tlv_data->us_tlv_type)
-                {
-                        case TLV_TYPE_TOPIC:
-                        {
-                                pc_topic = (char *)(pst_tlv_data+1);
-                                break;
-                        }
-                        case TLV_TYPE_PAYLOAD:
-                        {
-                                pc_payload = (char *)(pst_tlv_data+1);
-                                break;
-                        }
-                        default:
-                        {
-                                break;
-                        }
-                }
-
-                //next tlv
-                ui_temp_len = ui_temp_len + pst_tlv_data->us_tlv_len;
-                pst_tlv_data =  (CLIENT_TLV_DATA *)((char *)pst_tlv_data + pst_tlv_data->us_tlv_len);
-        }
-
-
-
-
-                
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient_localserv]  publish message[%d]: %s\n", i_ret, msg_buffer); 
-
-
-
-        return 0;
-}
-
-
-
-
-
-/*
-*@Description: parse connect data
-*@Input: pc_msg_data: pointer to the msg
-*@Input: ui_msg_len: msglen
-*@Return: 0: ok;   -1: fail
-*@author: chenzejun 20160123
-*/
-static int mqttclient_proc_pub_msg(char *pc_msg_data, unsigned int ui_msg_len)
+static int mqttclient_localserv_recvfrom_msg(char *pc_msg_data, unsigned int ui_msg_len)
 {
         struct cmsghdr *pst_head = (struct cmsghdr *)pc_msg_data;
         CLIENT_TLV_DATA *pst_tlv_data = (CLIENT_TLV_DATA *)(pst_head + 1);
@@ -992,122 +972,35 @@ static int mqttclient_proc_pub_msg(char *pc_msg_data, unsigned int ui_msg_len)
         }
 
 
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient_localserv]  ui_topic_len:%d, ui_payload_len:%d\n", ui_topic_len, ui_payload_len); 
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient]  cmsg_len:%d, ui_topic_len:%d, ui_payload_len:%d\n", 
+                pst_head->cmsg_len, ui_topic_len, ui_payload_len); 
 
         if (pc_topic && pc_payload && (ui_payload_len > sizeof(CLIENT_TLV_DATA)))
         {
-                ui_payload_len = ui_payload_len - sizeof(CLIENT_TLV_DATA) - 1;   //dec  tlv + '\0'
+                ui_payload_len = ui_payload_len - sizeof(CLIENT_TLV_DATA);   //dec  tlv + '\0'
+                if (pc_payload[ui_payload_len -1] == 0)    ui_payload_len--;   //'\0'
+
+               
                 i_ret = mosquitto_publish(p_mosq_client, NULL, pc_topic, ui_payload_len, ( const void *)pc_payload, 2, false);
+                if (i_ret != 0){
+                        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient]  publish fail, i_ret:%d\n", i_ret); 
+                }
+
+
+                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient]  pc_payload[%d] value:%d,  :%d,  :%d, :%d\n", 
+                        ui_payload_len, pc_payload[ui_payload_len-2], pc_payload[ui_payload_len-1], pc_payload[ui_payload_len], pc_payload[ui_payload_len+1]); 
+
+                //force  string end, for safe
+                pc_topic[ui_topic_len - 1]  = 0;
+                pc_payload[ui_payload_len - 1]  = 0;
+                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient]  publish i_ret:%d,  topic:%s\n", i_ret,  pc_topic); 
+                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient]  publish paylen:%d, msg:%s\n", ui_payload_len, pc_payload); 
         }
 
-                
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient_localserv]  publish message[%d]: %s\n", i_ret, pc_payload); 
-
-
-
+               
         return 0;
 }
 
-
-
-/*
-*@Description: parse connect data
-*@Input: pc_msg_data: pointer to the msg
-*@Input: ui_msg_len: msglen
-*@Return: 0: ok;   -1: fail
-*@author: chenzejun 20160123
-*/
-static int mqttclient_parse_client_msg(char *pc_msg_data, unsigned int ui_msg_len)
-{
-        struct cmsghdr *pst_head = (struct cmsghdr *)pc_msg_data;
-
-        if (pst_head->cmsg_type == MOSQ_CLIENT_SUB){
-                mqttclient_proc_sub_msg(pc_msg_data, ui_msg_len);
-
-        }
-        else if (pst_head->cmsg_type == MOSQ_CLIENT_PUB){
-                mqttclient_proc_pub_msg(pc_msg_data, ui_msg_len);
-
-        }
-
-                
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient_localserv]  message type:%d\n", pst_head->cmsg_type, pst_head->cmsg_len); 
-
-
-
-        return 0;
-}
-
-
-
-/**
- *@Description: create socket
- *@Input: 
-        address: socket address
- *@len: 
-        address: socket address length
- *@Return: 0: ok;   -1: fail
- *@author: chenzejun 20160323
- */
-int mqttclient_localserv_create(const char *name)
-{
-        int sock_fd = -1;  
-        int result;  
-        int opt = SO_REUSEADDR;
-        int len = 0;
-        struct sockaddr_un service_address = {0 };
-
-
-        
-        if (name == NULL)    return -1;  
-        
-        
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "local server start create...\n");  
-        sock_fd = socket (AF_UNIX, SOCK_STREAM, 0);  
-        if (sock_fd < 0)
-        {
-                MQTTCLIENT_DBG_PRINTF(LIBWL_ERROR, "socket error, %s, errno:%s\n",  __FUNCTION__, strerror(errno));  
-                return -1;    
-        }
-
-        setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-
-        /* init sun_path */
-        service_address.sun_family = AF_UNIX;
-        snprintf(service_address.sun_path, sizeof(service_address.sun_path), "/var/run/%s.local", name);
-
-
-        /* delete old path */
-        unlink (service_address.sun_path); 
-
-
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "local server start bind...\n");  
-
-        /* bind socket */
-        len = strlen(service_address.sun_path) + sizeof(service_address.sun_family);
-        result = bind(sock_fd, (struct sockaddr*)&service_address, len);  
-        if(result < 0)
-        {  
-                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "bind error, %s, errno:%s\n",  __FUNCTION__, strerror(errno));  
-                close(sock_fd);  
-                return -1;    
-        } 
-
-
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "local server start listen...\n");  
-
-        result = listen(sock_fd, LISTEN_MAX_SOCKET_NUM);	// 等待队列为
-        if(result < 0)
-        {  
-                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "listen error, %s, errno:%s\n",  __FUNCTION__, strerror(errno));  
-                close(sock_fd);  
-                return -1;    
-        } 
-        
-        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "local server is listen..., fd:%d\n", sock_fd);  
-        return sock_fd;
-}
 
 
 /**
@@ -1117,7 +1010,7 @@ int mqttclient_localserv_create(const char *name)
  *@Return: void
  *@author: chenzejun 20160323
  */
-static void mqttclient_localserv_handle(struct uloop_fd *u, unsigned int ev)
+static void mqttclient_localserv_recvfrom_handle(struct uloop_fd *u, unsigned int ev)
 {
         AP_TLV_DATA *pst_tlv = (AP_TLV_DATA *)msg_buffer;
         int bytes;
@@ -1131,14 +1024,14 @@ static void mqttclient_localserv_handle(struct uloop_fd *u, unsigned int ev)
         }
         
         sock_fd = u->fd;
-        LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "mqttclient_localserv..., fd:%d\n", sock_fd);  
+        LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "[mqttclient_localserv] in..., fd:%d\n", sock_fd);  
 
         /* found new client, process */
         while(1)  
         {
 
                 /* recv data, non block */
-                bytes = recv(sock_fd, msg_buffer, LOG_BUFFER_2048, MSG_DONTWAIT);
+                bytes = recv(sock_fd, msg_buffer, LOG_BUFFER_4096, MSG_DONTWAIT);
                 if(bytes < 0)
                 {
                         if(errno != EAGAIN)  
@@ -1164,10 +1057,10 @@ static void mqttclient_localserv_handle(struct uloop_fd *u, unsigned int ev)
 
 
 
-                mqttclient_parse_client_msg(msg_buffer, bytes);        
+                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient_localserv]  receive socket message, bytes:%d\n", bytes); 
+                mqttclient_localserv_recvfrom_msg(msg_buffer, bytes);        
                 //i_ret = mosquitto_publish(p_mosq_client, NULL, g_mosq_config.topic, bytes-1, ( const void *)msg_buffer, 2, false);
-
-                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient_localserv]  publish message, bytes:%d\n", bytes); 
+                //MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_MQTT_INFO, "[mqttclient_localserv]  publish message, bytes:%d\n", bytes); 
         }
 
         LIBWL_DBG_PRINTF(LIBWL_CMD_TRACE, "[mqttclient_localserv] , exit\n");  
@@ -1176,7 +1069,7 @@ static void mqttclient_localserv_handle(struct uloop_fd *u, unsigned int ev)
 
 
 /**
- *@Description: monoff command init
+ *@Description: mqttclient command init
  *@Input: void: void
  *@Return: 0: ok;   -1: fail
  *@author: chenzejun 20160323
@@ -1197,14 +1090,19 @@ static int mqttclient_localserv_init(void)
 
         
         /* command service*/
-        g_config.uloop_fd_local_service.cb = mqttclient_localserv_handle;
+        g_config.uloop_fd_local_service.cb = mqttclient_localserv_recvfrom_handle;
         g_config.uloop_fd_local_service.fd = libwl_cmd_create_socket(&serv_address);
         if (g_config.uloop_fd_local_service.fd > 0)
         {
                 uloop_fd_add(&g_config.uloop_fd_local_service,  ULOOP_READ | ULOOP_EDGE_TRIGGER);
-                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "[monoff] add local_service fd:%d\n", g_config.uloop_fd_local_service.fd );  
+                MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_LOCAL_SERVICE, "[mqttclient] add local_service fd:%d\n", g_config.uloop_fd_local_service.fd );  
 
         }
+
+
+        libwl_uci_scan_element_callback(uci_contex, "mqtt-client", "share", NULL, mqttclient_localserv_config_callback);
+
+        //config file check. ingore
         
         return 0;
 }
@@ -1212,7 +1110,7 @@ static int mqttclient_localserv_init(void)
 
 
 /**
- *@Description: monoff command destroy
+ *@Description: mqttclient command destroy
  *@Input: void: void
  *@Return: 0: ok;   -1: fail
  *@author: chenzejun 20160323
@@ -1273,7 +1171,6 @@ static void mqttclient_uloop_2s_timer(struct uloop_timeout *timeout)
 }
 
 
-
 /**
 *@Description: timer function
 *@Input: timeout: timeout
@@ -1289,7 +1186,6 @@ static void mqttclient_uloop_10s_timer(struct uloop_timeout *timeout)
 
         //try to connect mosquitto service
         mqttclient_try_connect();
-
 
 
         // get uci config
@@ -1399,7 +1295,7 @@ static void mqttclient_signal_setup(void)
 
 
 /**
- *@Description: show monoff client config
+ *@Description: show mqttclient client config
  *@Input: void
  *@Return: 0: ok;   -1: fail
  *@author: chenzejun 20160323
@@ -1441,9 +1337,10 @@ static int mqttclient_show_config(char *buffer, int buff_size)
         buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %s\n", "route_ip", g_config.route_ip);
         buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %s\n", "wan_ip_type", g_config.wan_ip_type);
         buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %s\n", "channelpath", g_config.channelpath);
-        buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %s\n", "topic", g_mosq_config.topic);
         buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %s\n", "host", g_mosq_config.host);
         buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %d\n", "port", g_mosq_config.port);
+        buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %s\n", "username", g_mosq_config.username);
+        buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %s\n", "password", g_mosq_config.password);
         buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%-30s: %d\n", "sequence_number", g_mosq_config.sequence_number);
 
         // buf_len is string length, buf_len++ will include \0 char to send.
@@ -1487,6 +1384,79 @@ static int mqttclient_show_debug_switch(char *buffer, int buff_size)
         // buf_len is string length, buf_len++ will include \0 char to send.
         return ++buf_len;
 }
+
+
+
+/**
+ *@Description: show the connection infomation of mac
+ *@Input: buffer
+ *@Input: buff_size
+ *@Return: 0: ok;   -1: fail
+ *@author: chenzejun 20160323
+ */
+static int mqttclient_show_connect(char *buffer, int buff_size)
+{
+        static int last_id = 0;
+        ALIST_HEAD *p_info = &connect_info;
+        MCLIENT_NODE_INFO  *pst_connect = NULL;
+        int i = 0;
+        int  buf_len = 0;  
+        int m = 0;
+
+
+        if (buffer == NULL)    return 0;
+
+        if (p_info->node_count <= 0)
+        {
+                buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "connect list count is 0\n");
+                return buf_len;
+        }
+        else
+        {
+                buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "no\tclient_name\t\t\tsun_path\t\t\t\tbranch_topic\n");
+        }
+
+        //connect data for show
+        libwl_alist_for_entry(pst_connect, i,  p_info) 
+        {
+                if (pst_connect == NULL)  break;
+                
+                //no data
+                if (i < last_id)  continue;
+
+
+                // add brandch_topic at blank
+                for(m = 0; m < sizeof(pst_connect->branch_topic)/sizeof(pst_connect->branch_topic[0]); m++)
+                {
+                        if (pst_connect->branch_topic[m][0]){
+                                buf_len += snprintf(&buffer[buf_len], (buff_size - buf_len), "%2d\t%-24s\t%-32s\t%-32s\n",
+                                        i,
+                                        pst_connect->client_name,
+                                        pst_connect->st_client_addr.sun_path, 
+                                        (char *)&pst_connect->branch_topic[m]);
+                        }
+
+                }
+
+                
+                // will to full, break;
+                if (buf_len > (LOG_BUFFER_2048 - 1024))
+                {
+                        last_id = i; //record
+                        break;
+                }
+                
+        }
+
+        if (i > p_info->tail_id)    last_id = 0;
+
+        MQTTCLIENT_DBG_PRINTF(MQTTCLIENT_CMD_TRACE, "cmd message[%d]: %s\n", buf_len, buffer); 
+
+        // buf_len is string length, buf_len++ will include \0 char to send.
+        return ++buf_len;
+}
+
+
 
 /**
 *@Description: print usage
@@ -1587,7 +1557,7 @@ int mqttclient_option_proc(int argc, char *argv[])
                         snprintf(g_config.localsrv_name, sizeof(g_config.localsrv_name), "%s", argv[i+1]);
                         i++;
                 }
-                else if(!strcmp(argv[i], "--publish-log"))
+                else if(!strcmp(argv[i], "--publog"))
                 {
                         MQTTCLIENT_OPTION_CHECK_RET(i, argc);
                         
@@ -1661,6 +1631,13 @@ static int mqttclient_init(void)
 
 
 
+        i_ret = mqttclient_connect_init();
+        if (i_ret != 0)
+        {
+                return -1;
+        }
+
+
         //uci config load
         i_ret = mqttclient_uci_load_config();
         if (i_ret != 0)
@@ -1711,7 +1688,7 @@ static int mqttclient_destroy(void)
         mqttclient_localserv_destroy();
         mqttclient_cmd_destroy();
         mqttclient_uci_unload_config();
-
+        mqttclient_connect_destroy();
         return 0;
 }
 

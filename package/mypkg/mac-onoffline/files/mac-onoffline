@@ -1,3 +1,0 @@
-config mac-onoffline
-	   option publish_record_log  '1'
-		

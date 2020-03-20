@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014 Felix Fietkau <nbd@openwrt.org>
+ * Copyright (C) 2011-2014  chenzejun <jack_chen_mail@163.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License version 2.1
@@ -250,7 +250,7 @@ int libwl_uci_get_option_fast(struct uci_context *uci_ctx, char *pkg_name, char 
         struct uci_element *e;  
         const char *value_name;
 
-        if (uci_ctx == NULL || pkg_name == NULL || section_type == NULL  || section_name == NULL || op_name == NULL || ret_value == NULL || ret_len <= 0)
+        if (uci_ctx == NULL || pkg_name == NULL || op_name == NULL || ret_value == NULL || ret_len <= 0)
         {
                 LIBWL_DBG_PRINTF(LIBWL_ERROR, "parameter error, %s\n",  __FUNCTION__);
                 return -1;
@@ -262,18 +262,25 @@ int libwl_uci_get_option_fast(struct uci_context *uci_ctx, char *pkg_name, char 
                 return -1;
         }
 
+        LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get option, package:%s, section type:%s, section name:%s\n", pkg_name, section_type, section_name);
         uci_foreach_element(&pkg->sections, e)  
         {  
                 struct uci_section *s = uci_to_section(e);  
 
-                LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, s->type:%s, s->name:%s\n", pkg_name, s->type, s->e.name);
-                if(strcmp(s->type, section_type) != 0)   continue;
-                if(strcmp(s->e.name, section_name) != 0)   continue;
+                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, s->type:%s, s->name:%s\n", pkg_name, s->type, s->e.name);
+                if (section_type){
+                        if(strcmp(s->type, section_type) != 0)   continue;
+                }
+
+                if (section_name){
+                        if(strcmp(s->e.name, section_name) != 0)   continue;
+                }
+
 
                 if (NULL != (value_name = uci_lookup_option_string(uci_ctx, s, op_name)))  
                 {  
                         snprintf(ret_value, ret_len, "%s", value_name);
-                        LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get pkg_name:%s, %s:%s \n", pkg_name, op_name, value_name); 
+                        LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get option, option:%s, value:%s \n", op_name, value_name); 
                 }  
         }
 
@@ -282,6 +289,297 @@ int libwl_uci_get_option_fast(struct uci_context *uci_ctx, char *pkg_name, char 
         return 0;
 }  
 
+
+
+
+
+
+
+/*
+*@Description: fast get value of the uci config
+*@Input: uci_ctx: the pointern of uci_ctx
+*@Input: pkg_name: package name
+*@Input: op_name: option name
+*@Output: ret_value: the array of return value
+*@Input: ret_len: the length of ret_value array
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20160123
+*/
+int libwl_uci_get_list_fast(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, char *op_name, char ret_value[], int ret_len)  
+{ 
+        struct uci_package * pkg = NULL;  
+        struct uci_element *e;  
+        const char *value_name;
+        int slen = 0;
+        int resv_len = ret_len;
+
+        if (uci_ctx == NULL || pkg_name == NULL || op_name == NULL || ret_value == NULL || ret_len <= 0)
+        {
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "parameter error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        if (UCI_OK != uci_load(uci_ctx, pkg_name, &pkg))
+        {  
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "uci_load error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get list, package:%s, section type:%s, section name:%s\n", pkg_name, section_type, section_name);
+        uci_foreach_element(&pkg->sections, e)  
+        {  
+                struct uci_section *s = uci_to_section(e);  
+
+                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, s->type:%s, s->name:%s\n", pkg_name, s->type, s->e.name);
+                if (section_type){
+                        if(strcmp(s->type, section_type) != 0)   continue;
+                }
+
+                if (section_name){
+                        if(strcmp(s->e.name, section_name) != 0)   continue;
+                }
+
+                struct uci_option * o = uci_lookup_option(uci_ctx, s, op_name);  
+                if(NULL == o)   continue;
+
+                 //o存在 且 类型是 UCI_TYPE_LIST则可以继续.  
+                if ((NULL != o) && (UCI_TYPE_LIST == o->type))
+                {  
+                        struct uci_element *oe;  
+                        uci_foreach_element(&o->v.list, oe)  
+                        {  
+                                //这里会循环遍历 list  
+                                // e->name 的值依次是 index.html, index.php, default.html  
+                                //slen--;
+                                slen += snprintf(ret_value + slen, resv_len, "%s ", oe->name);
+                                LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get list, list:%s, value:%s \n", op_name, oe->name);
+                                resv_len = (ret_len > slen) ? (ret_len - slen) : 0;
+                        }  
+                }  
+
+        }
+
+        uci_unload(uci_ctx, pkg);
+ 
+        return 0;
+}  
+
+
+
+
+
+/*
+*@Description: fast get value of the uci config
+*@Input: uci_ctx: the pointern of uci_ctx
+*@Input: pkg_name: package name
+*@Input: op_name: option name
+*@Output: ret_value: the array of return value
+*@Input: ret_len: the length of ret_value array
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20160123
+*/
+int libwl_uci_find_element_callback(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, char *op_name, PF_UCI_SCAN_CALLBACK pf_calllback)  
+{ 
+        struct uci_package * pkg = NULL;  
+        struct uci_element *e;  
+        const char *value_name;
+
+        if (uci_ctx == NULL || pkg_name == NULL || op_name == NULL || pf_calllback == NULL)
+        {
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "parameter error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        if (UCI_OK != uci_load(uci_ctx, pkg_name, &pkg))
+        {  
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "uci_load error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get list, package:%s, section type:%s, section name:%s\n", pkg_name, section_type, section_name);
+        uci_foreach_element(&pkg->sections, e)  
+        {  
+                struct uci_section *s = uci_to_section(e);  
+
+                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, s->type:%s, s->name:%s\n", pkg_name, s->type, s->e.name);
+                if (section_type){
+                        if(strcmp(s->type, section_type) != 0)   continue;
+                }
+
+                if (section_name){
+                        if(strcmp(s->e.name, section_name) != 0)   continue;
+                }
+
+                struct uci_option * o = uci_lookup_option(uci_ctx, s, op_name);  
+                if(NULL == o)   continue;
+
+                 //o存在 且 类型是 UCI_TYPE_LIST则可以继续.  
+                if (UCI_TYPE_LIST == o->type)
+                {  
+                        struct uci_element *oe;  
+                        uci_foreach_element(&o->v.list, oe)  
+                        {  
+                                  pf_calllback(s->e.name, op_name, oe->name);
+                        }  
+                }  
+                else if (UCI_TYPE_STRING == o->type)
+                {
+                        value_name = uci_lookup_option_string(uci_ctx, s, op_name);  
+                        pf_calllback(s->e.name, op_name, value_name);
+                }
+        }
+
+        uci_unload(uci_ctx, pkg);
+ 
+        return 0;
+}  
+
+
+
+
+
+
+
+
+/*
+*@Description: fast get value of the uci config
+*@Input: uci_ctx: the pointern of uci_ctx
+*@Input: pkg_name: package name
+*@Input: op_name: option name
+*@Output: ret_value: the array of return value
+*@Input: ret_len: the length of ret_value array
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20160123
+*/
+int libwl_uci_scan_element_callback(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, PF_UCI_SCAN_ALL_CALLBACK pf_calllback)  
+{ 
+        struct uci_package * pkg = NULL;  
+        struct uci_element *e;  
+        const char *value_name;
+
+        if (uci_ctx == NULL || pkg_name == NULL || pf_calllback == NULL)
+        {
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "parameter error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        if (UCI_OK != uci_load(uci_ctx, pkg_name, &pkg))
+        {  
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "uci_load error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get list, package:%s, section type:%s, section name:%s\n", pkg_name, section_type, section_name);
+        uci_foreach_element(&pkg->sections, e)  
+        {  
+                struct uci_section *s = uci_to_section(e);  
+
+                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, s->type:%s, s->name:%s\n", pkg_name, s->type, s->e.name);
+                if (section_type){
+                        if(strcmp(s->type, section_type) != 0)   continue;
+                }
+
+                if (section_name){
+                        if(strcmp(s->e.name, section_name) != 0)   continue;
+                }
+
+
+                struct uci_element *oe;  
+                uci_foreach_element(&s->options, oe)  
+                {  
+                        struct uci_option * option = uci_lookup_option(uci_ctx, s, oe->name);  
+                        if(NULL == option)   continue;
+
+                         //o存在 且 类型是 UCI_TYPE_LIST则可以继续.  
+                        if (UCI_TYPE_STRING == option->type)
+                        {  
+                                value_name = uci_lookup_option_string(uci_ctx, s, oe->name);  
+                                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, type:%d, s->type:%s, s->name:%s, oname:%s, vname:%s\n", option->type, s->type, s->e.name, oe->name, value_name);
+                                pf_calllback(s->type, s->e.name, option->type, oe->name, value_name);
+                        }  
+                        
+                        if (UCI_TYPE_LIST == option->type)
+                        {  
+                                struct uci_element *loe;  
+                                uci_foreach_element(&option->v.list, loe)  
+                                {  
+                                        //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, type:%d, s->type:%s, s->name:%s, oname:%s, vname:%s\n", option->type, s->type, s->e.name, oe->name, loe->name);
+                                        pf_calllback(s->type, s->e.name, option->type, oe->name, loe->name);
+                                }  
+                        }  
+                        
+                        //pf_calllback(s->e.name, op_name, oe->name);
+                } 
+
+        
+        }
+
+        uci_unload(uci_ctx, pkg);
+ 
+        return 0;
+}  
+
+
+
+
+
+
+
+
+
+
+/*
+*@Description: fast get value of the uci config
+*@Input: uci_ctx: the pointern of uci_ctx
+*@Input: pkg_name: package name
+*@Input: op_name: option name
+*@Output: ret_value: the array of return value
+*@Input: ret_len: the length of ret_value array
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20160123
+*/
+int libwl_uci_scan_section_callback(struct uci_context *uci_ctx, char *pkg_name, char *section_type, char *section_name, PF_UCI_SECTION_CALLBACK pf_calllback)  
+{ 
+        struct uci_package * pkg = NULL;  
+        struct uci_element *e;  
+        const char *value_name;
+
+        if (uci_ctx == NULL || pkg_name == NULL || pf_calllback == NULL)
+        {
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "parameter error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        if (UCI_OK != uci_load(uci_ctx, pkg_name, &pkg))
+        {  
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "uci_load error, %s\n",  __FUNCTION__);
+                return -1;
+        }
+
+        //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get list, package:%s, section type:%s, section name:%s\n", pkg_name, section_type, section_name);
+        uci_foreach_element(&pkg->sections, e)  
+        {  
+                struct uci_section *s = uci_to_section(e);  
+
+                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, s->type:%s, s->name:%s\n", pkg_name, s->type, s->e.name);
+                if (section_type){
+                        if(strcmp(s->type, section_type) != 0)   continue;
+                }
+
+                if (section_name){
+                        if(strcmp(s->e.name, section_name) != 0)   continue;
+                }
+
+
+                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, s->type:%s, s->name:%s\n", s->type, s->e.name);
+                pf_calllback(s->type, s->e.name);
+        
+        }
+
+        uci_unload(uci_ctx, pkg);
+ 
+        return 0;
+}  
 
 
 
@@ -314,18 +612,19 @@ int libwl_uci_get_option_api(char *pkg_name, char *section_type, char *section_n
                 return -1;
         }
 
+        LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get option, package:%s, section type:%s, section name:%s\n", pkg_name, section_type, section_name);
         uci_foreach_element(&pkg->sections, e)  
         {  
                 struct uci_section *s = uci_to_section(e);  
 
-                LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, section->type:%s, section->name:%s\n", pkg_name, s->type, s->e.name);
+                //LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get, package:%s, section->type:%s, section->name:%s\n", pkg_name, s->type, s->e.name);
                 if(strcmp(s->type, section_type) != 0)   continue;
                 if(strcmp(s->e.name, section_name) != 0)   continue;
 
                 if (NULL != (value_name = uci_lookup_option_string(uci_ctx, s, op_name)))  
                 {  
                         snprintf(ret_value, ret_len, "%s", value_name);
-                        LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get pkg_name:%s, %s:%s \n", pkg_name, op_name, value_name); 
+                        LIBWL_DBG_PRINTF(LIBWL_INFO, "uci get option, option:%s, value:%s \n", op_name, value_name); 
                 }  
         }
 
@@ -977,6 +1276,55 @@ int libwl_get_5g_port_no(char *port_name, int buf_len, int *port_no)
         return -1;
 }
 
+
+
+
+
+
+/**
+*@Description: get board name for router
+*@Output:board_name: the name of board, output parameter
+*@Input:buf_len: the length of port name, the length must greater than 16
+*@Return: 0: ok;   -1: fail
+*@author: chenzejun 20190923
+*/
+int libwl_get_board_name(char *board_name, int buf_len)
+{
+        FILE *fp;
+        int num;
+        char line[BUF_LEN_64] = {0};
+
+        if (buf_len < BUF_LEN_64 ||board_name == NULL) 
+        {
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "parameter error, %s, buf_len:%d\n",  __FUNCTION__, buf_len);
+                return -1;
+        }
+
+        fp = fopen("/tmp/sysinfo/board_name", "r");
+        if (fp == NULL)
+        {
+                LIBWL_DBG_PRINTF(LIBWL_ERROR, "fopen error, %s, board_name:%s, errno:%s\n",  __FUNCTION__, board_name, strerror(errno));  
+                return -1;
+        }        
+        
+
+        /* Read the file cache entries. */
+        while (fgets(line, sizeof(line), fp))
+        {
+                /* All these strings can't overflow
+                * because fgets above reads limited amount of data */
+                if (buf_len < sizeof(line))  break;
+                
+                num = sscanf(line, "%s\n", board_name);
+
+                fclose(fp);
+                return 0;
+                
+        }
+
+        fclose(fp);
+        return -1;
+}
 
 
 

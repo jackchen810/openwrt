@@ -1,0 +1,19 @@
+#!/bin/sh /etc/rc.common
+
+STOP=97
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+FRPC=/usr/bin/frpc
+
+
+
+start() {
+        service_start $FRPC -c /etc/frpc.ini
+}
+
+stop() {
+        service_stop $FRPC
+}

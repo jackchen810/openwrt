@@ -1,3 +1,0 @@
-config plcgw
-	   option plcgw_enable  '0'
-		
